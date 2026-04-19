@@ -1,0 +1,61 @@
+# 設計判断
+
+## 2026-04-17
+- 使用言語: Java 21
+- フレームワーク: HTTP API とアプリケーション起動基盤に Spring Boot 3.x を採用する
+- ビルドツール: Maven Wrapper を採用する
+- 目標: 将来の Web フロントエンドを見据えた API-first 構成にする
+- 初期の実行形態: まずは単一の Spring Boot アプリケーションとし、Java 移行の初期段階では CLI アダプタは分けない
+- 優先事項: ポーカーのルールは決定的でテストしやすく保ち、フレームワーク依存の隠れた挙動よりも明示的なドメインコードを優先する
+- 進め方: 先に Go 版のドメイン挙動を移植し、その後に周辺アダプタを段階的に置き換える
+- Go 版から維持するドメイン範囲:
+  - Card / Deck / Hand / Board モデル
+  - ハンド評価（7 枚からの最強 5 枚判定、勝者決定）
+  - アクションの合法性検証
+  - ハンド進行（preflop, flop, turn, river）
+  - showdown、サイドポット計算、端数チップ配分
+- プレイヤー人数: 呼び出し側が固定で 2-9 人を指定する
+- API 方式: JSON over HTTP とし、`game_id` をキーにサーバー側でゲーム状態を保持する
+- ID 方針: game ID は UUID 文字列を使用する
+- シリアライズ: リクエスト/レスポンス DTO と JSON カラムの変換には Jackson を使う
+- 永続化方針:
+  - アプリケーション層は repository port に依存する
+  - 高速なテストとローカル開発用にインメモリ実装を用意する
+  - 永続運用向けに PostgreSQL 実装を用意する
+  - ゲーム状態更新と action log 追加は 1 トランザクションで行う
+- SQL アクセス: ゲーム状態のマッピングを明示的に保つため、Spring JDBC / `JdbcTemplate` 系の実装を優先する
+- マイグレーション: Flyway を使い、`src/main/resources/db/migration` に配置する
+- パッケージ構成:
+  - `com.mapoker.application`: ユースケースとサービスのオーケストレーション
+  - `com.mapoker.domain`: ポーカーのルール、評価器、エンティティ/値オブジェクト
+  - `com.mapoker.infrastructure`: 永続化、認証連携、設定
+  - `com.mapoker.interfaces.http`: Controller、DTO、例外マッピング
+- Java のソース配置:
+  - `src/main/java`
+  - `src/main/resources`
+  - `src/test/java`
+  - `src/integrationTest/java`（または同等の Maven integration-test source set）
+- テスト方針:
+  - 単体テストとアプリケーションテストに JUnit 5 を使う
+  - 可読性の高いアサーションのため AssertJ を使う
+  - PostgreSQL 連携テストに Testcontainers を使う
+  - JaCoCo のカバレッジ目標は全体 80% 以上とし、特に `domain` と `application` を重視する
+- 整形と静的チェック:
+  - Spotless 経由で `google-java-format` を適用する
+  - 最初の動作版の後に、必要に応じて SpotBugs や Error Prone を追加する
+- 認証方針:
+  - Google ログイン API の外形は現行仕様を維持する
+  - Java 実装では cookie / session 処理に Spring Security を使う
+  - Google ID token の検証は infrastructure 層で扱い、移行期間中は匿名ローカルプロファイルを残してよい
+- 可視性ポリシー:
+  - ハンド進行中の hole cards は本人にだけ見せる
+  - showdown では全員に hole cards を公開する
+  - 管理者 / デバッグ用の可視性は別の関心事として扱う
+- Go 版から維持するベッティング判断:
+  - `bet` と `raise` の `amount` は raise-to の合計額とする
+  - `call` の `amount = 0` は auto-call とみなしてよい
+  - 最小レイズ額は `max(big blind, last raise size)` とする
+  - 最小レイズ未満の all-in は許可するが、ベッティングは reopen しない
+- Go 版から維持する配当判断:
+  - サイドポットは各プレイヤーの hand 全体の contribution を基準に計算する
+  - 端数チップ配分は設定可能とし、デフォルトは `low_index` とする

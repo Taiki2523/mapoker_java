@@ -1,0 +1,78 @@
+# IDE & Editor
+.vscode/
+.idea/
+*.iml
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Build & Compilation
+target/
+build/
+dist/
+.gradle/
+node_modules/
+.npm/
+.next/
+out/
+
+# Java/Maven
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+.classpath
+.project
+.settings/
+*.log
+
+# Node.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+lerna-debug.log*
+
+# Frontend build outputs
+mapoker-frontend/dist/
+mapoker-frontend/build/
+
+# Environment variables & Secrets
+.env
+.env.local
+.env.prd
+.env.*.local
+.env.production.local
+
+# Backend secrets (Spring)
+mapoker-backend/src/main/resources/application-secret.properties
+mapoker-backend/src/main/resources/application-secret-*.properties
+
+# Private keys & credentials
+*.key
+*.pem
+*.p12
+*.pfx
+credentials.json
+service-account-*.json
+google-*.json
+
+# Test coverage
+*.exec
+jacoco.exec
+coverage/
+.nyc_output/
+
+# devcontainer
+.devcontainer/.env*
+.devcontainer/.env.local
+
+# Sensitive backups
+*.bak
+*.backup
+dump.sql

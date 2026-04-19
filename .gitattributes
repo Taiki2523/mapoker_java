@@ -1,0 +1,6 @@
+# 基本はLF
+* text=auto eol=lf
+
+# Windows用はCRLF
+*.cmd text eol=crlf
+*.bat text eol=crlf

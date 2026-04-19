@@ -1,0 +1,64 @@
+:root {
+  font-family: -apple-system, system-ui, 'Segoe UI', Roboto, 'Oxygen-Sans', 'Apple Color Emoji',
+    'Segoe UI Emoji', 'Segoe UI Symbol', Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans',
+    'Helvetica Neue', Helvetica, 'ヒラギノ角ゴ Pro W3', 'メイリオ', Meiryo, 'ＭＳ Ｐゴシック',
+    Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #211922;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* Pinterest Design System */
+  --red: #e60023;
+  --plum: #211922;
+  --olive: #62625b;
+  --silver: #91918c;
+  --sand: #e5e5e0;
+  --warm-light: #e0e0d9;
+  --focus: #435ee5;
+  --fog: #f6f6f3;
+  --dark-surface: #33332e;
+  --warm-wash: hsla(60, 20%, 98%, 0.5);
+  --error-red: #9e0a0a;
+
+  /* Poker table */
+  --felt: #1a5c2e;
+  --felt-dark: #134421;
+  --rail: #8B6914;
+  --rail-dark: #5a4010;
+  --gold: #ffd700;
+
+  /* Legacy aliases */
+  --ink: #211922;
+  --ink-soft: #62625b;
+  --accent: #e60023;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  color: var(--plum);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
