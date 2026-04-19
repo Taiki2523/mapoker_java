@@ -57,7 +57,7 @@ services:
       GAME_DEFAULT_PLAYER_NAME: ${GAME_DEFAULT_PLAYER_NAME:-Player}
 
       # CORS settings
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://mapoker.marciadesign.org}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
       CORS_ALLOWED_METHODS: ${CORS_ALLOWED_METHODS:-GET,POST,PUT,DELETE,OPTIONS}
       CORS_ALLOW_CREDENTIALS: ${CORS_ALLOW_CREDENTIALS:-true}
 
@@ -81,11 +81,14 @@ services:
       context: ./mapoker-frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8080}
+        APPLICATION_URL: ${APPLICATION_URL:-http://localhost:3000}
         VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
         VITE_APP_ENV: ${VITE_APP_ENV:-production}
     container_name: mapoker-frontend
     restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
     ports:
       - "3000:80"
     healthcheck:

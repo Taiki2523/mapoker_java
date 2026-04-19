@@ -19,7 +19,7 @@
 │  ┌──────────────────┐      ┌──────────────────┐   │
 │  │ Spring Boot      │      │ nginx + React    │   │
 │  │ backend:8080     │      │ frontend:3000    │   │
-│  │ /v1/games        │      │ (SPA, static)    │   │
+│  │ /v1/games        │      │ /api/v1/...      │   │
 │  └────────┬─────────┘      └──────────────────┘   │
 │           │                                        │
 │           ▼                                        │
@@ -45,7 +45,7 @@ docker compose logs -f
 # 3. アクセス確認
 # Frontend: http://localhost:3000
 # Backend Health: http://localhost:8080/actuator/health
-# API: http://localhost:8080/v1/games
+# Application API: http://localhost:3000/api/v1/games
 ```
 
 ---
@@ -68,7 +68,7 @@ POSTGRES_PASSWORD=$(openssl rand -base64 32)
 
 SPRING_PROFILES_ACTIVE=postgresql,production
 
-VITE_API_BASE=https://api.mapoker.marciadesign.org/v1
+APPLICATION_URL=https://mapoker.marciadesign.org
 VITE_GOOGLE_CLIENT_ID=your-google-client-id
 VITE_APP_ENV=production
 
@@ -124,13 +124,11 @@ docker compose ps
 
 ```
 Domain: mapoker.marciadesign.org
-├── https://mapoker.marciadesign.org → frontend:3000
-└── https://api.mapoker.marciadesign.org → backend:8080
+└── https://mapoker.marciadesign.org → frontend:3000 (/api は backend:8080 へ)
 ```
 
 CloudFlare DNS 設定:
 - A record: `mapoker.marciadesign.org` → `your-server-ip`
-- A record: `api.mapoker.marciadesign.org` → `your-server-ip`
 
 サーバー側 nginx（ポート 80/443 でリッスン）:
 
@@ -149,17 +147,9 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
-}
 
-# api.mapoker.marciadesign.org → backend:8080
-server {
-    listen 443 ssl http2;
-    server_name api.mapoker.marciadesign.org;
-    ssl_certificate /path/to/cert.pem;
-    ssl_certificate_key /path/to/key.pem;
-    
-    location /v1/ {
-        proxy_pass http://localhost:8080;
+    location /api/ {
+        proxy_pass http://localhost:8080/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

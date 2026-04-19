@@ -15,7 +15,7 @@ mapoker の Docker 本番環境構成ルールをまとめたものです。
 │  ┌──────────────────┐      ┌──────────────────┐   │
 │  │ Spring Boot      │      │ nginx + React    │   │
 │  │ backend:8080     │      │ frontend:3000    │   │
-│  │ /v1/games        │      │ (SPA, static)    │   │
+│  │ /v1/games        │      │ /api/v1/...      │   │
 │  └────────┬─────────┘      └──────────────────┘   │
 │           │                                        │
 │           ▼                                        │
@@ -136,7 +136,7 @@ docker compose --env-file .env.local up -d
 # アクセス
 # Frontend: http://localhost:3000
 # Backend: http://localhost:8080
-# API: http://localhost:8080/v1/games
+# Application API: http://localhost:3000/api/v1/games
 ```
 
 ### 本番環境
@@ -176,7 +176,7 @@ networks:
 
 **コンテナ間通信:**
 - `backend` ↔ `db` (`postgres://db:5432`)
-- `frontend` ↔ `backend` (環境変数で指定)
+- `frontend` ↔ `backend` (`/api` を nginx が `http://backend:8080` へプロキシ)
 
 ### 本番 HTTPS ルーティング
 
@@ -184,7 +184,7 @@ networks:
 
 ```
 https://mapoker.marciadesign.org
-└── https://mapoker.marciadesign.org:80 → frontend:3000 (SPA)
+└── https://mapoker.marciadesign.org:80 → frontend:3000 (SPA, /api は backend へ)
 
 https://api.mapoker.marciadesign.org
 └── https://api.mapoker.marciadesign.org:80 → backend:8080 (/v1/...)

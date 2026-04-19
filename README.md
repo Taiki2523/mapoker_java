@@ -16,7 +16,8 @@ docker compose --env-file .env.local up -d
 
 # アクセス
 # Frontend: http://localhost:3000
-# Backend API: http://localhost:8080/v1/games
+# Application API: http://localhost:3000/api/v1/games
+# Backend direct: http://localhost:8080/v1/games
 ```
 
 **本番環境:**
@@ -70,4 +71,3 @@ npm run dev
 - `.env.local` と `.env.example` は `.gitignore` に記載済み
 - 秘密情報は環境変数で注入（コードに直書きしない）
 - 詳細は [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) を参照
-

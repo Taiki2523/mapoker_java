@@ -99,7 +99,8 @@ export SPRING_PROFILES_ACTIVE=postgresql,production
 2. **実際の値を記入**
 
    ```
-   VITE_API_BASE=http://localhost:8080
+   APPLICATION_URL=http://localhost:5173
+   BACKEND_URL=http://localhost:8080
    VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
    VITE_APP_ENV=development
    ```
@@ -115,11 +116,14 @@ export SPRING_PROFILES_ACTIVE=postgresql,production
 ### Vite の環境変数ルール
 
 - **ファイル名:** `.env` / `.env.local` / `.env.production`
-- **変数名プレフィックス:** `VITE_` を付けない変数はクライアント側へ公開されない
+- **変数名プレフィックス:** 通常は `VITE_` が必要。`APPLICATION_URL` は `vite.config.ts` で明示的に公開している
 - **読み込み順序:**
   1. `.env` （デフォルト、コミット可）
   2. `.env.local` （ローカル上書き、`.gitignore`）
   3. `.env.production` または環境別ファイル
+
+`APPLICATION_URL` は API ベース URL の起点として使われ、フロントエンドは常に `${APPLICATION_URL}/api/v1/...` を呼びます。
+ローカルの `npm run dev` では Vite が `/api` を `BACKEND_URL`（未指定時は `http://localhost:8080`）へプロキシします。
 
 **ローカル開発:**
 ```bash
