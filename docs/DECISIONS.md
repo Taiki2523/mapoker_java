@@ -59,3 +59,19 @@
 - Go 版から維持する配当判断:
   - サイドポットは各プレイヤーの hand 全体の contribution を基準に計算する
   - 端数チップ配分は設定可能とし、デフォルトは `low_index` とする
+
+## 2026-04-21
+- Git ブランチ戦略:
+  - 長寿命ブランチは `main` と `develop` の 2 本とする
+  - 通常開発は `feature/*` を `develop` から作成し、PR で `develop` にマージする
+  - リリース反映は `develop` から `main` への PR で行う
+  - 緊急修正は `hotfix/*` を `main` から作成し、`main` と `develop` の両方へ反映する
+- ブランチ保護方針:
+  - `main` と `develop` は direct push を避け、PR 経由でのみ更新する
+  - `main` と `develop` は force push / branch deletion を禁止する
+  - `main` と `develop` は stale approval dismiss と conversation resolution を有効化する
+  - approval 件数は当面 `0` とし、単独運用でも PR 必須ルールを維持する
+- CI 必須チェック方針:
+  - GitHub Actions 整備前は required status checks を有効化しない
+  - GitHub Actions 整備後は `backend-test`, `frontend-lint`, `frontend-build` を `main` / `develop` の必須チェックにする
+  - 対応する実行コマンドは `mapoker-backend` の `./mvnw test`、`mapoker-frontend` の `npm run lint`、`mapoker-frontend` の `npm run build` とする
