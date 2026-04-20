@@ -1,4 +1,5 @@
 # Claude Code
+.claude/
 .claude/settings.local.json
 
 # IDE & Editor
