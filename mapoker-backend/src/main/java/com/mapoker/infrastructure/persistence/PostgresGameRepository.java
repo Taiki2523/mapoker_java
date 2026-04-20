@@ -115,11 +115,11 @@ public class PostgresGameRepository implements GameRepository {
                 INSERT INTO games (
                   id, status, street, button_index, small_blind_idx, big_blind_idx,
                   current_player, current_bet, last_raise_size, big_blind, pot_total,
-                  odd_chip_rule, deck, deck_pos, community, acted, raise_open, last_showdown
+                  odd_chip_rule, deck, deck_pos, community, acted, raise_open, fold_win, last_showdown
                 ) VALUES (
                   ?, CAST(? AS game_status), CAST(? AS game_street), ?, ?, ?, ?, ?, ?, ?, ?,
                   CAST(? AS odd_chip_rule),
-                  CAST(? AS jsonb), ?, CAST(? AS jsonb), CAST(? AS jsonb), ?, CAST(? AS jsonb)
+                  CAST(? AS jsonb), ?, CAST(? AS jsonb), CAST(? AS jsonb), ?, ?, CAST(? AS jsonb)
                 )
                 """,
                 id,
@@ -139,6 +139,7 @@ public class PostgresGameRepository implements GameRepository {
                 toJson(s.getCommunity()),
                 toJson(s.getActed()),
                 s.isRaiseOpen(),
+                s.isFoldWin(),
                 s.getLastShowdown() != null ? toJson(s.getLastShowdown()) : null);
     }
 
@@ -161,6 +162,7 @@ public class PostgresGameRepository implements GameRepository {
                   community       = CAST(? AS jsonb),
                   acted           = CAST(? AS jsonb),
                   raise_open      = ?,
+                  fold_win        = ?,
                   last_showdown   = CAST(? AS jsonb),
                   updated_at      = CURRENT_TIMESTAMP
                 WHERE id = ?
@@ -181,6 +183,7 @@ public class PostgresGameRepository implements GameRepository {
                 toJson(s.getCommunity()),
                 toJson(s.getActed()),
                 s.isRaiseOpen(),
+                s.isFoldWin(),
                 s.getLastShowdown() != null ? toJson(s.getLastShowdown()) : null,
                 id);
     }
@@ -250,6 +253,10 @@ public class PostgresGameRepository implements GameRepository {
         s.setCommunity(fromJson(str(row.get("community")), CARD_LIST));
         s.setActed(fromJson(str(row.get("acted")), boolean[].class));
         s.setRaiseOpen((Boolean) row.get("raise_open"));
+        Object foldWinRaw = row.get("fold_win");
+        if (foldWinRaw != null) {
+            s.setFoldWin((Boolean) foldWinRaw);
+        }
         Object sdRaw = row.get("last_showdown");
         if (sdRaw != null) {
             s.setLastShowdown(fromJson(str(sdRaw), ShowdownResult.class));
