@@ -44,9 +44,9 @@
   - Spotless 経由で `google-java-format` を適用する
   - 最初の動作版の後に、必要に応じて SpotBugs や Error Prone を追加する
 - 認証方針:
-  - Google ログイン API の外形は現行仕様を維持する
+  - 認証方式: Google OAuth を採用しない。ユーザー名 / パスワード認証（Spring Security + BCrypt + セッション Cookie）を使う
   - Java 実装では cookie / session 処理に Spring Security を使う
-  - Google ID token の検証は infrastructure 層で扱い、移行期間中は匿名ローカルプロファイルを残してよい
+  - パスワード照合は BCrypt を使い、認証済み状態はセッション Cookie で扱う
 - 可視性ポリシー:
   - ハンド進行中の hole cards は本人にだけ見せる
   - showdown では全員に hole cards を公開する

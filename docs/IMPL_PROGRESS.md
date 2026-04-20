@@ -33,7 +33,13 @@
 - [x] `resources/db/migration/V1__initial_schema.sql`
 - [x] `resources/application.properties`
 - [x] `resources/application-local.properties`
-- [ ] `infrastructure/persistence/PostgresGameRepository.java` ← 次フェーズ
+- [x] `infrastructure/persistence/PostgresGameRepository.java`
+- [x] `infrastructure/persistence/InMemoryUserRepository.java`
+- [x] `infrastructure/persistence/PostgresUserRepository.java`
+- [x] `application/User.java`
+- [x] `application/UserRepository.java`
+- [x] `application/UserService.java`
+- [x] `infrastructure/config/RateLimitConfig.java`
 
 ## Phase 4: HTTP Layer ✅ 完了
 - [x] `interfaces/http/dto/CreateGameRequest.java`
@@ -45,6 +51,12 @@
 - [x] `interfaces/http/dto/ErrorResponse.java`
 - [x] `interfaces/http/GameController.java`
 - [x] `interfaces/http/GlobalExceptionHandler.java`
+- [x] `interfaces/http/AuthController.java`
+- [x] `interfaces/http/RoomController.java`
+- [x] `interfaces/http/filter/LoginRateLimitFilter.java`
+- [x] `interfaces/http/dto/LoginRequest.java`
+- [x] `interfaces/http/dto/RegisterRequest.java`
+- [x] `interfaces/http/dto/UserResponse.java`
 
 ## Phase 5: クリーンアップ ✅ 完了
 - [x] `com.mapoker.mapoker.*` 重複ファイル無害化
@@ -60,14 +72,10 @@
 
 ### 次にやること
 1. **コンパイル確認** — devcontainer内で `./mvnw test -Dspring.profiles.active=local` を実行してエラー確認
-2. **PostgresGameRepository** — `@Profile("postgresql")` 実装（JdbcTemplate + JSON）
-3. **Google認証** — `POST /v1/auth/google`, `GET /v1/auth/me`, `POST /v1/auth/logout`
-4. **ホールカード可視性** — 認証ユーザーの index と player_id を照合して hole cards フィルタリング
-5. **統合テスト** — Testcontainers で PostgreSQL 含む E2E シナリオ
-6. **バリデーション** — `@Valid` アノテーション、入力サニタイズ
+2. **ホールカード可視性** — 認証ユーザーの index と player_id を照合して hole cards フィルタリング
+3. **統合テスト** — Testcontainers で PostgreSQL 含む E2E シナリオ
+4. **バリデーション** — `@Valid` アノテーション、入力サニタイズ
 
 ### 既知の未実装
-- auth API (/v1/auth/*)
-- Room API (/v1/rooms/*)
-- PostgreSQL repository
 - ホールカード可視性の本番実装（現在は null 返し）
+- 統合テスト（Testcontainers）

@@ -137,32 +137,43 @@
 
 ## 認証 API
 
-API の外形は Go 版を維持しつつ、Java 側の内部実装では Spring Security を使う想定とする。
+ユーザー名 / パスワード認証。Spring Security のセッション Cookie ベース。
 
-### Google ログイン
-`POST /v1/auth/google`
+### ユーザー登録
+`POST /v1/auth/register`
 
 ```json
-{ "id_token": "..." }
+{ "username": "alice", "password": "secret" }
 ```
 
-Google Identity Services の `credential` も受け付ける。
+レスポンス (`201 Created`):
+```json
+{ "id": "uuid", "username": "alice" }
+```
 
-挙動:
-- Google ID token を検証する
-- ローカルユーザーを検索または作成する
-- `mapoker_session` を HttpOnly cookie として設定する
-- 認証済みユーザー情報を返す
+### ログイン
+`POST /v1/auth/login`
+
+```json
+{ "username": "alice", "password": "secret" }
+```
+
+セッション Cookie (`JSESSIONID`) を HttpOnly / Secure / SameSite=Lax で発行する。
+
+レスポンス (`200 OK`):
+```json
+{ "id": "uuid", "username": "alice" }
+```
 
 ### 現在ユーザー取得
 `GET /v1/auth/me`
 
-session cookie から現在ユーザーを返す。
+セッション Cookie から現在ユーザーを返す。未認証時は `401`。
 
 ### ログアウト
 `POST /v1/auth/logout`
 
-session cookie を削除する。
+セッションを破棄する。レスポンス: `204 No Content`。
 
 ## アクション種別
 `fold | check | call | bet | raise | all_in`
