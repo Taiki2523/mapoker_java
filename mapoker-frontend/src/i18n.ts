@@ -131,6 +131,7 @@ const ja = {
   goToSignIn: 'サインインに戻る',
   logout: 'ログアウト',
   loggedInAs: 'ログイン中',
+  myPage: 'マイページ',
 
   // --- エラーメッセージ ---
   errEnterName: '名前を入力してください',

@@ -1,5 +1,6 @@
-import type { GameState, RoomMember } from '../types'
+import type { AuthUser, GameState, RoomMember } from '../types'
 import { t } from '../i18n'
+import { UserHeader } from './UserHeader'
 
 type Props = {
   gameId: string
@@ -19,15 +20,19 @@ type Props = {
   targetPlayerCount: number
   loading: boolean
   loginError: string
+  currentUser: AuthUser | null
+  onLogout: () => void
 }
 
 export function WaitingScreen({
   gameId, inviteUrl, inviteCopied, onCopyInvite,
   game, roster, mySeatIndex, loginSeatIndex, setLoginSeatIndex, onJoinLobby, onStartHand,
   isOwner, canStartHand, lobbyReady, targetPlayerCount, loading, loginError,
+  currentUser, onLogout,
 }: Props) {
   return (
     <>
+      <UserHeader username={currentUser?.username ?? ''} onLogout={onLogout} />
       <div>
         <h2>{t('waitingRoomTitle')}</h2>
         <p>{t('waitingRoomDesc')}</p>

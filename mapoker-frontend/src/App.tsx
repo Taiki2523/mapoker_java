@@ -490,6 +490,8 @@ function App() {
                 error={error}
                 onCreateGame={createGame}
                 onJoinRoom={joinRoom}
+                currentUser={currentUser}
+                onLogout={() => void handleLogout()}
               />
             )}
             {viewMode === 'waiting' && (
@@ -511,6 +513,8 @@ function App() {
                 targetPlayerCount={targetPlayerCount}
                 loading={loading}
                 loginError={loginError}
+                currentUser={currentUser}
+                onLogout={() => void handleLogout()}
               />
             )}
           </div>

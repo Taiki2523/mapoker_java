@@ -6,9 +6,15 @@ function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '')
 }
 
-export const APPLICATION_URL = trimTrailingSlash(
-  import.meta.env.APPLICATION_URL ?? DEFAULT_APPLICATION_URL,
-)
+function resolveApplicationUrl(): string {
+  if (typeof window !== 'undefined') {
+    return trimTrailingSlash(window.location.origin)
+  }
+
+  return trimTrailingSlash(import.meta.env.APPLICATION_URL ?? DEFAULT_APPLICATION_URL)
+}
+
+export const APPLICATION_URL = resolveApplicationUrl()
 
 export const API_BASE = `${APPLICATION_URL}/api`
 

@@ -66,6 +66,7 @@ public class SecurityConfig {
                 .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                 .sessionFixation().migrateSession())
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/v1/auth/login", "/v1/auth/register").permitAll()
                 .anyRequest().authenticated());
         return http.build();

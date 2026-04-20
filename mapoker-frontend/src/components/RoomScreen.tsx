@@ -1,15 +1,18 @@
 import { useState } from 'react'
-import type { CreateGameConfig } from '../types'
+import type { AuthUser, CreateGameConfig } from '../types'
 import { t } from '../i18n'
+import { UserHeader } from './UserHeader'
 
 type Props = {
   loading: boolean
   error: string
   onCreateGame: (config: CreateGameConfig) => Promise<void>
   onJoinRoom: (idOrUrl: string) => Promise<void>
+  currentUser: AuthUser | null
+  onLogout: () => void
 }
 
-export function RoomScreen({ loading, error, onCreateGame, onJoinRoom }: Props) {
+export function RoomScreen({ loading, error, onCreateGame, onJoinRoom, currentUser, onLogout }: Props) {
   const [roomInput, setRoomInput] = useState('')
   const [playerCount, setPlayerCount] = useState(2)
   const [stackSize, setStackSize] = useState(100)
@@ -20,6 +23,7 @@ export function RoomScreen({ loading, error, onCreateGame, onJoinRoom }: Props) 
 
   return (
     <>
+      <UserHeader username={currentUser?.username ?? ''} onLogout={onLogout} />
       <div>
         <h2>{t('roomTitle')}</h2>
         <p>{t('roomDesc')}</p>

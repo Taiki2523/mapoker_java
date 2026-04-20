@@ -122,8 +122,8 @@ export SPRING_PROFILES_ACTIVE=postgresql,production
   2. `.env.local` （ローカル上書き、`.gitignore`）
   3. `.env.production` または環境別ファイル
 
-`APPLICATION_URL` は API ベース URL の起点として使われ、フロントエンドは常に `${APPLICATION_URL}/api/v1/...` を呼びます。
-ローカルの `npm run dev` では Vite が `/api` を `BACKEND_URL`（未指定時は `http://localhost:8080`）へプロキシします。
+`APPLICATION_URL` は公開されるフロントエンドのオリジンです。ブラウザは同一オリジンの `/api/v1/...` を呼び、ローカルの `npm run dev` と Docker の nginx はどちらも `/api` をバックエンドへプロキシします。
+そのためローカル Docker 環境では `APPLICATION_URL` を `http://localhost:3000` に設定します。`http://localhost:8080` を入れるとブラウザがバックエンドへ直接アクセスし、`/api/...` がそのまま届いて 403 になります。
 
 **ローカル開発:**
 ```bash
