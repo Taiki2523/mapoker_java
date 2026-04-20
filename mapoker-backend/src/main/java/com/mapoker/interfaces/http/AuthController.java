@@ -37,21 +37,25 @@ public class AuthController {
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
-    public UserResponse register(@Valid @RequestBody RegisterRequest req) {
-        var user = userService.register(req.username(), req.password());
-        return new UserResponse(user.id(), user.username());
+    public UserResponse register(@Valid @RequestBody RegisterRequest req, HttpServletRequest request) {
+        userService.register(req.username(), req.password());
+        return createSessionAndReturn(req.username(), req.password(), request);
     }
 
     @PostMapping("/login")
     public UserResponse login(@RequestBody LoginRequest req, HttpServletRequest request) {
+        return createSessionAndReturn(req.username(), req.password(), request);
+    }
+
+    private UserResponse createSessionAndReturn(String username, String rawPassword, HttpServletRequest request) {
         Authentication auth = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(req.username(), req.password()));
+                new UsernamePasswordAuthenticationToken(username, rawPassword));
         SecurityContextHolder.getContext().setAuthentication(auth);
         HttpSession session = request.getSession(true);
         session.setAttribute(
                 HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
                 SecurityContextHolder.getContext());
-        var user = userService.getByUsername(req.username());
+        var user = userService.getByUsername(username);
         return new UserResponse(user.id(), user.username());
     }
 

@@ -40,6 +40,7 @@ public class GameState {
     private OddChipRule oddChipRule;
     private boolean raiseOpen;
     private ShowdownResult lastShowdown;
+    private boolean foldWin = false;
 
     private GameState() {}
 
@@ -77,6 +78,7 @@ public class GameState {
         if (status == GameStatus.SHOWDOWN)
             throw new IllegalStateException("cannot start hand: showdown not resolved");
         status = GameStatus.IN_PROGRESS;
+        foldWin = false;
         lastShowdown = null;
         community.clear();
         deckPos = 0;
@@ -206,6 +208,7 @@ public class GameState {
             List<Integer> payouts = splitPots(winners);
             ShowdownResult result = new ShowdownResult(winners, new HandValue(HandRank.HIGH_CARD, List.of()), payouts);
             lastShowdown = result;
+            foldWin = true;
             applyPayouts(payouts);
             return;
         }
@@ -382,9 +385,6 @@ public class GameState {
     }
 
     private int firstToAct() {
-        if (players.size() == 2) {
-            return street == Street.PREFLOP ? smallBlindIdx : bigBlindIdx;
-        }
         return street == Street.PREFLOP ? nextActive(bigBlindIdx) : nextActive(buttonIndex);
     }
 
@@ -519,6 +519,7 @@ public class GameState {
     public boolean[] getActed() { return acted; }
     public OddChipRule getOddChipRule() { return oddChipRule; }
     public boolean isRaiseOpen() { return raiseOpen; }
+    public boolean isFoldWin() { return foldWin; }
     public ShowdownResult getLastShowdown() { return lastShowdown; }
     public void setStatus(GameStatus status) { this.status = status; }
     public void setPlayers(List<Player> players) { this.players = players; }
@@ -534,5 +535,6 @@ public class GameState {
     public void setActed(boolean[] acted) { this.acted = acted; }
     public void setOddChipRule(OddChipRule oddChipRule) { this.oddChipRule = oddChipRule; }
     public void setRaiseOpen(boolean raiseOpen) { this.raiseOpen = raiseOpen; }
+    public void setFoldWin(boolean foldWin) { this.foldWin = foldWin; }
     public void setLastShowdown(ShowdownResult lastShowdown) { this.lastShowdown = lastShowdown; }
 }

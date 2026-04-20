@@ -50,7 +50,8 @@ public record GameResponse(
 
     public static GameResponse from(GameState g, Integer viewerIndex, boolean spectator) {
         List<PlayerResponse> playerResponses = new ArrayList<>();
-        boolean showAll = g.getStatus() == GameStatus.SHOWDOWN || g.getStatus() == GameStatus.FINISHED;
+        boolean showAll = g.getStatus() == GameStatus.SHOWDOWN
+                || (g.getStatus() == GameStatus.FINISHED && !g.isFoldWin());
 
         for (int i = 0; i < g.getPlayers().size(); i++) {
             Player p = g.getPlayers().get(i);
@@ -71,9 +72,12 @@ public record GameResponse(
         ShowdownDto showdownDto = null;
         if (g.getLastShowdown() != null) {
             ShowdownResult sr = g.getLastShowdown();
+            ShowdownDto.BestHandDto bestHandDto = g.isFoldWin()
+                    ? null
+                    : new ShowdownDto.BestHandDto(sr.bestHand().rank(), sr.bestHand().kickers());
             showdownDto = new ShowdownDto(
                     sr.winnerIndexes(),
-                    new ShowdownDto.BestHandDto(sr.bestHand().rank(), sr.bestHand().kickers()),
+                    bestHandDto,
                     sr.payouts());
         }
 

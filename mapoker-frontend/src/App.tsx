@@ -65,7 +65,8 @@ function App() {
       .filter((l) => l.amount > 0)
   }, [displayName, game, showdown])
 
-  const isShowdown = game?.status === 'showdown' || game?.status === 'finished'
+  const isShowdown = game?.status === 'showdown'
+    || (game?.status === 'finished' && showdown !== null)
 
   const inviteUrl = useMemo(() => {
     if (!gameId) return ''
@@ -222,12 +223,13 @@ function App() {
     if (!gameId || !game) return
     if (mySeatIndex !== null) return
     if (!myName.trim()) return
+    if (!roster.length) return
     if (autoJoinRef.current === gameId) return
     autoJoinRef.current = gameId
     const seat = firstAvailableSeat()
     setLoginSeatIndex(seat)
     void loginAsPlayer(seat)
-  }, [game, gameId, myName, mySeatIndex, viewMode])
+  }, [game, gameId, myName, mySeatIndex, roster, viewMode])
 
   const refreshGame = async (id = gameId) => {
     if (!id) return
@@ -256,7 +258,7 @@ function App() {
       setGame(data)
       if (data.last_showdown) {
         setShowdown(data.last_showdown)
-      } else if (data.status !== 'showdown' && data.status !== 'finished') {
+      } else {
         setShowdown(null)
       }
       setLoginSeatIndex((prev) => (prev < data.players.length ? prev : 0))
@@ -446,7 +448,11 @@ function App() {
         body: JSON.stringify({ player_index: seat, action: { type, amount } }),
       })
       setGame(data)
-      if (data.last_showdown) setShowdown(data.last_showdown)
+      if (data.last_showdown) {
+        setShowdown(data.last_showdown)
+      } else {
+        setShowdown(null)
+      }
       if (data.status === 'showdown' && !showdown && isOwner) {
         void runShowdown()
       } else {
