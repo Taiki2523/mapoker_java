@@ -180,6 +180,7 @@ function App() {
       void refreshMembers(initial)
       void refreshTable(initial)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -213,6 +214,7 @@ function App() {
       void refreshMembers(gameId)
     }, 2000)
     return () => window.clearInterval(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRefresh, gameId])
 
   useEffect(() => {
@@ -220,6 +222,7 @@ function App() {
     if (game.status === 'showdown' && !showdown && isOwner) {
       void runShowdown()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game, isOwner, showdown])
 
   useEffect(() => {
@@ -240,6 +243,7 @@ function App() {
     const seat = firstAvailableSeat()
     setLoginSeatIndex(seat)
     void loginAsPlayer(seat)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game, gameId, myName, mySeatIndex, roster, viewMode])
 
   const refreshGame = async (id = gameId) => {
