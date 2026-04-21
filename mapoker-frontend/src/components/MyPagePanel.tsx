@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import { hasTranslation, t } from '../i18n'
 import type {
   AuthUser,
@@ -56,7 +55,6 @@ export function MyPagePanel({
   onClaimDailyBonus,
   onClaimRecovery,
 }: Props) {
-  const now = useMemo(() => Date.now(), [])
   const recentTableIds = new Set(history.map((entry) => entry.table_id))
   const historyByTableId = new Map<string, UserTableHistoryEntry>()
   history.forEach((entry) => {
@@ -91,7 +89,7 @@ export function MyPagePanel({
   const formatCooldown = (value: string | null) => {
     if (!value) return null
     const targetAt = new Date(value).getTime()
-    if (Number.isNaN(targetAt) || targetAt <= now) return null
+    if (Number.isNaN(targetAt)) return null
     return t('cooldownUntil', { time: formatDate(value) })
   }
 
