@@ -92,6 +92,7 @@ public class GameState {
         for (Player p : players) {
             p.setFolded(false);
             p.setAllIn(false);
+            p.setSittingOut(false);
             p.setContributed(0);
             p.setTotalContrib(0);
             p.setHole(new Card[PokerConstants.HOLE_CARDS]);
@@ -252,6 +253,7 @@ public class GameState {
         for (int i = 0; i < players.size(); i++) {
             Player p = players.get(i);
             if (p.isFolded()) continue;
+            if (p.isSittingOut()) continue;
             Card[] seven = buildSeven(p.getHole(), community);
             HandValue val = HandEvaluator.eval7(seven);
             int cmp = val.compareTo(best);
@@ -282,6 +284,14 @@ public class GameState {
         currentBet = 0;
         lastRaiseSize = bigBlindSize;
         status = GameStatus.FINISHED;
+    }
+
+    public boolean canStartHand() {
+        int eligible = 0;
+        for (Player p : players) {
+            if (p.getStack() > 0 && !p.isSittingOut()) eligible++;
+        }
+        return eligible >= 2;
     }
 
     // ---- private helpers ----
@@ -362,7 +372,9 @@ public class GameState {
 
     private int remainingActive() {
         int count = 0;
-        for (Player p : players) if (!p.isFolded()) count++;
+        for (Player p : players) {
+            if (!p.isFolded() && !p.isSittingOut()) count++;
+        }
         return count;
     }
 
@@ -385,6 +397,7 @@ public class GameState {
             Player p = players.get(i);
             if (p.isFolded()) continue;
             if (p.isAllIn()) continue;
+            if (p.isSittingOut()) continue;
             if (p.getContributed() != currentBet) return false;
             if (!acted[i]) return false;
         }
@@ -406,6 +419,7 @@ public class GameState {
             Player p = players.get(idx);
             if (p.isFolded()) continue;
             if (p.isAllIn()) continue;
+            if (p.isSittingOut()) continue;
             return idx;
         }
         return from;
