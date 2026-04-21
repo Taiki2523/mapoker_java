@@ -180,7 +180,9 @@ public class TableService {
         }
 
         GameState state = gameService.getGame(table.gameId());
-        if (state.getStatus() == GameStatus.IN_PROGRESS || state.getStatus() == GameStatus.SHOWDOWN) {
+        boolean handActive = (state.getStatus() == GameStatus.IN_PROGRESS && state.getPot() > 0)
+                || state.getStatus() == GameStatus.SHOWDOWN;
+        if (handActive) {
             List<TableMemberRecord> updatedMembers = new ArrayList<>();
             for (TableMemberRecord current : members) {
                 if (current.name().equals(member.name()) && current.seatIndex() == member.seatIndex()) {

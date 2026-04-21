@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.List;
 
@@ -20,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(classes = MapokerApplication.class)
 @Import(TestcontainersConfiguration.class)
 @ActiveProfiles("postgresql")
+@Testcontainers(disabledWithoutDocker = true)
 class PostgresPersistenceIntegrationTest {
 
     @Autowired
