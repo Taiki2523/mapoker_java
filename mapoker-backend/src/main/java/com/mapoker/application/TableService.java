@@ -118,6 +118,20 @@ public class TableService {
         return List.copyOf(tableMembers.get(table.id()));
     }
 
+    public GameState startHand(String tableId, int bigBlind) {
+        List<TableMemberRecord> members = getMembers(tableId);
+        if (!members.isEmpty()) {
+            TableRecord table = getTable(tableId);
+            int firstSeat = members.stream()
+                    .min(Comparator.comparing(TableMemberRecord::joinedAt))
+                    .map(TableMemberRecord::seatIndex)
+                    .orElse(0);
+            int buttonBefore = (firstSeat - 1 + table.maxPlayers()) % table.maxPlayers();
+            gameService.setButtonIndex(tableId, buttonBefore);
+        }
+        return gameService.startHand(tableId, bigBlind);
+    }
+
     public Integer findSeatIndex(String id, String memberName) {
         if (memberName == null || memberName.isBlank()) {
             return null;
