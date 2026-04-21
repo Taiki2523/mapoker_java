@@ -74,7 +74,8 @@ public class TableService {
                 normalizedVisibility,
                 "waiting",
                 game.getId(),
-                Instant.now()
+                Instant.now(),
+                false
         );
         tables.put(table.id(), table);
         tableMembers.putIfAbsent(table.id(), new ArrayList<>());
@@ -368,7 +369,8 @@ public class TableService {
                 existing != null ? existing.visibility() : "public",
                 deriveStatus(game),
                 existing != null ? existing.gameId() : game.getId(),
-                existing != null ? existing.createdAt() : Instant.now()
+                existing != null ? existing.createdAt() : Instant.now(),
+                existing != null ? existing.everSeated() : false
         );
     }
 
