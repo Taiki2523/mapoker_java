@@ -1,5 +1,6 @@
 package com.mapoker.interfaces.http;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.mapoker.application.TableMemberRecord;
 import com.mapoker.application.TableRecord;
 import com.mapoker.application.TableService;
@@ -31,11 +32,7 @@ public class TableController {
         TableService.CreateTableResult result = tableService.createRingTable(new TableService.CreateRingTableInput(
                 request.tableName(),
                 request.playerCount(),
-                request.stackSize(),
                 request.bigBlind(),
-                request.buttonIndex(),
-                request.seed(),
-                request.oddChipRule(),
                 request.visibility(),
                 request.flags()
         ));
@@ -62,13 +59,13 @@ public class TableController {
     }
 
     @PostMapping("/{id}/join")
-    public MembersResponse join(@PathVariable String id,
-                                @Valid @RequestBody(required = false) TableMembershipRequest body,
-                                @AuthenticationPrincipal UserDetails principal) {
+    public JoinResponse join(@PathVariable String id,
+                             @Valid @RequestBody(required = false) TableMembershipRequest body,
+                             @AuthenticationPrincipal UserDetails principal) {
         String name = principal != null ? principal.getUsername() : body != null ? body.name() : null;
-        Integer seatIndex = body != null ? body.seatIndex() : null;
         int buyIn = body != null && body.buyIn() != null ? body.buyIn() : 0;
-        return new MembersResponse(toMembers(tableService.join(id, name, seatIndex, buyIn)));
+        TableService.JoinResult result = tableService.join(id, name, buyIn);
+        return new JoinResponse(result.assignedSeatIndex(), toMembers(result.members()));
     }
 
     @PostMapping("/{id}/leave")
@@ -76,8 +73,7 @@ public class TableController {
                                  @Valid @RequestBody(required = false) TableMembershipRequest body,
                                  @AuthenticationPrincipal UserDetails principal) {
         String name = principal != null ? principal.getUsername() : body != null ? body.name() : null;
-        Integer seatIndex = body != null ? body.seatIndex() : null;
-        return new MembersResponse(toMembers(tableService.leave(id, name, seatIndex)));
+        return new MembersResponse(toMembers(tableService.leave(id, name, null)));
     }
 
     private List<TableResponse.MemberDto> toMembers(List<TableMemberRecord> members) {
@@ -87,4 +83,9 @@ public class TableController {
     }
 
     public record MembersResponse(List<TableResponse.MemberDto> members) {}
+
+    public record JoinResponse(
+            @JsonProperty("assigned_seat_index") int assignedSeatIndex,
+            List<TableResponse.MemberDto> members
+    ) {}
 }
