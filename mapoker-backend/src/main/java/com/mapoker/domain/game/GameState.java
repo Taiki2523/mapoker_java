@@ -214,7 +214,7 @@ public class GameState {
         }
 
         if (isBettingRoundComplete()) {
-            if (activeCount() == 0) {
+            if (activeCount() <= 1) {
                 // all players are all-in, run out the board
                 while (street != Street.RIVER) {
                     advanceStreet();

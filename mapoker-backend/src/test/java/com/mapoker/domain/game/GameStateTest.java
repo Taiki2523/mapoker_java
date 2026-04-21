@@ -2,6 +2,7 @@ package com.mapoker.domain.game;
 
 import com.mapoker.domain.rules.Action;
 import com.mapoker.domain.rules.ActionType;
+import com.mapoker.domain.rules.Street;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -81,6 +82,20 @@ class GameStateTest {
             g.applyAction(pi, action);
         }
         assertThat(g.getStatus()).isIn(GameStatus.SHOWDOWN, GameStatus.FINISHED);
+    }
+
+    @Test
+    void shortStackAllInCallRunsOutBoardToShowdown() {
+        List<Player> players = List.of(new Player("p1", 20), new Player("p2", 100));
+        GameState g = GameState.newGame(players, 1, 10, new Random(42), OddChipRule.LOW_INDEX);
+
+        g.startHand(10);
+        g.applyAction(0, Action.of(ActionType.ALL_IN, 0));
+        g.applyAction(1, Action.of(ActionType.CALL, 0));
+
+        assertThat(g.getStatus()).isEqualTo(GameStatus.SHOWDOWN);
+        assertThat(g.getCommunity()).hasSize(5);
+        assertThat(g.getStreet()).isEqualTo(Street.RIVER);
     }
 
     @Test
