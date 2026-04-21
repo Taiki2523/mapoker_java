@@ -12,6 +12,8 @@ export type GameState = {
   status: string
   street: string
   button_index: number
+  small_blind_idx: number
+  big_blind_idx: number
   current_player: number
   current_bet: number
   last_raise_size: number
@@ -33,6 +35,86 @@ export type Showdown = {
 export type AuthUser = {
   id: number
   username: string
+}
+
+export type TableVisibility = 'public' | 'private'
+
+export type TableFlag = 'casual' | 'serious' | 'newbie' | 'short_handed'
+
+export type StoredSession = {
+  name: string
+  seatIndex: number
+  owner: boolean
+  updatedAt?: string
+}
+
+export type UserTableHistoryEntry = {
+  table_id: string
+  table_name: string
+  seat_index: number
+  visibility: string
+  status: string
+  flags: string[]
+  joined_at: string
+  left_at?: string | null
+  active: boolean
+}
+
+export type HandHistoryPlayer = {
+  name: string
+  seat_index: number
+  stack_before: number
+  stack_after: number
+  folded: boolean
+  hole_cards: string[]
+}
+
+export type HandHistoryEntry = {
+  table_id: string
+  hand_id: string
+  players: HandHistoryPlayer[]
+  winners: number[]
+  pot: number
+  street: string
+  finished_at: string
+}
+
+export type WalletSummary = {
+  chip_balance: number
+  next_daily_bonus_at: string | null
+  next_recovery_at: string | null
+}
+
+export type WalletLedgerEntry = {
+  id: number
+  delta: number
+  balance_after: number
+  reason: string
+  reference_type: string | null
+  reference_id: string | null
+  created_at: string
+}
+
+export type Table = {
+  id: string
+  room_id: string
+  name: string
+  game_type: string
+  stake: {
+    small_blind: number
+    big_blind: number
+  }
+  min_buy_in: number
+  max_buy_in: number
+  max_players: number
+  flags: TableFlag[]
+  visibility: TableVisibility
+  status: string
+  game_id: string
+  created_at: string
+  member_count: number
+  members: RoomMemberApi[]
+  game?: GameState | null
 }
 
 export type ApiError = {
@@ -65,10 +147,13 @@ export type PayoutLine = {
 }
 
 export type CreateGameConfig = {
+  tableName: string
   playerCount: number
   stackSize: number
   bigBlind: number
   buttonIndex: number
   seed: string
   autoStart: boolean
+  visibility: TableVisibility
+  flags: TableFlag[]
 }

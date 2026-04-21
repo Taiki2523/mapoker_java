@@ -2,6 +2,7 @@ package com.mapoker.domain.game;
 
 import com.mapoker.domain.rules.Action;
 import com.mapoker.domain.rules.ActionType;
+import com.mapoker.domain.rules.Street;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -15,6 +16,21 @@ class GameStateTest {
     private static GameState newGame2P() {
         List<Player> players = List.of(new Player("p1", 100), new Player("p2", 100));
         return GameState.newGame(players, 0, 10, new Random(42), OddChipRule.LOW_INDEX);
+    }
+
+    private static GameState newGame3P() {
+        List<Player> players = List.of(
+                new Player("p1", 100),
+                new Player("p2", 100),
+                new Player("p3", 100)
+        );
+        return GameState.newGame(players, 0, 10, new Random(42), OddChipRule.LOW_INDEX);
+    }
+
+    private static void finishHandByFoldingToWinner(GameState g) {
+        while (g.getStatus() == GameStatus.IN_PROGRESS) {
+            g.applyAction(g.getCurrentPlayer(), Action.of(ActionType.FOLD, 0));
+        }
     }
 
     @Test
@@ -31,6 +47,44 @@ class GameStateTest {
         // SB posts 5, BB posts 10 → pot = 15
         assertThat(g.getPot()).isEqualTo(15);
         assertThat(g.getCurrentBet()).isEqualTo(10);
+    }
+
+    @Test
+    void buttonAdvancesBetweenHands() {
+        GameState g = newGame3P();
+
+        g.startHand(10);
+        assertThat(g.getButtonIndex()).isEqualTo(1);
+        finishHandByFoldingToWinner(g);
+
+        g.startHand(10);
+        assertThat(g.getButtonIndex()).isEqualTo(2);
+        finishHandByFoldingToWinner(g);
+
+        g.startHand(10);
+        assertThat(g.getButtonIndex()).isEqualTo(0);
+    }
+
+    @Test
+    void headsUpButtonPostsSmallBlind() {
+        GameState g = newGame2P();
+
+        g.startHand(10);
+
+        assertThat(g.getButtonIndex()).isEqualTo(1);
+        assertThat(g.getSmallBlindIdx()).isEqualTo(g.getButtonIndex());
+        assertThat(g.getBigBlindIdx()).isNotEqualTo(g.getSmallBlindIdx());
+    }
+
+    @Test
+    void multiPlayerBlindsFollowButton() {
+        GameState g = newGame3P();
+
+        g.startHand(10);
+
+        assertThat(g.getButtonIndex()).isEqualTo(1);
+        assertThat(g.getSmallBlindIdx()).isEqualTo((g.getButtonIndex() + 1) % 3);
+        assertThat(g.getBigBlindIdx()).isEqualTo((g.getButtonIndex() + 2) % 3);
     }
 
     @Test
@@ -81,6 +135,20 @@ class GameStateTest {
             g.applyAction(pi, action);
         }
         assertThat(g.getStatus()).isIn(GameStatus.SHOWDOWN, GameStatus.FINISHED);
+    }
+
+    @Test
+    void shortStackAllInCallRunsOutBoardToShowdown() {
+        List<Player> players = List.of(new Player("p1", 20), new Player("p2", 100));
+        GameState g = GameState.newGame(players, 1, 10, new Random(42), OddChipRule.LOW_INDEX);
+
+        g.startHand(10);
+        g.applyAction(0, Action.of(ActionType.ALL_IN, 0));
+        g.applyAction(1, Action.of(ActionType.CALL, 0));
+
+        assertThat(g.getStatus()).isEqualTo(GameStatus.SHOWDOWN);
+        assertThat(g.getCommunity()).hasSize(5);
+        assertThat(g.getStreet()).isEqualTo(Street.RIVER);
     }
 
     @Test

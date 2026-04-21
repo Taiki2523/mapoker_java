@@ -57,25 +57,36 @@
 - [x] `interfaces/http/dto/LoginRequest.java`
 - [x] `interfaces/http/dto/RegisterRequest.java`
 - [x] `interfaces/http/dto/UserResponse.java`
+- [x] `interfaces/http/TableController.java`
+- [x] `interfaces/http/dto/CreateTableRequest.java`
+- [x] `interfaces/http/dto/TableResponse.java`
+- [x] `interfaces/http/dto/TableMembershipRequest.java`
 
 ## Phase 5: クリーンアップ ✅ 完了
 - [x] `com.mapoker.mapoker.*` 重複ファイル無害化
 
-## Phase 6: Tests ✅ 完了（基本）
+## Phase 6: Tests ✅ 完了
 - [x] `domain/hand/HandEvaluatorTest.java`
 - [x] `domain/rules/ActionValidatorTest.java`
 - [x] `domain/game/GameStateTest.java`
 - [x] `MapokerApplicationTests.java` (local profile)
+- [x] `interfaces/http/TableControllerIntegrationTest.java`
+- [x] `interfaces/http/GameControllerVisibilityTest.java`
+- [x] `PostgresPersistenceIntegrationTest.java` (Testcontainers)
 
 ---
-## 残タスク（優先順）
+## 完了メモ
 
-### 次にやること
-1. **コンパイル確認** — devcontainer内で `./mvnw test -Dspring.profiles.active=local` を実行してエラー確認
-2. **ホールカード可視性** — 認証ユーザーの index と player_id を照合して hole cards フィルタリング
-3. **統合テスト** — Testcontainers で PostgreSQL 含む E2E シナリオ
-4. **バリデーション** — `@Valid` アノテーション、入力サニタイズ
+- コア実装は完了。`/v1/tables` ベースのテーブル作成・参加・退室フローを実装済み。
+- ホールカード可視性は、認証済みユーザーの参加席に基づいてサーバー側で判定するよう修正済み。
+- DTO バリデーションと統一エラーハンドリングを追加済み。
+- `/v1/auth/history` とテーブル参加履歴の永続化を追加済み。マイページはプレイ履歴 API を表示する構成に更新済み。
+- 検証済み:
+  - `npm run build`
+  - `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /tmp/m2:/root/.m2 -v /home/taiki/projects/mapoker_java/mapoker-backend:/workspace -w /workspace maven:3.9-eclipse-temurin-21-alpine ./mvnw test`
 
-### 既知の未実装
-- ホールカード可視性の本番実装（現在は null 返し）
-- 統合テスト（Testcontainers）
+## 将来タスク（任意機能）
+
+- ハンドリプレイ
+- テーブル検索 / 絞り込み
+- オーナー移譲や再接続時の自動復帰強化

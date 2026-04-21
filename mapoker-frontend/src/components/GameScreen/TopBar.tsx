@@ -15,6 +15,7 @@ type Props = {
   setAutoRefresh: (v: boolean) => void
   inviteCopied: boolean
   onCopyInvite: () => void
+  onOpenMyPage: () => void
   onLoginAsPlayer: () => void
   onLeaveRoom: () => void
   onLogout: () => void
@@ -28,7 +29,7 @@ type Props = {
 export function TopBar({
   game, currentUser, myName, mySeatIndex, loginSeatIndex, setLoginSeatIndex,
   isOwner, loading, error, autoRefresh, setAutoRefresh,
-  inviteCopied, onCopyInvite, onLoginAsPlayer, onLeaveRoom, onLogout,
+  inviteCopied, onCopyInvite, onOpenMyPage, onLoginAsPlayer, onLeaveRoom, onLogout,
   onStartHand, onRunShowdown, loginError, showSession, onToggleSession,
 }: Props) {
   return (
@@ -59,6 +60,9 @@ export function TopBar({
         </label>
         <button className="icon-btn" onClick={onCopyInvite} title="Copy invite link">
           {inviteCopied ? '✓' : '🔗'}
+        </button>
+        <button className="icon-btn" onClick={onOpenMyPage} title={t('myPage')}>
+          ☺
         </button>
         <div className="session-details">
           <button className="icon-btn" onClick={onToggleSession} title="Session settings">

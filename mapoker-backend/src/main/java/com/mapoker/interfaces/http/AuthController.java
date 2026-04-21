@@ -1,9 +1,13 @@
 package com.mapoker.interfaces.http;
 
+import com.mapoker.application.HandHistoryService;
 import com.mapoker.application.UserService;
+import com.mapoker.application.UserTableHistoryService;
+import com.mapoker.interfaces.http.dto.HandHistoryResponse;
 import com.mapoker.interfaces.http.dto.LoginRequest;
 import com.mapoker.interfaces.http.dto.RegisterRequest;
 import com.mapoker.interfaces.http.dto.UserResponse;
+import com.mapoker.interfaces.http.dto.UserTableHistoryResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
@@ -20,6 +24,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -28,10 +33,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final UserService userService;
+    private final UserTableHistoryService userTableHistoryService;
+    private final HandHistoryService handHistoryService;
     private final AuthenticationManager authenticationManager;
 
-    public AuthController(UserService userService, AuthenticationManager authenticationManager) {
+    public AuthController(UserService userService,
+                          UserTableHistoryService userTableHistoryService,
+                          HandHistoryService handHistoryService,
+                          AuthenticationManager authenticationManager) {
         this.userService = userService;
+        this.userTableHistoryService = userTableHistoryService;
+        this.handHistoryService = handHistoryService;
         this.authenticationManager = authenticationManager;
     }
 
@@ -43,7 +55,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public UserResponse login(@RequestBody LoginRequest req, HttpServletRequest request) {
+    public UserResponse login(@Valid @RequestBody LoginRequest req, HttpServletRequest request) {
         return createSessionAndReturn(req.username(), req.password(), request);
     }
 
@@ -66,6 +78,28 @@ public class AuthController {
         }
         var user = userService.getByUsername(principal.getUsername());
         return ResponseEntity.ok(new UserResponse(user.id(), user.username()));
+    }
+
+    @GetMapping("/history")
+    public ResponseEntity<java.util.List<UserTableHistoryResponse>> history(@AuthenticationPrincipal UserDetails principal) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(userTableHistoryService.listRecent(principal.getUsername()).stream()
+                .map(UserTableHistoryResponse::from)
+                .toList());
+    }
+
+    @GetMapping("/hand-history")
+    public ResponseEntity<java.util.List<HandHistoryResponse>> handHistory(
+            @AuthenticationPrincipal UserDetails principal,
+            @RequestParam(name = "limit", defaultValue = "20") int limit) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(handHistoryService.listRecentForUser(principal.getUsername(), limit).stream()
+                .map(HandHistoryResponse::from)
+                .toList());
     }
 
     @PostMapping("/logout")

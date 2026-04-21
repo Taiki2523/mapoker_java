@@ -1,12 +1,16 @@
 package com.mapoker.interfaces.http;
 
 import com.mapoker.application.GameService;
+import com.mapoker.application.TableService;
 import com.mapoker.domain.game.GameState;
 import com.mapoker.domain.game.OddChipRule;
 import com.mapoker.infrastructure.config.GameProperties;
 import com.mapoker.interfaces.http.dto.*;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.List;
 
@@ -16,15 +20,17 @@ public class GameController {
 
     private final GameService gameService;
     private final GameProperties gameProperties;
+    private final TableService tableService;
 
-    public GameController(GameService gameService, GameProperties gameProperties) {
+    public GameController(GameService gameService, GameProperties gameProperties, TableService tableService) {
         this.gameService = gameService;
         this.gameProperties = gameProperties;
+        this.tableService = tableService;
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public GameResponse createGame(@RequestBody CreateGameRequest req) {
+    public GameResponse createGame(@Valid @RequestBody CreateGameRequest req) {
         List<GameService.PlayerInput> inputs = req.players().stream()
                 .map(p -> new GameService.PlayerInput(p.id(), p.stack()))
                 .toList();
@@ -44,24 +50,28 @@ public class GameController {
     public GameResponse getGame(
             @PathVariable String id,
             @RequestParam(name = "viewer_index", required = false) Integer viewerIndex,
-            @RequestParam(name = "spectator", required = false, defaultValue = "0") String spectator) {
+            @RequestParam(name = "spectator", required = false, defaultValue = "0") String spectator,
+            @AuthenticationPrincipal UserDetails principal) {
         boolean isSpectator = "1".equals(spectator) || "true".equalsIgnoreCase(spectator);
-        return GameResponse.from(gameService.getGame(id), viewerIndex, isSpectator);
+        Integer effectiveViewerIndex = resolveViewerIndex(id, viewerIndex, principal);
+        return GameResponse.from(gameService.getGame(id), effectiveViewerIndex, isSpectator);
     }
 
     @PostMapping("/{id}/start")
-    public GameResponse startHand(@PathVariable String id, @RequestBody StartHandRequest req) {
+    public GameResponse startHand(@PathVariable String id, @Valid @RequestBody StartHandRequest req) {
         return GameResponse.from(gameService.startHand(id, req.bigBlind()), null, false);
     }
 
     @PostMapping("/{id}/actions")
     public GameResponse applyAction(
             @PathVariable String id,
-            @RequestBody ApplyActionRequest req,
-            @RequestParam(name = "viewer_index", required = false) Integer viewerIndex) {
+            @Valid @RequestBody ApplyActionRequest req,
+            @RequestParam(name = "viewer_index", required = false) Integer viewerIndex,
+            @AuthenticationPrincipal UserDetails principal) {
         GameState state = gameService.applyAction(id, req.playerIndex(),
                 req.action().type(), req.action().amount());
-        return GameResponse.from(state, viewerIndex, false);
+        Integer effectiveViewerIndex = resolveViewerIndex(id, viewerIndex, principal);
+        return GameResponse.from(state, effectiveViewerIndex, false);
     }
 
     @GetMapping("/{id}/actions")
@@ -75,5 +85,12 @@ public class GameController {
         // showdown後のGameResponseにlast_showdownと全参加者のホールカードを含める
         GameState state = gameService.getGame(id);
         return GameResponse.from(state, null, false);
+    }
+
+    private Integer resolveViewerIndex(String id, Integer requestedViewerIndex, UserDetails principal) {
+        if (principal == null) {
+            return requestedViewerIndex;
+        }
+        return tableService.findSeatIndex(id, principal.getUsername());
     }
 }

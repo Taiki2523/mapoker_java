@@ -15,7 +15,6 @@ services:
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - ${DB_DATA_LOCATION:-/srv/mapoker/data/db}:/var/lib/postgresql/data
-      - ./mapoker-backend/src/main/resources/db/migration:/docker-entrypoint-initdb.d:ro
     ports:
       - "5432:5432"
     healthcheck:
