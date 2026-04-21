@@ -34,9 +34,7 @@ class TableControllerIntegrationTest {
                 {
                   "table_name": "Cash Orbit Tokyo",
                   "player_count": 3,
-                  "stack_size": 150,
                   "big_blind": 10,
-                  "button_index": 1,
                   "visibility": "private",
                   "flags": ["casual", "newbie"]
                 }
@@ -48,7 +46,6 @@ class TableControllerIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("Cash Orbit Tokyo"))
                 .andExpect(jsonPath("$.max_players").value(3))
-                .andExpect(jsonPath("$.game.players.length()").value(3))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
@@ -60,16 +57,18 @@ class TableControllerIntegrationTest {
         mockMvc.perform(post("/v1/tables/{id}/join", tableId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"name":"alice","seat_index":1}
+                                {"name":"alice"}
                                 """))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assigned_seat_index").isNumber())
                 .andExpect(jsonPath("$.members[0].name").value("alice"))
-                .andExpect(jsonPath("$.members[0].seat_index").value(1));
+                .andExpect(jsonPath("$.members[0].seat_index").isNumber());
 
         mockMvc.perform(get("/v1/tables/{id}/members", tableId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.members.length()").value(1))
-                .andExpect(jsonPath("$.members[0].seat_index").value(1));
+                .andExpect(jsonPath("$.members[0].name").value("alice"))
+                .andExpect(jsonPath("$.members[0].seat_index").isNumber());
 
         mockMvc.perform(get("/v1/rooms/{id}/members", tableId))
                 .andExpect(status().isOk())
@@ -84,25 +83,21 @@ class TableControllerIntegrationTest {
         mockMvc.perform(post("/v1/tables/{id}/join", tableId)
                         .with(SecurityMockMvcRequestPostProcessors.user("alice"))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"seat_index":1}
-                                """))
+                        .content("{}"))
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/v1/auth/history")
                         .with(SecurityMockMvcRequestPostProcessors.user("alice")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].table_id").value(tableId))
-                .andExpect(jsonPath("$[0].seat_index").value(1))
+                .andExpect(jsonPath("$[0].seat_index").isNumber())
                 .andExpect(jsonPath("$[0].active").value(true))
                 .andExpect(jsonPath("$[0].left_at").doesNotExist());
 
         mockMvc.perform(post("/v1/tables/{id}/leave", tableId)
                         .with(SecurityMockMvcRequestPostProcessors.user("alice"))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"seat_index":1}
-                                """))
+                        .content("{}"))
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/v1/auth/history")
@@ -114,24 +109,31 @@ class TableControllerIntegrationTest {
     }
 
     @Test
-    void rejectsDuplicateSeatJoin() throws Exception {
+    void rejectsJoinWhenTableIsFull() throws Exception {
         String tableId = createTable();
 
         mockMvc.perform(post("/v1/tables/{id}/join", tableId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"name":"alice","seat_index":0}
+                                {"name":"alice"}
                                 """))
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/v1/tables/{id}/join", tableId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"name":"bob","seat_index":0}
+                                {"name":"bob"}
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/v1/tables/{id}/join", tableId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"carol"}
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("invalid_request"))
-                .andExpect(jsonPath("$.error.message").value("seat already taken"));
+                .andExpect(jsonPath("$.error.message").value("table is full"));
     }
 
     @Test
@@ -164,9 +166,7 @@ class TableControllerIntegrationTest {
                                 {
                                   "table_name": "bad",
                                   "player_count": 1,
-                                  "stack_size": 0,
                                   "big_blind": 0,
-                                  "button_index": -1,
                                   "visibility": "secret",
                                   "flags": ["NotAllowed"]
                                 }
@@ -201,9 +201,7 @@ class TableControllerIntegrationTest {
                                 {
                                   "table_name": "%s",
                                   "player_count": 2,
-                                  "stack_size": 100,
                                   "big_blind": 10,
-                                  "button_index": 0,
                                   "visibility": "%s",
                                   "flags": %s
                                 }
