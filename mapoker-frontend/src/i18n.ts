@@ -166,6 +166,8 @@ const ja = {
   tableStatusFinished: '終了',
   myTables: 'マイテーブル',
   myTablesDesc: '参加中または最近プレイしたテーブル',
+  tableList: 'テーブル一覧',
+  createTable: 'テーブル作成',
   publicTablesTitle: '公開テーブル一覧',
   publicTablesDesc: '参加先をここから選べます',
   noMyTables: 'まだ自分のテーブル履歴はありません',
@@ -199,6 +201,13 @@ const ja = {
   TABLE_CASH_OUT: 'キャッシュアウト',
   cooldownUntil: '次回: {time}',
   insufficientFunds: 'チップが不足しています',
+  buyIn: 'バイイン',
+  confirmBuyIn: '参加する',
+  ring: 'リングゲーム',
+  tournament: 'トーナメント',
+  comingSoon: '近日公開',
+  youHaveBeenRemovedFromTable: 'テーブルから退席しました',
+  rebuy: 'リバイ',
 
   // --- エラーメッセージ ---
   errEnterName: '名前を入力してください',

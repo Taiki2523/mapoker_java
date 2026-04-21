@@ -5,7 +5,7 @@ import { t } from './i18n'
 import { bestHandName } from './handEval'
 import { mapMembers } from './utils'
 import type {
-  AuthUser, BetPreset, CreateGameConfig, GameState, HandHistoryEntry, PayoutLine, Table,
+  AuthUser, BetPreset, CreateGameConfig, GameState, HandHistoryEntry, JoinResponse, PayoutLine, Table,
   RoomMember, RoomMemberApi, Showdown, StoredSession, UserTableHistoryEntry,
   WalletLedgerEntry, WalletSummary,
 } from './types'
@@ -13,7 +13,6 @@ import { AuthScreen } from './components/AuthScreen'
 import { LobbyScreen } from './components/LobbyScreen'
 import { MyPagePanel } from './components/MyPagePanel'
 import { RoomScreen } from './components/RoomScreen'
-import { WaitingScreen } from './components/WaitingScreen'
 import { GameScreen } from './components/GameScreen'
 
 function App() {
@@ -44,7 +43,6 @@ function App() {
   const [profileLoading, setProfileLoading] = useState(false)
   const [profileError, setProfileError] = useState('')
   const [roomScreenMode, setRoomScreenMode] = useState<'room' | 'lobby'>('room')
-  const autoJoinRef = useRef<string | null>(null)
 
   const formatErrorMessage = (err: unknown) => {
     const message = err instanceof Error ? err.message : String(err)
@@ -150,20 +148,11 @@ function App() {
     return isMyTurn && game?.status === 'in_progress' && !isSpectator
   }, [game?.status, isMyTurn, isSpectator])
 
-  const targetPlayerCount = useMemo(() => game?.players?.length ?? 0, [game])
-
-  const canStartHand = game?.can_start_hand ?? true
-
-  const lobbyReady = useMemo(() => {
-    return roster.length >= targetPlayerCount && targetPlayerCount > 0
-  }, [roster, targetPlayerCount])
-
   const viewMode = useMemo(() => {
     if (!currentUser) return 'auth'
-    if (!gameId) return 'room'
-    if (!lobbyReady) return 'waiting'
+    if (!gameId || !game) return 'room'
     return 'game'
-  }, [currentUser, gameId, lobbyReady])
+  }, [currentUser, game, gameId])
 
   useEffect(() => {
     fetchJSON<AuthUser>('/v1/auth/me')
@@ -231,20 +220,6 @@ function App() {
     }
     prevIsMyTurn.current = isMyTurn
   }, [isMyTurn, minRaise])
-
-  useEffect(() => {
-    if (viewMode !== 'waiting') return
-    if (!gameId || !game) return
-    if (mySeatIndex !== null) return
-    if (!myName.trim()) return
-    if (!roster.length) return
-    if (autoJoinRef.current === gameId) return
-    autoJoinRef.current = gameId
-    const seat = firstAvailableSeat()
-    setLoginSeatIndex(seat)
-    void loginAsPlayer(seat)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game, gameId, myName, mySeatIndex, roster, viewMode])
 
   const refreshGame = async (id = gameId) => {
     if (!id) return
@@ -317,15 +292,6 @@ function App() {
     const ledger = await fetchJSON<WalletLedgerEntry[]>('/v1/wallet/ledger?limit=20')
     setWallet(nextWallet)
     setWalletLedger(ledger)
-  }
-
-  const firstAvailableSeat = () => {
-    if (!game) return 0
-    const taken = new Set(roster.map((m) => m.seatIndex))
-    for (let i = 0; i < game.players.length; i += 1) {
-      if (!taken.has(i)) return i
-    }
-    return 0
   }
 
   const handleAuthSuccess = (user: AuthUser) => {
@@ -415,7 +381,7 @@ function App() {
       setGame(data.game)
       setTable(data)
       setIsOwner(true)
-      await fetchJSON(`/v1/tables/${data.id}/join`, {
+      const result = await fetchJSON<JoinResponse>(`/v1/tables/${data.id}/join`, {
         method: 'POST',
         body: JSON.stringify({
           name: myName.trim() || 'Host',
@@ -423,10 +389,11 @@ function App() {
           buy_in: data.min_buy_in ?? 0,
         }),
       })
-      setMySeatIndex(0)
-      setLoginSeatIndex(0)
-      await refreshMembers(data.id)
-      persistSession(data.id, { name: myName.trim() || 'Host', seatIndex: 0, owner: true })
+      const assignedSeatIndex = result.assigned_seat_index
+      setMySeatIndex(assignedSeatIndex)
+      setLoginSeatIndex(assignedSeatIndex)
+      setRoster(mapMembers(result.members))
+      persistSession(data.id, { name: myName.trim() || 'Host', seatIndex: assignedSeatIndex, owner: true })
       window.history.replaceState(null, '', `?tableId=${data.id}`)
       if (config.autoStart) await startHand(data.id, config.bigBlind)
     } catch (err) {
@@ -470,7 +437,7 @@ function App() {
     setIsOwner(false)
     setLoginError('')
     try {
-      const result = await fetchJSON<{ members: RoomMemberApi[] }>(`/v1/tables/${gameId}/join`, {
+      const result = await fetchJSON<JoinResponse>(`/v1/tables/${gameId}/join`, {
         method: 'POST',
         body: JSON.stringify({
           name: myName.trim(),
@@ -478,9 +445,11 @@ function App() {
           buy_in: table?.min_buy_in ?? 0,
         }),
       })
-      setMySeatIndex(seatIndex)
+      const assignedSeatIndex = result.assigned_seat_index
+      setMySeatIndex(assignedSeatIndex)
+      setLoginSeatIndex(assignedSeatIndex)
       setRoster(mapMembers(result.members))
-      persistSession(game.id, { name: myName.trim(), seatIndex, owner: false })
+      persistSession(gameId, { name: myName.trim(), seatIndex: assignedSeatIndex, owner: false })
     } catch (err) {
       setLoginError(formatErrorMessage(err))
     }
@@ -629,30 +598,6 @@ function App() {
                   onBack={() => setRoomScreenMode('room')}
                 />
               )
-            )}
-            {viewMode === 'waiting' && (
-              <WaitingScreen
-                gameId={gameId}
-                inviteUrl={inviteUrl}
-                inviteCopied={inviteCopied}
-                onCopyInvite={() => void copyInvite()}
-                game={game}
-                roster={roster}
-                mySeatIndex={mySeatIndex}
-                loginSeatIndex={loginSeatIndex}
-                setLoginSeatIndex={setLoginSeatIndex}
-                onJoinLobby={(seat) => void loginAsPlayer(seat)}
-                onStartHand={() => void startHand()}
-                isOwner={isOwner}
-                canStartHand={canStartHand}
-                lobbyReady={lobbyReady}
-                targetPlayerCount={targetPlayerCount}
-                loading={loading}
-                loginError={loginError}
-                currentUser={currentUser}
-                onOpenMyPage={() => void openMyPage()}
-                onLogout={() => void handleLogout()}
-              />
             )}
           </div>
         </div>

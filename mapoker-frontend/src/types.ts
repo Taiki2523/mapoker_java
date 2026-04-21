@@ -23,6 +23,8 @@ export type GameState = {
   community: string[]
   odd_chip_rule: string
   can_start_hand?: boolean
+  viewer_membership_active: boolean
+  can_rebuy: boolean
   last_showdown?: Showdown
 }
 
@@ -134,6 +136,13 @@ export type RoomMemberApi = {
   name: string
   seat_index: number
   joined_at: string
+}
+
+export type Member = RoomMemberApi
+
+export type JoinResponse = {
+  assigned_seat_index: number
+  members: Member[]
 }
 
 export type BetPreset = {
