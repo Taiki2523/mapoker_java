@@ -12,6 +12,8 @@ export type GameState = {
   status: string
   street: string
   button_index: number
+  small_blind_idx: number
+  big_blind_idx: number
   current_player: number
   current_bet: number
   last_raise_size: number

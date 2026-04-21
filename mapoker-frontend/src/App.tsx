@@ -140,16 +140,6 @@ function App() {
     return isMyTurn && game?.status === 'in_progress' && !isSpectator
   }, [game?.status, isMyTurn, isSpectator])
 
-  const smallBlindIndex = useMemo(() => {
-    if (!game || game.players.length === 0) return null
-    return (game.button_index + 1) % game.players.length
-  }, [game])
-
-  const bigBlindIndex = useMemo(() => {
-    if (!game || game.players.length === 0) return null
-    return (game.button_index + 2) % game.players.length
-  }, [game])
-
   const targetPlayerCount = useMemo(() => game?.players?.length ?? 0, [game])
 
   const canStartHand = game?.can_start_hand ?? true
@@ -604,8 +594,6 @@ function App() {
           error={error}
           inviteCopied={inviteCopied}
           loginError={loginError}
-          smallBlindIndex={smallBlindIndex}
-          bigBlindIndex={bigBlindIndex}
           toCall={toCall}
           minRaise={minRaise}
           maxBet={maxBet}

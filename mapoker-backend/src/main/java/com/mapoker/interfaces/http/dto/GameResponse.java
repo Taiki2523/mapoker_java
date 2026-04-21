@@ -20,6 +20,8 @@ public record GameResponse(
         GameStatus status,
         Street street,
         @JsonProperty("button_index") int buttonIndex,
+        @JsonProperty("small_blind_idx") int smallBlindIdx,
+        @JsonProperty("big_blind_idx") int bigBlindIdx,
         @JsonProperty("current_player") int currentPlayer,
         @JsonProperty("current_bet") int currentBet,
         @JsonProperty("last_raise_size") int lastRaiseSize,
@@ -83,7 +85,7 @@ public record GameResponse(
 
         return new GameResponse(
                 g.getId(), g.getStatus(), g.getStreet(),
-                g.getButtonIndex(), g.getCurrentPlayer(),
+                g.getButtonIndex(), g.getSmallBlindIdx(), g.getBigBlindIdx(), g.getCurrentPlayer(),
                 g.getCurrentBet(), g.getLastRaiseSize(), g.getBigBlindSize(),
                 g.getPot(), playerResponses, g.getCommunity(), g.getOddChipRule(),
                 canStartHand, showdownDto);

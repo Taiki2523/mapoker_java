@@ -9,8 +9,6 @@ type Props = {
   isShowdown: boolean
   mySeat: number | null
   isSpectator: boolean
-  smallBlindIndex: number | null
-  bigBlindIndex: number | null
   winnerNames: string
   payoutLines: PayoutLine[]
   displayName: (idx: number) => string
@@ -19,7 +17,7 @@ type Props = {
 
 export function TableArea({
   game, showdown, isShowdown, mySeat, isSpectator,
-  smallBlindIndex, bigBlindIndex, winnerNames, payoutLines,
+  winnerNames, payoutLines,
   displayName, onCloseSession,
 }: Props) {
   return (
@@ -90,8 +88,8 @@ export function TableArea({
                   <span className="player-name">{displayName(idx)}</span>
                   <div className="badges">
                     {game.button_index === idx && <span className="badge btn">D</span>}
-                    {smallBlindIndex === idx && <span className="badge sb">SB</span>}
-                    {bigBlindIndex === idx && <span className="badge bb">BB</span>}
+                    {game.small_blind_idx === idx && <span className="badge sb">SB</span>}
+                    {game.big_blind_idx === idx && <span className="badge bb">BB</span>}
                     {player.folded && <span className="badge warn">F</span>}
                     {player.all_in && <span className="badge accent">AI</span>}
                   </div>

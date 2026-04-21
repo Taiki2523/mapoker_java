@@ -24,8 +24,6 @@ type Props = {
   error: string
   inviteCopied: boolean
   loginError: string
-  smallBlindIndex: number | null
-  bigBlindIndex: number | null
   toCall: number
   minRaise: number
   maxBet: number
@@ -53,7 +51,6 @@ export function GameScreen({
   isOwner, isSpectator, autoRefresh, setAutoRefresh,
   actionAmount, setActionAmount, loading, error,
   inviteCopied, loginError,
-  smallBlindIndex, bigBlindIndex,
   toCall, minRaise, maxBet, betPresets,
   myHandName, currentPlayer, canAct,
   winnerNames, payoutLines, displayName,
@@ -94,8 +91,6 @@ export function GameScreen({
         isShowdown={isShowdown}
         mySeat={mySeat}
         isSpectator={isSpectator}
-        smallBlindIndex={smallBlindIndex}
-        bigBlindIndex={bigBlindIndex}
         winnerNames={winnerNames}
         payoutLines={payoutLines}
         displayName={displayName}
