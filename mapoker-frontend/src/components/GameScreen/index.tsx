@@ -37,6 +37,7 @@ type Props = {
   payoutLines: PayoutLine[]
   displayName: (idx: number) => string
   onCopyInvite: () => void
+  onOpenMyPage: () => void
   onLoginAsPlayer: () => void
   onLeaveRoom: () => void
   onLogout: () => void
@@ -56,7 +57,7 @@ export function GameScreen({
   toCall, minRaise, maxBet, betPresets,
   myHandName, currentPlayer, canAct,
   winnerNames, payoutLines, displayName,
-  onCopyInvite, onLoginAsPlayer, onLeaveRoom, onLogout,
+  onCopyInvite, onOpenMyPage, onLoginAsPlayer, onLeaveRoom, onLogout,
   onStartHand, onRunShowdown, onSendAction,
 }: Props) {
   const [showSession, setShowSession] = useState(false)
@@ -77,6 +78,7 @@ export function GameScreen({
         setAutoRefresh={setAutoRefresh}
         inviteCopied={inviteCopied}
         onCopyInvite={onCopyInvite}
+        onOpenMyPage={onOpenMyPage}
         onLoginAsPlayer={onLoginAsPlayer}
         onLeaveRoom={onLeaveRoom}
         onLogout={onLogout}

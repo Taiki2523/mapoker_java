@@ -1,24 +1,24 @@
 package com.mapoker.interfaces.http;
 
+import com.mapoker.application.TableMemberRecord;
+import com.mapoker.application.TableService;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.mapoker.infrastructure.config.GameProperties;
+import com.mapoker.interfaces.http.dto.TableMembershipRequest;
+import jakarta.validation.Valid;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @RestController
 @RequestMapping("/v1/rooms")
 public class RoomController {
 
-    private final Map<String, List<MemberRecord>> rooms = new ConcurrentHashMap<>();
-    private final GameProperties gameProperties;
+    private final TableService tableService;
 
-    public RoomController(GameProperties gameProperties) {
-        this.gameProperties = gameProperties;
+    public RoomController(TableService tableService) {
+        this.tableService = tableService;
     }
 
     public record MemberRecord(
@@ -31,32 +31,30 @@ public class RoomController {
 
     @GetMapping("/{id}/members")
     public MembersResponse getMembers(@PathVariable String id) {
-        return new MembersResponse(rooms.getOrDefault(id, List.of()));
+        return new MembersResponse(mapMembers(tableService.getMembers(id)));
     }
 
     @PostMapping("/{id}/join")
     public MembersResponse join(@PathVariable String id,
-                                @RequestBody(required = false) Map<String, Object> body) {
-        List<MemberRecord> members = rooms.computeIfAbsent(id, k -> new ArrayList<>());
-        String name = body != null && body.containsKey("name")
-                ? String.valueOf(body.get("name")) : gameProperties.defaultPlayerName();
-        int seatIndex = members.size();
-        boolean alreadyJoined = members.stream().anyMatch(m -> m.name().equals(name));
-        if (!alreadyJoined) {
-            members.add(new MemberRecord(name, seatIndex, Instant.now().toString()));
-        }
-        return new MembersResponse(List.copyOf(members));
+                                @Valid @RequestBody(required = false) TableMembershipRequest body,
+                                @AuthenticationPrincipal UserDetails principal) {
+        String name = principal != null ? principal.getUsername() : body != null ? body.name() : null;
+        Integer seatIndex = body != null ? body.seatIndex() : null;
+        return new MembersResponse(mapMembers(tableService.join(id, name, seatIndex)));
     }
 
     @PostMapping("/{id}/leave")
     public MembersResponse leave(@PathVariable String id,
-                                 @RequestBody(required = false) Map<String, Object> body) {
-        String name = body != null && body.containsKey("name")
-                ? String.valueOf(body.get("name")) : null;
-        List<MemberRecord> members = rooms.getOrDefault(id, new ArrayList<>());
-        if (name != null) {
-            members.removeIf(m -> m.name().equals(name));
-        }
-        return new MembersResponse(List.copyOf(members));
+                                 @Valid @RequestBody(required = false) TableMembershipRequest body,
+                                 @AuthenticationPrincipal UserDetails principal) {
+        String name = principal != null ? principal.getUsername() : body != null ? body.name() : null;
+        Integer seatIndex = body != null ? body.seatIndex() : null;
+        return new MembersResponse(mapMembers(tableService.leave(id, name, seatIndex)));
+    }
+
+    private List<MemberRecord> mapMembers(List<TableMemberRecord> members) {
+        return members.stream()
+                .map(member -> new MemberRecord(member.name(), member.seatIndex(), member.joinedAt()))
+                .toList();
     }
 }
