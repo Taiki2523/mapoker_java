@@ -78,7 +78,7 @@ class PostgresPersistenceIntegrationTest {
                 List.of("casual", "newbie")
         ));
 
-        tableService.join(created.table().id(), "history_alice", 1);
+        tableService.join(created.table().id(), "history_alice", 1, 0);
         tableService.leave(created.table().id(), "history_alice", 1);
 
         var history = userTableHistoryService.listRecent("history_alice", 10);

@@ -185,6 +185,20 @@ const ja = {
   streetFlop: 'フロップ',
   streetTurn: 'ターン',
   streetRiver: 'リバー',
+  chipBalance: '所持チップ',
+  claimDailyBonus: 'デイリーボーナス',
+  claimRecovery: '回復チップ',
+  walletLedger: '増減履歴',
+  noWalletLedger: 'まだ増減履歴はありません',
+  REGISTER_BONUS: '新規登録ボーナス',
+  DAILY_BONUS: 'デイリーボーナス',
+  RECOVERY: '回復チップ',
+  RECOVERY_BONUS: '回復チップ',
+  ADMIN_GRANT: '管理者付与',
+  TABLE_BUY_IN: 'バイイン',
+  TABLE_CASH_OUT: 'キャッシュアウト',
+  cooldownUntil: '次回: {time}',
+  insufficientFunds: 'チップが不足しています',
 
   // --- エラーメッセージ ---
   errEnterName: '名前を入力してください',
@@ -210,4 +224,8 @@ export function t(key: Key, vars?: Record<string, string | number>): string {
     }
   }
   return s
+}
+
+export function hasTranslation(key: string): key is Key {
+  return Object.prototype.hasOwnProperty.call(ja, key)
 }

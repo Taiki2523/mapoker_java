@@ -67,7 +67,8 @@ public class TableController {
                                 @AuthenticationPrincipal UserDetails principal) {
         String name = principal != null ? principal.getUsername() : body != null ? body.name() : null;
         Integer seatIndex = body != null ? body.seatIndex() : null;
-        return new MembersResponse(toMembers(tableService.join(id, name, seatIndex)));
+        int buyIn = body != null && body.buyIn() != null ? body.buyIn() : 0;
+        return new MembersResponse(toMembers(tableService.join(id, name, seatIndex, buyIn)));
     }
 
     @PostMapping("/{id}/leave")

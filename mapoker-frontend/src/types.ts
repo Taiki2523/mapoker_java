@@ -79,6 +79,22 @@ export type HandHistoryEntry = {
   finished_at: string
 }
 
+export type WalletSummary = {
+  chip_balance: number
+  next_daily_bonus_at: string | null
+  next_recovery_at: string | null
+}
+
+export type WalletLedgerEntry = {
+  id: number
+  delta: number
+  balance_after: number
+  reason: string
+  reference_type: string | null
+  reference_id: string | null
+  created_at: string
+}
+
 export type Table = {
   id: string
   room_id: string

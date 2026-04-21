@@ -1,8 +1,10 @@
 package com.mapoker.application;
 
 import com.mapoker.domain.game.GameState;
+import com.mapoker.domain.game.GameStatus;
 import com.mapoker.domain.game.OddChipRule;
 import com.mapoker.infrastructure.config.GameProperties;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -24,13 +26,16 @@ public class TableService {
     private final GameService gameService;
     private final GameProperties gameProperties;
     private final UserTableHistoryService userTableHistoryService;
+    private final ObjectProvider<WalletService> walletServiceProvider;
 
     public TableService(GameService gameService,
                         GameProperties gameProperties,
-                        UserTableHistoryService userTableHistoryService) {
+                        UserTableHistoryService userTableHistoryService,
+                        ObjectProvider<WalletService> walletServiceProvider) {
         this.gameService = gameService;
         this.gameProperties = gameProperties;
         this.userTableHistoryService = userTableHistoryService;
+        this.walletServiceProvider = walletServiceProvider;
     }
 
     public CreateTableResult createRingTable(CreateRingTableInput input) {
@@ -124,6 +129,10 @@ public class TableService {
     }
 
     public List<TableMemberRecord> join(String id, String requestedName, Integer requestedSeatIndex) {
+        return join(id, requestedName, requestedSeatIndex, 0);
+    }
+
+    public List<TableMemberRecord> join(String id, String requestedName, Integer requestedSeatIndex, int buyIn) {
         TableRecord table = getTable(id);
         String name = normalizeMemberName(requestedName);
         List<TableMemberRecord> members = new ArrayList<>(tableMembers.computeIfAbsent(table.id(), ignored -> new ArrayList<>()));
@@ -146,6 +155,15 @@ public class TableService {
             throw new IllegalArgumentException("seat already taken");
         }
 
+        WalletService walletService = walletServiceProvider.getIfAvailable();
+        if (walletService != null && buyIn > 0) {
+            if (buyIn < table.minBuyIn() || buyIn > table.maxBuyIn()) {
+                throw new IllegalArgumentException("buy-in out of range");
+            }
+            walletService.buyIn(name, table.id(), buyIn);
+            gameService.setSeatStack(table.gameId(), seatIndex, buyIn);
+        }
+
         members.add(new TableMemberRecord(name, seatIndex, Instant.now().toString()));
         members.sort(Comparator.comparingInt(TableMemberRecord::seatIndex));
         tableMembers.put(table.id(), members);
@@ -156,19 +174,58 @@ public class TableService {
     public List<TableMemberRecord> leave(String id, String name, Integer seatIndex) {
         TableRecord table = getTable(id);
         List<TableMemberRecord> members = new ArrayList<>(tableMembers.computeIfAbsent(table.id(), ignored -> new ArrayList<>()));
-        List<TableMemberRecord> previousMembers = List.copyOf(members);
-        if (name != null && !name.isBlank()) {
-            members.removeIf(member -> member.name().equals(name));
-        } else if (seatIndex != null) {
-            members.removeIf(member -> member.seatIndex() == seatIndex);
+        TableMemberRecord member = findMember(members, name, seatIndex);
+        if (member == null) {
+            return List.copyOf(members);
         }
+
+        GameState state = gameService.getGame(table.gameId());
+        if (state.getStatus() == GameStatus.IN_PROGRESS || state.getStatus() == GameStatus.SHOWDOWN) {
+            List<TableMemberRecord> updatedMembers = new ArrayList<>();
+            for (TableMemberRecord current : members) {
+                if (current.name().equals(member.name()) && current.seatIndex() == member.seatIndex()) {
+                    updatedMembers.add(new TableMemberRecord(
+                            current.name(),
+                            current.seatIndex(),
+                            current.joinedAt(),
+                            true
+                    ));
+                } else {
+                    updatedMembers.add(current);
+                }
+            }
+            updatedMembers.sort(Comparator.comparingInt(TableMemberRecord::seatIndex));
+            tableMembers.put(table.id(), updatedMembers);
+            return List.copyOf(updatedMembers);
+        }
+
+        members.removeIf(current -> current.name().equals(member.name()) && current.seatIndex() == member.seatIndex());
         members.sort(Comparator.comparingInt(TableMemberRecord::seatIndex));
         tableMembers.put(table.id(), members);
-        previousMembers.stream()
-                .filter(member -> members.stream().noneMatch(current ->
-                        current.name().equals(member.name()) && current.seatIndex() == member.seatIndex()))
-                .forEach(member -> userTableHistoryService.recordLeave(member.name(), table.id(), member.seatIndex()));
+        cashOutSeatStackIfPossible(member.name(), table.gameId(), member.seatIndex());
+        userTableHistoryService.recordLeave(member.name(), table.id(), member.seatIndex());
         return List.copyOf(members);
+    }
+
+    public void processPendingLeaves(String tableId) {
+        TableRecord table = getTable(tableId);
+        List<TableMemberRecord> members = new ArrayList<>(tableMembers.getOrDefault(table.id(), List.of()));
+        if (members.isEmpty()) {
+            tableMembers.putIfAbsent(table.id(), new ArrayList<>());
+            return;
+        }
+
+        List<TableMemberRecord> remainingMembers = new ArrayList<>();
+        for (TableMemberRecord member : members) {
+            if (!member.pendingLeave()) {
+                remainingMembers.add(member);
+                continue;
+            }
+            cashOutSeatStackIfPossible(member.name(), table.gameId(), member.seatIndex());
+            userTableHistoryService.recordLeave(member.name(), table.id(), member.seatIndex());
+        }
+        remainingMembers.sort(Comparator.comparingInt(TableMemberRecord::seatIndex));
+        tableMembers.put(table.id(), remainingMembers);
     }
 
     private TableRecord fromGame(GameState game) {
@@ -262,6 +319,35 @@ public class TableService {
         if (input.buttonIndex() < 0 || input.buttonIndex() >= input.playerCount()) {
             throw new IllegalArgumentException("button index out of range");
         }
+    }
+
+    private TableMemberRecord findMember(List<TableMemberRecord> members, String name, Integer seatIndex) {
+        if (name != null && !name.isBlank()) {
+            return members.stream()
+                    .filter(member -> member.name().equals(name))
+                    .findFirst()
+                    .orElse(null);
+        }
+        if (seatIndex != null) {
+            return members.stream()
+                    .filter(member -> member.seatIndex() == seatIndex)
+                    .findFirst()
+                    .orElse(null);
+        }
+        return null;
+    }
+
+    private void cashOutSeatStackIfPossible(String name, String tableId, int seatIndex) {
+        int stack = gameService.getSeatStack(tableId, seatIndex);
+        if (stack <= 0) {
+            return;
+        }
+
+        WalletService walletService = walletServiceProvider.getIfAvailable();
+        if (walletService != null) {
+            walletService.cashOut(name, tableId, stack);
+        }
+        gameService.setSeatStack(tableId, seatIndex, 0);
     }
 
     private TableRecord mergeTableWithGame(TableRecord existing, GameState game) {

@@ -7,6 +7,7 @@ import { mapMembers } from './utils'
 import type {
   AuthUser, BetPreset, CreateGameConfig, GameState, HandHistoryEntry, PayoutLine, Table,
   RoomMember, RoomMemberApi, Showdown, StoredSession, UserTableHistoryEntry,
+  WalletLedgerEntry, WalletSummary,
 } from './types'
 import { AuthScreen } from './components/AuthScreen'
 import { LobbyScreen } from './components/LobbyScreen'
@@ -34,13 +35,22 @@ function App() {
   const [isOwner, setIsOwner] = useState(false)
   const [roster, setRoster] = useState<RoomMember[]>([])
   const [showMyPage, setShowMyPage] = useState(false)
+  const [table, setTable] = useState<Table | null>(null)
   const [profileTables, setProfileTables] = useState<Table[]>([])
   const [profileHistory, setProfileHistory] = useState<UserTableHistoryEntry[]>([])
   const [profileHandHistory, setProfileHandHistory] = useState<HandHistoryEntry[]>([])
+  const [wallet, setWallet] = useState<WalletSummary | null>(null)
+  const [walletLedger, setWalletLedger] = useState<WalletLedgerEntry[]>([])
   const [profileLoading, setProfileLoading] = useState(false)
   const [profileError, setProfileError] = useState('')
   const [roomScreenMode, setRoomScreenMode] = useState<'room' | 'lobby'>('room')
   const autoJoinRef = useRef<string | null>(null)
+
+  const formatErrorMessage = (err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err)
+    if (message === 'insufficient funds') return t('insufficientFunds')
+    return message
+  }
 
   const currentPlayer = useMemo(() => {
     if (!game) return null
@@ -167,6 +177,8 @@ function App() {
     if (initial) {
       setGameId(initial)
       void refreshGame(initial)
+      void refreshMembers(initial)
+      void refreshTable(initial)
     }
   }, [])
 
@@ -276,6 +288,33 @@ function App() {
     }
   }
 
+  const refreshTable = async (id = gameId) => {
+    if (!id) return null
+    try {
+      const data = await fetchJSON<Table>(`/v1/tables/${id}`)
+      setTable(data)
+      return data
+    } catch {
+      setTable(null)
+      return null
+    }
+  }
+
+  const refreshWallet = async () => {
+    let nextWallet: WalletSummary | null = null
+    try {
+      nextWallet = await fetchJSON<WalletSummary>('/v1/wallet')
+      setWallet(nextWallet)
+    } catch {
+      setWallet(null)
+      setWalletLedger([])
+      return
+    }
+    const ledger = await fetchJSON<WalletLedgerEntry[]>('/v1/wallet/ledger?limit=20')
+    setWallet(nextWallet)
+    setWalletLedger(ledger)
+  }
+
   const firstAvailableSeat = () => {
     if (!game) return 0
     const taken = new Set(roster.map((m) => m.seatIndex))
@@ -300,10 +339,13 @@ function App() {
     setMyName('')
     setGameId('')
     setGame(null)
+    setTable(null)
     setMySeatIndex(null)
     setIsOwner(false)
     setProfileHistory([])
     setProfileHandHistory([])
+    setWallet(null)
+    setWalletLedger([])
     setShowMyPage(false)
     setRoomScreenMode('room')
   }
@@ -330,8 +372,9 @@ function App() {
       setProfileTables(tables)
       setProfileHistory(history)
       setProfileHandHistory(handHistory)
+      await refreshWallet()
     } catch (err) {
-      setProfileError((err as Error).message)
+      setProfileError(formatErrorMessage(err))
     } finally {
       setProfileLoading(false)
     }
@@ -366,19 +409,24 @@ function App() {
       if (!data.game) throw new Error('table game payload is missing')
       setGameId(data.id)
       setGame(data.game)
-      setMySeatIndex(0)
-      setLoginSeatIndex(0)
+      setTable(data)
       setIsOwner(true)
       await fetchJSON(`/v1/tables/${data.id}/join`, {
         method: 'POST',
-        body: JSON.stringify({ name: myName.trim() || 'Host', seat_index: 0 }),
+        body: JSON.stringify({
+          name: myName.trim() || 'Host',
+          seat_index: 0,
+          buy_in: data.min_buy_in ?? 0,
+        }),
       })
+      setMySeatIndex(0)
+      setLoginSeatIndex(0)
       await refreshMembers(data.id)
       persistSession(data.id, { name: myName.trim() || 'Host', seatIndex: 0, owner: true })
       window.history.replaceState(null, '', `?tableId=${data.id}`)
       if (config.autoStart) await startHand(data.id, config.bigBlind)
     } catch (err) {
-      setError((err as Error).message)
+      setError(formatErrorMessage(err))
     } finally {
       setLoading(false)
     }
@@ -401,10 +449,12 @@ function App() {
       id = raw
     }
     setGameId(id)
+    setTable(null)
     setShowdown(null)
     window.history.replaceState(null, '', `?tableId=${id}`)
     await refreshGame(id)
     await refreshMembers(id)
+    await refreshTable(id)
   }
 
   const loginAsPlayer = async (seatOverride?: number) => {
@@ -413,19 +463,49 @@ function App() {
     const seatIndex = seatOverride ?? loginSeatIndex
     if (seatIndex < 0 || seatIndex >= game.players.length) { setLoginError(t('errSelectSeat')); return }
     if (!gameId) { setLoginError(t('errMissingRoom')); return }
-    setMySeatIndex(seatIndex)
     setIsOwner(false)
     setLoginError('')
     try {
       const result = await fetchJSON<{ members: RoomMemberApi[] }>(`/v1/tables/${gameId}/join`, {
         method: 'POST',
-        body: JSON.stringify({ name: myName.trim(), seat_index: seatIndex }),
+        body: JSON.stringify({
+          name: myName.trim(),
+          seat_index: seatIndex,
+          buy_in: table?.min_buy_in ?? 0,
+        }),
       })
+      setMySeatIndex(seatIndex)
       setRoster(mapMembers(result.members))
+      persistSession(game.id, { name: myName.trim(), seatIndex, owner: false })
     } catch (err) {
-      setLoginError((err as Error).message)
+      setLoginError(formatErrorMessage(err))
     }
-    persistSession(game.id, { name: myName.trim(), seatIndex, owner: false })
+  }
+
+  const handleClaimDailyBonus = async () => {
+    setProfileLoading(true)
+    setProfileError('')
+    try {
+      await fetchJSON('/v1/wallet/daily-bonus', { method: 'POST' })
+      await refreshWallet()
+    } catch (err) {
+      setProfileError(formatErrorMessage(err))
+    } finally {
+      setProfileLoading(false)
+    }
+  }
+
+  const handleClaimRecovery = async () => {
+    setProfileLoading(true)
+    setProfileError('')
+    try {
+      await fetchJSON('/v1/wallet/recovery', { method: 'POST' })
+      await refreshWallet()
+    } catch (err) {
+      setProfileError(formatErrorMessage(err))
+    } finally {
+      setProfileLoading(false)
+    }
   }
 
   const leaveRoom = () => {
@@ -620,11 +700,15 @@ function App() {
           tables={profileTables}
           history={profileHistory}
           handHistory={profileHandHistory}
+          wallet={wallet}
+          walletLedger={walletLedger}
           currentTableId={gameId}
           loading={profileLoading}
           error={profileError}
           onClose={() => setShowMyPage(false)}
           onRefresh={() => void refreshProfileTables()}
+          onClaimDailyBonus={() => void handleClaimDailyBonus()}
+          onClaimRecovery={() => void handleClaimRecovery()}
           onOpenTable={(tableId) => {
             setShowMyPage(false)
             void joinRoom(tableId)

@@ -64,6 +64,18 @@ public class GameService {
         return state;
     }
 
+    public void setSeatStack(String tableId, int seatIndex, int amount) {
+        GameState state = getGame(tableId);
+        Player player = state.getPlayers().get(seatIndex);
+        player.setStack(amount);
+        gameRepository.update(tableId, state);
+    }
+
+    public int getSeatStack(String tableId, int seatIndex) {
+        GameState state = getGame(tableId);
+        return state.getPlayers().get(seatIndex).getStack();
+    }
+
     public GameState applyAction(String id, int playerIndex, ActionType type, int amount) {
         GameState state = getGame(id);
         Action action = Action.of(type, amount);
@@ -73,6 +85,12 @@ public class GameService {
                 playerIndex, type, amount);
         gameRepository.update(id, state, record);
         recordHandHistoryIfFinished(id, state);
+        if (state.isFoldWin()) {
+            TableService tableService = tableServiceProvider.getIfAvailable();
+            if (tableService != null) {
+                tableService.processPendingLeaves(id);
+            }
+        }
         return state;
     }
 
@@ -87,6 +105,10 @@ public class GameService {
         state.applyPayouts(result.payouts());
         gameRepository.update(id, state);
         recordHandHistoryIfFinished(id, state);
+        TableService tableService = tableServiceProvider.getIfAvailable();
+        if (tableService != null) {
+            tableService.processPendingLeaves(id);
+        }
         return result;
     }
 
