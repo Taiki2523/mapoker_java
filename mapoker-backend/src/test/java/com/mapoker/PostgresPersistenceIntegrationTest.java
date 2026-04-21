@@ -71,11 +71,7 @@ class PostgresPersistenceIntegrationTest {
         var created = tableService.createRingTable(new TableService.CreateRingTableInput(
                 "History Table",
                 3,
-                150,
                 10,
-                0,
-                7L,
-                OddChipRule.LOW_INDEX,
                 "public",
                 List.of("casual", "newbie")
         ));
