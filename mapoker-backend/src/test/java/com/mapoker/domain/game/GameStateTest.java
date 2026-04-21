@@ -18,6 +18,21 @@ class GameStateTest {
         return GameState.newGame(players, 0, 10, new Random(42), OddChipRule.LOW_INDEX);
     }
 
+    private static GameState newGame3P() {
+        List<Player> players = List.of(
+                new Player("p1", 100),
+                new Player("p2", 100),
+                new Player("p3", 100)
+        );
+        return GameState.newGame(players, 0, 10, new Random(42), OddChipRule.LOW_INDEX);
+    }
+
+    private static void finishHandByFoldingToWinner(GameState g) {
+        while (g.getStatus() == GameStatus.IN_PROGRESS) {
+            g.applyAction(g.getCurrentPlayer(), Action.of(ActionType.FOLD, 0));
+        }
+    }
+
     @Test
     void newGameCreated() {
         GameState g = newGame2P();
@@ -32,6 +47,44 @@ class GameStateTest {
         // SB posts 5, BB posts 10 → pot = 15
         assertThat(g.getPot()).isEqualTo(15);
         assertThat(g.getCurrentBet()).isEqualTo(10);
+    }
+
+    @Test
+    void buttonAdvancesBetweenHands() {
+        GameState g = newGame3P();
+
+        g.startHand(10);
+        assertThat(g.getButtonIndex()).isEqualTo(1);
+        finishHandByFoldingToWinner(g);
+
+        g.startHand(10);
+        assertThat(g.getButtonIndex()).isEqualTo(2);
+        finishHandByFoldingToWinner(g);
+
+        g.startHand(10);
+        assertThat(g.getButtonIndex()).isEqualTo(0);
+    }
+
+    @Test
+    void headsUpButtonPostsSmallBlind() {
+        GameState g = newGame2P();
+
+        g.startHand(10);
+
+        assertThat(g.getButtonIndex()).isEqualTo(1);
+        assertThat(g.getSmallBlindIdx()).isEqualTo(g.getButtonIndex());
+        assertThat(g.getBigBlindIdx()).isNotEqualTo(g.getSmallBlindIdx());
+    }
+
+    @Test
+    void multiPlayerBlindsFollowButton() {
+        GameState g = newGame3P();
+
+        g.startHand(10);
+
+        assertThat(g.getButtonIndex()).isEqualTo(1);
+        assertThat(g.getSmallBlindIdx()).isEqualTo((g.getButtonIndex() + 1) % 3);
+        assertThat(g.getBigBlindIdx()).isEqualTo((g.getButtonIndex() + 2) % 3);
     }
 
     @Test

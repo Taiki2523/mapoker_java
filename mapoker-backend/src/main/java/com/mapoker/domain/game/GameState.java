@@ -108,12 +108,19 @@ public class GameState {
         if (activePlayers < PokerConstants.MIN_PLAYERS)
             throw new IllegalStateException("not enough players with chips");
 
+        buttonIndex = nextActive(buttonIndex);
+
         // Shuffle fresh deck for new hand
         deck = Deck.newDeck();
         Deck.shuffle(deck, null);
 
-        smallBlindIdx = nextActive(buttonIndex);
-        bigBlindIdx = nextActive(smallBlindIdx);
+        if (activePlayers == 2) {
+            smallBlindIdx = buttonIndex;
+            bigBlindIdx = nextActive(buttonIndex);
+        } else {
+            smallBlindIdx = nextActive(buttonIndex);
+            bigBlindIdx = nextActive(smallBlindIdx);
+        }
 
         postBlind(smallBlindIdx, bigBlind / PokerConstants.SMALL_BLIND_DIVISOR);
         postBlind(bigBlindIdx, bigBlind);
