@@ -21,6 +21,7 @@ type Props = {
   loading: boolean
   loginError: string
   currentUser: AuthUser | null
+  onOpenMyPage: () => void
   onLogout: () => void
 }
 
@@ -28,11 +29,11 @@ export function WaitingScreen({
   gameId, inviteUrl, inviteCopied, onCopyInvite,
   game, roster, mySeatIndex, loginSeatIndex, setLoginSeatIndex, onJoinLobby, onStartHand,
   isOwner, canStartHand, lobbyReady, targetPlayerCount, loading, loginError,
-  currentUser, onLogout,
+  currentUser, onOpenMyPage, onLogout,
 }: Props) {
   return (
     <>
-      <UserHeader username={currentUser?.username ?? ''} onLogout={onLogout} />
+      <UserHeader username={currentUser?.username ?? ''} onOpenMyPage={onOpenMyPage} onLogout={onLogout} />
       <div>
         <h2>{t('waitingRoomTitle')}</h2>
         <p>{t('waitingRoomDesc')}</p>

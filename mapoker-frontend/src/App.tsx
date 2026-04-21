@@ -5,10 +5,12 @@ import { t } from './i18n'
 import { bestHandName } from './handEval'
 import { mapMembers } from './utils'
 import type {
-  AuthUser, BetPreset, CreateGameConfig, GameState, PayoutLine,
-  RoomMember, RoomMemberApi, Showdown,
+  AuthUser, BetPreset, CreateGameConfig, GameState, HandHistoryEntry, PayoutLine, Table,
+  RoomMember, RoomMemberApi, Showdown, StoredSession, UserTableHistoryEntry,
 } from './types'
 import { AuthScreen } from './components/AuthScreen'
+import { LobbyScreen } from './components/LobbyScreen'
+import { MyPagePanel } from './components/MyPagePanel'
 import { RoomScreen } from './components/RoomScreen'
 import { WaitingScreen } from './components/WaitingScreen'
 import { GameScreen } from './components/GameScreen'
@@ -31,6 +33,13 @@ function App() {
   const [loginError, setLoginError] = useState('')
   const [isOwner, setIsOwner] = useState(false)
   const [roster, setRoster] = useState<RoomMember[]>([])
+  const [showMyPage, setShowMyPage] = useState(false)
+  const [profileTables, setProfileTables] = useState<Table[]>([])
+  const [profileHistory, setProfileHistory] = useState<UserTableHistoryEntry[]>([])
+  const [profileHandHistory, setProfileHandHistory] = useState<HandHistoryEntry[]>([])
+  const [profileLoading, setProfileLoading] = useState(false)
+  const [profileError, setProfileError] = useState('')
+  const [roomScreenMode, setRoomScreenMode] = useState<'room' | 'lobby'>('room')
   const autoJoinRef = useRef<string | null>(null)
 
   const currentPlayer = useMemo(() => {
@@ -70,7 +79,7 @@ function App() {
 
   const inviteUrl = useMemo(() => {
     if (!gameId) return ''
-    return `${window.location.origin}?gameId=${gameId}`
+    return `${window.location.origin}?tableId=${gameId}`
   }, [gameId])
 
   const toCall = useMemo(() => {
@@ -164,7 +173,7 @@ function App() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    const initial = params.get('gameId')
+    const initial = params.get('tableId') ?? params.get('gameId')
     if (initial) {
       setGameId(initial)
       void refreshGame(initial)
@@ -270,7 +279,7 @@ function App() {
   const refreshMembers = async (id = gameId) => {
     if (!id) return
     try {
-      const data = await fetchJSON<{ members: RoomMemberApi[] }>(`/v1/rooms/${id}/members`)
+      const data = await fetchJSON<{ members: RoomMemberApi[] }>(`/v1/tables/${id}/members`)
       setRoster(mapMembers(data.members))
     } catch {
       // ignore
@@ -303,43 +312,80 @@ function App() {
     setGame(null)
     setMySeatIndex(null)
     setIsOwner(false)
+    setProfileHistory([])
+    setProfileHandHistory([])
+    setShowMyPage(false)
+    setRoomScreenMode('room')
+  }
+
+  const persistSession = (tableId: string, session: Omit<StoredSession, 'updatedAt'>) => {
+    window.localStorage.setItem(
+      `mapoker.session.${tableId}`,
+      JSON.stringify({
+        ...session,
+        updatedAt: new Date().toISOString(),
+      })
+    )
+  }
+
+  const refreshProfileTables = async () => {
+    setProfileLoading(true)
+    setProfileError('')
+    try {
+      const [tables, history, handHistory] = await Promise.all([
+        fetchJSON<Table[]>('/v1/tables'),
+        fetchJSON<UserTableHistoryEntry[]>('/v1/auth/history'),
+        fetchJSON<HandHistoryEntry[]>('/v1/auth/hand-history'),
+      ])
+      setProfileTables(tables)
+      setProfileHistory(history)
+      setProfileHandHistory(handHistory)
+    } catch (err) {
+      setProfileError((err as Error).message)
+    } finally {
+      setProfileLoading(false)
+    }
+  }
+
+  const openMyPage = async () => {
+    setShowMyPage(true)
+    await refreshProfileTables()
   }
 
   const createGame = async (config: CreateGameConfig) => {
     setLoading(true)
     setError('')
     setShowdown(null)
+    setRoomScreenMode('room')
     try {
-      const players = Array.from({ length: config.playerCount }, (_, idx) => ({
-        id: `p${idx + 1}`,
-        stack: config.stackSize,
-      }))
       const payload: Record<string, unknown> = {
-        players,
+        table_name: config.tableName.trim() || 'Cash Orbit',
+        player_count: config.playerCount,
+        stack_size: config.stackSize,
         button_index: config.buttonIndex,
         big_blind: config.bigBlind,
         odd_chip_rule: 'low_index',
+        visibility: config.visibility,
+        flags: config.flags,
       }
       if (config.seed.trim()) payload.seed = Number(config.seed)
-      const data = await fetchJSON<GameState>('/v1/games', {
+      const data = await fetchJSON<Table>('/v1/tables', {
         method: 'POST',
         body: JSON.stringify(payload),
       })
+      if (!data.game) throw new Error('table game payload is missing')
       setGameId(data.id)
-      setGame(data)
+      setGame(data.game)
       setMySeatIndex(0)
       setLoginSeatIndex(0)
       setIsOwner(true)
-      await fetchJSON(`/v1/rooms/${data.id}/join`, {
+      await fetchJSON(`/v1/tables/${data.id}/join`, {
         method: 'POST',
         body: JSON.stringify({ name: myName.trim() || 'Host', seat_index: 0 }),
       })
       await refreshMembers(data.id)
-      window.localStorage.setItem(
-        `mapoker.session.${data.id}`,
-        JSON.stringify({ name: myName.trim() || 'Host', seatIndex: 0, owner: true })
-      )
-      window.history.replaceState(null, '', `?gameId=${data.id}`)
+      persistSession(data.id, { name: myName.trim() || 'Host', seatIndex: 0, owner: true })
+      window.history.replaceState(null, '', `?tableId=${data.id}`)
       if (config.autoStart) await startHand(data.id, config.bigBlind)
     } catch (err) {
       setError((err as Error).message)
@@ -351,21 +397,22 @@ function App() {
   const joinRoom = async (raw: string) => {
     if (!raw) return
     setLoginError('')
+    setRoomScreenMode('room')
     let id = raw
     try {
       if (raw.includes('://')) {
         const url = new URL(raw)
-        id = url.searchParams.get('gameId') ?? raw
-      } else if (raw.includes('gameId=')) {
+        id = url.searchParams.get('tableId') ?? url.searchParams.get('gameId') ?? raw
+      } else if (raw.includes('tableId=') || raw.includes('gameId=')) {
         const url = new URL(`http://local.test/?${raw}`)
-        id = url.searchParams.get('gameId') ?? raw
+        id = url.searchParams.get('tableId') ?? url.searchParams.get('gameId') ?? raw
       }
     } catch {
       id = raw
     }
     setGameId(id)
     setShowdown(null)
-    window.history.replaceState(null, '', `?gameId=${id}`)
+    window.history.replaceState(null, '', `?tableId=${id}`)
     await refreshGame(id)
     await refreshMembers(id)
   }
@@ -380,7 +427,7 @@ function App() {
     setIsOwner(false)
     setLoginError('')
     try {
-      const result = await fetchJSON<{ members: RoomMemberApi[] }>(`/v1/rooms/${gameId}/join`, {
+      const result = await fetchJSON<{ members: RoomMemberApi[] }>(`/v1/tables/${gameId}/join`, {
         method: 'POST',
         body: JSON.stringify({ name: myName.trim(), seat_index: seatIndex }),
       })
@@ -388,16 +435,13 @@ function App() {
     } catch (err) {
       setLoginError((err as Error).message)
     }
-    window.localStorage.setItem(
-      `mapoker.session.${game.id}`,
-      JSON.stringify({ name: myName.trim(), seatIndex, owner: false })
-    )
+    persistSession(game.id, { name: myName.trim(), seatIndex, owner: false })
   }
 
   const leaveRoom = () => {
     if (!gameId) return
     if (mySeatIndex !== null) {
-      void fetchJSON<{ members: RoomMemberApi[] }>(`/v1/rooms/${gameId}/leave`, {
+      void fetchJSON<{ members: RoomMemberApi[] }>(`/v1/tables/${gameId}/leave`, {
         method: 'POST',
         body: JSON.stringify({ seat_index: mySeatIndex }),
       }).then((result) => setRoster(mapMembers(result.members)))
@@ -491,14 +535,26 @@ function App() {
               <AuthScreen onAuthSuccess={handleAuthSuccess} />
             )}
             {viewMode === 'room' && (
-              <RoomScreen
-                loading={loading}
-                error={error}
-                onCreateGame={createGame}
-                onJoinRoom={joinRoom}
-                currentUser={currentUser}
-                onLogout={() => void handleLogout()}
-              />
+              roomScreenMode === 'room' ? (
+                <RoomScreen
+                  loading={loading}
+                  error={error}
+                  onCreateGame={createGame}
+                  onJoinRoom={joinRoom}
+                  currentUser={currentUser}
+                  onOpenMyPage={() => void openMyPage()}
+                  onLogout={() => void handleLogout()}
+                  onOpenLobby={() => setRoomScreenMode('lobby')}
+                />
+              ) : (
+                <LobbyScreen
+                  currentUser={currentUser}
+                  onOpenMyPage={() => void openMyPage()}
+                  onLogout={() => void handleLogout()}
+                  onJoinRoom={joinRoom}
+                  onBack={() => setRoomScreenMode('room')}
+                />
+              )
             )}
             {viewMode === 'waiting' && (
               <WaitingScreen
@@ -520,6 +576,7 @@ function App() {
                 loading={loading}
                 loginError={loginError}
                 currentUser={currentUser}
+                onOpenMyPage={() => void openMyPage()}
                 onLogout={() => void handleLogout()}
               />
             )}
@@ -560,12 +617,30 @@ function App() {
           payoutLines={payoutLines}
           displayName={displayName}
           onCopyInvite={() => void copyInvite()}
+          onOpenMyPage={() => void openMyPage()}
           onLoginAsPlayer={() => void loginAsPlayer()}
           onLeaveRoom={leaveRoom}
           onLogout={() => void handleLogout()}
           onStartHand={() => void startHand()}
           onRunShowdown={() => void runShowdown()}
           onSendAction={(type, amount) => void sendAction(type, amount)}
+        />
+      )}
+      {showMyPage && currentUser && (
+        <MyPagePanel
+          currentUser={currentUser}
+          tables={profileTables}
+          history={profileHistory}
+          handHistory={profileHandHistory}
+          currentTableId={gameId}
+          loading={profileLoading}
+          error={profileError}
+          onClose={() => setShowMyPage(false)}
+          onRefresh={() => void refreshProfileTables()}
+          onOpenTable={(tableId) => {
+            setShowMyPage(false)
+            void joinRoom(tableId)
+          }}
         />
       )}
     </div>

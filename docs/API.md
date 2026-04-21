@@ -135,6 +135,55 @@
 ### ゲーム一覧取得（任意）
 `GET /v1/games`
 
+### テーブル作成
+`POST /v1/tables`
+
+```json
+{
+  "table_name": "Cash Orbit Tokyo",
+  "player_count": 6,
+  "stack_size": 200,
+  "big_blind": 10,
+  "button_index": 0,
+  "seed": 42,
+  "odd_chip_rule": "low_index",
+  "visibility": "public",
+  "flags": ["casual", "newbie"]
+}
+```
+
+レスポンスにはテーブル情報と初期 `game` スナップショットを含む。
+
+### テーブル一覧取得
+`GET /v1/tables`
+
+### テーブル取得
+`GET /v1/tables/{table_id}`
+
+### テーブル参加
+`POST /v1/tables/{table_id}/join`
+
+```json
+{
+  "name": "alice",
+  "seat_index": 1
+}
+```
+
+認証済みセッションでは `name` はサーバー側で現在ユーザーに正規化される。
+
+### テーブル退室
+`POST /v1/tables/{table_id}/leave`
+
+```json
+{
+  "seat_index": 1
+}
+```
+
+### テーブル参加者一覧
+`GET /v1/tables/{table_id}/members`
+
 ## 認証 API
 
 ユーザー名 / パスワード認証。Spring Security のセッション Cookie ベース。
@@ -170,6 +219,28 @@
 
 セッション Cookie から現在ユーザーを返す。未認証時は `401`。
 
+### プレイ履歴取得
+`GET /v1/auth/history`
+
+セッション Cookie から現在ユーザーの最近のテーブル参加履歴を返す。未認証時は `401`。
+
+レスポンス (`200 OK`):
+```json
+[
+  {
+    "table_id": "550e8400-e29b-41d4-a716-446655440000",
+    "table_name": "Cash Orbit Tokyo",
+    "seat_index": 1,
+    "visibility": "public",
+    "status": "waiting",
+    "flags": ["casual", "newbie"],
+    "joined_at": "2026-04-21T03:00:00Z",
+    "left_at": "2026-04-21T03:40:00Z",
+    "active": false
+  }
+]
+```
+
 ### ログアウト
 `POST /v1/auth/logout`
 
@@ -188,6 +259,7 @@
 ## 可視性に関する注意
 - hole cards の表示可否はリクエストした利用者に依存する
 - ハンド進行中は、自分の hole cards だけが見える
+- 認証済みセッションでは、サーバー側でテーブル参加席と照合して可視性を判定する
 - showdown では公開された hole cards を全員が見られる
 - 管理者 / デバッグ用の完全可視性はコアドメインの外で扱う
 
