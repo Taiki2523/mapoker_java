@@ -17,6 +17,7 @@ export function mapMembers(members: RoomMemberApi[] = []): RoomMember[] {
     name: member.name,
     seatIndex: member.seat_index,
     joinedAt: member.joined_at,
+    pendingLeave: member.pending_leave ?? false,
   }))
 }
 
@@ -26,7 +27,7 @@ export function seatPosition(seatIdx: number, mySeat: number, n: number) {
   const BET_RX = 26
   const BET_RY = 27
   const relIdx = ((seatIdx - mySeat) + n) % n
-  const angle = Math.PI / 2 - (relIdx * 2 * Math.PI / n)
+  const angle = Math.PI / 2 + (relIdx * 2 * Math.PI / n)
   return {
     x: 50 + ORBIT_RX * Math.cos(angle),
     y: 50 + ORBIT_RY * Math.sin(angle),

@@ -65,7 +65,7 @@ public class TableService {
                 game.getId(),
                 normalizeTableName(input.tableName(), game.getId()),
                 "ring",
-                Math.max(1, input.bigBlind() / 2),
+                input.smallBlind(),
                 input.bigBlind(),
                 minBuyIn,
                 maxBuyIn,
@@ -94,6 +94,7 @@ public class TableService {
             fromGame(game);
         });
         return tables.values().stream()
+                .filter(table -> !"inactive".equals(table.status()))
                 .filter(table -> visibilityFilter == null || table.visibility().equals(visibilityFilter))
                 .filter(table -> requiredFlags.stream().allMatch(table.flags()::contains))
                 .sorted(Comparator.comparing(TableRecord::createdAt).reversed())
@@ -356,6 +357,9 @@ public class TableService {
         if (input.bigBlind() <= 0) {
             throw new IllegalArgumentException("big blind must be positive");
         }
+        if (input.smallBlind() <= 0) {
+            throw new IllegalArgumentException("small blind must be positive");
+        }
     }
 
     private TableMemberRecord findMember(List<TableMemberRecord> members, String name, Integer seatIndex) {
@@ -425,10 +429,19 @@ public class TableService {
     public record CreateRingTableInput(
             String tableName,
             int playerCount,
+            int smallBlind,
             int bigBlind,
             String visibility,
             List<String> flags
-    ) {}
+    ) {
+        public CreateRingTableInput(String tableName,
+                                    int playerCount,
+                                    int bigBlind,
+                                    String visibility,
+                                    List<String> flags) {
+            this(tableName, playerCount, Math.max(1, bigBlind / 2), bigBlind, visibility, flags);
+        }
+    }
 
     public record JoinResult(int assignedSeatIndex, List<TableMemberRecord> members) {}
 

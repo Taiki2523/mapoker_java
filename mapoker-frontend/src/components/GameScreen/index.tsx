@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { AuthUser, BetPreset, GameState, PayoutLine, Player, Showdown } from '../../types'
+import type { AuthUser, BetPreset, GameState, PayoutLine, Player, RoomMember, Showdown } from '../../types'
 import { TopBar } from './TopBar'
 import { TableArea } from './TableArea'
 import { ActionPanel } from './ActionPanel'
@@ -14,8 +14,8 @@ type Props = {
   mySeatIndex: number | null
   loginSeatIndex: number
   setLoginSeatIndex: (n: number) => void
-  isOwner: boolean
   isSpectator: boolean
+  roster: RoomMember[]
   autoRefresh: boolean
   setAutoRefresh: (v: boolean) => void
   actionAmount: number
@@ -24,6 +24,7 @@ type Props = {
   error: string
   inviteCopied: boolean
   loginError: string
+  leavePending: boolean
   toCall: number
   minRaise: number
   maxBet: number
@@ -39,8 +40,6 @@ type Props = {
   onLoginAsPlayer: () => void
   onLeaveRoom: () => void
   onLogout: () => void
-  onStartHand: () => void
-  onRunShowdown: () => void
   onSendAction: (type: string, amount: number) => void
 }
 
@@ -48,14 +47,14 @@ export function GameScreen({
   game, showdown, isShowdown,
   currentUser, myName, mySeat, mySeatIndex,
   loginSeatIndex, setLoginSeatIndex,
-  isOwner, isSpectator, autoRefresh, setAutoRefresh,
+  isSpectator, roster, autoRefresh, setAutoRefresh,
   actionAmount, setActionAmount, loading, error,
-  inviteCopied, loginError,
+  inviteCopied, loginError, leavePending,
   toCall, minRaise, maxBet, betPresets,
   myHandName, currentPlayer, canAct,
   winnerNames, payoutLines, displayName,
   onCopyInvite, onOpenMyPage, onLoginAsPlayer, onLeaveRoom, onLogout,
-  onStartHand, onRunShowdown, onSendAction,
+  onSendAction,
 }: Props) {
   const [showSession, setShowSession] = useState(false)
 
@@ -68,9 +67,9 @@ export function GameScreen({
         mySeatIndex={mySeatIndex}
         loginSeatIndex={loginSeatIndex}
         setLoginSeatIndex={setLoginSeatIndex}
-        isOwner={isOwner}
         loading={loading}
         error={error}
+        leavePending={leavePending}
         autoRefresh={autoRefresh}
         setAutoRefresh={setAutoRefresh}
         inviteCopied={inviteCopied}
@@ -79,8 +78,6 @@ export function GameScreen({
         onLoginAsPlayer={onLoginAsPlayer}
         onLeaveRoom={onLeaveRoom}
         onLogout={onLogout}
-        onStartHand={onStartHand}
-        onRunShowdown={onRunShowdown}
         loginError={loginError}
         showSession={showSession}
         onToggleSession={() => setShowSession((v) => !v)}
@@ -91,6 +88,7 @@ export function GameScreen({
         isShowdown={isShowdown}
         mySeat={mySeat}
         isSpectator={isSpectator}
+        roster={roster}
         winnerNames={winnerNames}
         payoutLines={payoutLines}
         displayName={displayName}
@@ -101,7 +99,6 @@ export function GameScreen({
         mySeatIndex={mySeatIndex}
         canAct={canAct}
         loading={loading}
-        isOwner={isOwner}
         toCall={toCall}
         minRaise={minRaise}
         maxBet={maxBet}

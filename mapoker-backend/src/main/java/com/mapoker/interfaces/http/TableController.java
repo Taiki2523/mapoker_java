@@ -32,6 +32,7 @@ public class TableController {
         TableService.CreateTableResult result = tableService.createRingTable(new TableService.CreateRingTableInput(
                 request.tableName(),
                 request.playerCount(),
+                request.smallBlind(),
                 request.bigBlind(),
                 request.visibility(),
                 request.flags()
@@ -78,7 +79,7 @@ public class TableController {
 
     private List<TableResponse.MemberDto> toMembers(List<TableMemberRecord> members) {
         return members.stream()
-                .map(member -> new TableResponse.MemberDto(member.name(), member.seatIndex(), member.joinedAt()))
+                .map(member -> new TableResponse.MemberDto(member.name(), member.seatIndex(), member.joinedAt(), member.pendingLeave()))
                 .toList();
     }
 

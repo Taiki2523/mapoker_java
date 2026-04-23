@@ -61,6 +61,7 @@ const ja = {
   joinLobby: 'ロビーに参加',
   playersJoined: '参加プレイヤー',
   waitingForPlayers: 'プレイヤーを待っています...',
+  leavePending: '退席予約中...',
 
   // --- テーブル ---
   tableTitle: 'テーブル',
@@ -102,13 +103,10 @@ const ja = {
   // --- ショーダウン ---
   showdownTitle: 'ショーダウン',
   showdownDesc: 'ハンドを解決してペイアウトを確認',
-  runShowdown: 'ショーダウン実行',
-  waitingHostShowdown: 'ホストがショーダウンを実行するまでお待ちください',
   winners: '勝者',
   bestHand: 'ベストハンド',
   payouts: 'ペイアウト',
   noShowdown: 'まだショーダウンはありません',
-  nextHand: '次のハンド',
 
   // --- フッター ---
   tip: 'ヒント',
@@ -146,7 +144,6 @@ const ja = {
   close: '閉じる',
   currentTable: '現在のテーブル',
   none: 'なし',
-  owner: 'オーナー',
   guest: 'ゲスト',
   notJoined: 'まだ着席していません',
   playHistory: 'プレイ履歴',
@@ -156,6 +153,8 @@ const ja = {
   lobbyBrowserTitle: 'ロビーブラウザ',
   lobbyBrowserDesc: '公開・非公開テーブルを絞り込んで参加先を探せます',
   backToRoomForm: '作成画面に戻る',
+  backToLobby: 'ロビーに戻る',
+  back: '戻る',
   joinTable: '参加',
   noLobbyTables: '条件に合うテーブルはありません',
   stakeLabel: 'ブラインド',
@@ -206,6 +205,13 @@ const ja = {
   ring: 'リングゲーム',
   tournament: 'トーナメント',
   comingSoon: '近日公開',
+  gameTypeTitle: 'ゲームタイプを選択',
+  gameTypeDesc: 'どのゲームで遊びますか？',
+  buyInTitle: 'バイイン',
+  buyInAmount: 'バイイン額',
+  buyInMin: '最小',
+  buyInMax: '最大',
+  cancel: 'キャンセル',
   youHaveBeenRemovedFromTable: 'テーブルから退席しました',
   rebuy: 'リバイ',
 

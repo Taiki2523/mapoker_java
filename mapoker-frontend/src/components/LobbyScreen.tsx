@@ -9,6 +9,7 @@ type Props = {
   onOpenMyPage: () => void
   onLogout: () => void
   onJoinRoom: (tableId: string) => Promise<void>
+  onCreateTable: () => void
   onBack: () => void
 }
 
@@ -28,7 +29,7 @@ const statusLabels: Record<string, string> = {
   finished: t('tableStatusFinished'),
 }
 
-export function LobbyScreen({ currentUser, onOpenMyPage, onLogout, onJoinRoom, onBack }: Props) {
+export function LobbyScreen({ currentUser, onOpenMyPage, onLogout, onJoinRoom, onCreateTable, onBack }: Props) {
   const [tables, setTables] = useState<Table[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -81,8 +82,11 @@ export function LobbyScreen({ currentUser, onOpenMyPage, onLogout, onJoinRoom, o
           <button className="secondary" onClick={() => void refreshTables()} disabled={loading}>
             {t('refresh')}
           </button>
+          <button className="primary" onClick={onCreateTable}>
+            {t('createGame')}
+          </button>
           <button className="ghost" onClick={onBack}>
-            {t('backToRoomForm')}
+            {t('back')}
           </button>
         </div>
       </div>

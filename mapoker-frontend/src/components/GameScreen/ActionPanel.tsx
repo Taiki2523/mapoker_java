@@ -7,7 +7,6 @@ type Props = {
   mySeatIndex: number | null
   canAct: boolean
   loading: boolean
-  isOwner: boolean
   toCall: number
   minRaise: number
   maxBet: number
@@ -21,7 +20,7 @@ type Props = {
 }
 
 export function ActionPanel({
-  game, mySeatIndex, canAct, loading, isOwner,
+  game, mySeatIndex, canAct, loading,
   toCall, minRaise, maxBet, betPresets, actionAmount, setActionAmount,
   myHandName, currentPlayer, displayName, onSendAction,
 }: Props) {
@@ -47,9 +46,6 @@ export function ActionPanel({
             <span className="muted-light">
               {currentPlayer ? displayName(game.current_player) : '?'}...
             </span>
-          )}
-          {game?.status === 'showdown' && !isOwner && (
-            <span className="muted-light">{t('waitingHostShowdown')}</span>
           )}
         </div>
       </div>

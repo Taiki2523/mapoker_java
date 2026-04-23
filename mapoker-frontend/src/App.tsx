@@ -10,10 +10,14 @@ import type {
   WalletLedgerEntry, WalletSummary,
 } from './types'
 import { AuthScreen } from './components/AuthScreen'
+import { BuyInPopup } from './components/BuyInPopup'
+import { GameTypeScreen } from './components/GameTypeScreen'
 import { LobbyScreen } from './components/LobbyScreen'
 import { MyPagePanel } from './components/MyPagePanel'
 import { RoomScreen } from './components/RoomScreen'
 import { GameScreen } from './components/GameScreen'
+
+const NEXT_HAND_DELAY_MS = 3000
 
 function App() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
@@ -31,7 +35,7 @@ function App() {
   const [mySeatIndex, setMySeatIndex] = useState<number | null>(null)
   const [loginSeatIndex, setLoginSeatIndex] = useState(0)
   const [loginError, setLoginError] = useState('')
-  const [isOwner, setIsOwner] = useState(false)
+  const [leavePending, setLeavePending] = useState(false)
   const [roster, setRoster] = useState<RoomMember[]>([])
   const [showMyPage, setShowMyPage] = useState(false)
   const [table, setTable] = useState<Table | null>(null)
@@ -42,7 +46,16 @@ function App() {
   const [walletLedger, setWalletLedger] = useState<WalletLedgerEntry[]>([])
   const [profileLoading, setProfileLoading] = useState(false)
   const [profileError, setProfileError] = useState('')
-  const [roomScreenMode, setRoomScreenMode] = useState<'room' | 'lobby'>('room')
+  const [roomScreenMode, setRoomScreenMode] = useState<'gameType' | 'room' | 'lobby'>('gameType')
+  const [buyInContext, setBuyInContext] = useState<{
+    tableId: string
+    tableName: string
+    minBuyIn: number
+    maxBuyIn: number
+    bigBlind: number
+    onConfirm: (amount: number) => void
+    onCancel: () => void
+  } | null>(null)
 
   const formatErrorMessage = (err: unknown) => {
     const message = err instanceof Error ? err.message : String(err)
@@ -177,11 +190,10 @@ function App() {
     const raw = window.localStorage.getItem(`mapoker.session.${gameId}`)
     if (!raw) return
     try {
-      const data = JSON.parse(raw) as { name: string; seatIndex: number; owner: boolean }
+      const data = JSON.parse(raw) as StoredSession
       setMyName(data.name)
       setMySeatIndex(data.seatIndex)
       setLoginSeatIndex(data.seatIndex)
-      setIsOwner(data.owner)
     } catch {
       // ignore
     }
@@ -208,11 +220,20 @@ function App() {
 
   useEffect(() => {
     if (!game) return
-    if (game.status === 'showdown' && !showdown && isOwner) {
-      void runShowdown()
+    if (game.status === 'showdown' && !showdown) {
+      void runShowdown({ suppressError: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game, isOwner, showdown])
+  }, [game, showdown])
+
+  useEffect(() => {
+    if (!game || game.status !== 'finished' || !game.can_start_hand) return
+    const timer = window.setTimeout(() => {
+      void startHand(undefined, undefined, { suppressError: true })
+    }, NEXT_HAND_DELAY_MS)
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game?.status, game?.can_start_hand, gameId])
 
   useEffect(() => {
     if (isMyTurn && !prevIsMyTurn.current) {
@@ -220,6 +241,27 @@ function App() {
     }
     prevIsMyTurn.current = isMyTurn
   }, [isMyTurn, minRaise])
+
+  // Bug3: 退席予約が解消されたらロビーに戻る
+  useEffect(() => {
+    if (!leavePending || !myName.trim()) return
+    const stillInRoster = roster.some((m) => m.name === myName.trim())
+    if (!stillInRoster) {
+      navigateToLobby()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roster, leavePending, myName])
+
+  // Bug4: ローカルのシート番号が他のプレイヤーと衝突していたらリセット
+  useEffect(() => {
+    if (mySeatIndex === null || !myName.trim() || !roster.length) return
+    const memberAtSeat = roster.find((m) => m.seatIndex === mySeatIndex)
+    if (memberAtSeat && memberAtSeat.name !== myName.trim()) {
+      setMySeatIndex(null)
+      if (gameId) window.localStorage.removeItem(`mapoker.session.${gameId}`)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roster])
 
   const refreshGame = async (id = gameId) => {
     if (!id) return
@@ -311,13 +353,13 @@ function App() {
     setGame(null)
     setTable(null)
     setMySeatIndex(null)
-    setIsOwner(false)
     setProfileHistory([])
     setProfileHandHistory([])
     setWallet(null)
     setWalletLedger([])
     setShowMyPage(false)
-    setRoomScreenMode('room')
+    setBuyInContext(null)
+    setRoomScreenMode('gameType')
   }
 
   const persistSession = (tableId: string, session: Omit<StoredSession, 'updatedAt'>) => {
@@ -355,47 +397,69 @@ function App() {
     await refreshProfileTables()
   }
 
+  const doTableJoin = async (tableId: string, name: string, buyIn: number) => {
+    const result = await fetchJSON<JoinResponse>(`/v1/tables/${tableId}/join`, {
+      method: 'POST',
+      body: JSON.stringify({ name, buy_in: buyIn }),
+    })
+    const assignedSeatIndex = result.assigned_seat_index
+    setMySeatIndex(assignedSeatIndex)
+    setLoginSeatIndex(assignedSeatIndex)
+    setRoster(mapMembers(result.members))
+    persistSession(tableId, { name, seatIndex: assignedSeatIndex })
+    return assignedSeatIndex
+  }
+
   const createGame = async (config: CreateGameConfig) => {
     setLoading(true)
     setError('')
     setShowdown(null)
-    setRoomScreenMode('room')
     try {
-      const payload: Record<string, unknown> = {
+      const payload = {
         table_name: config.tableName.trim() || 'Cash Orbit',
         player_count: config.playerCount,
-        stack_size: config.stackSize,
-        button_index: config.buttonIndex,
+        small_blind: config.smallBlind,
         big_blind: config.bigBlind,
-        odd_chip_rule: 'low_index',
         visibility: config.visibility,
         flags: config.flags,
       }
-      if (config.seed.trim()) payload.seed = Number(config.seed)
       const data = await fetchJSON<Table>('/v1/tables', {
         method: 'POST',
         body: JSON.stringify(payload),
       })
       if (!data.game) throw new Error('table game payload is missing')
-      setGameId(data.id)
-      setGame(data.game)
-      setTable(data)
-      setIsOwner(true)
-      const result = await fetchJSON<JoinResponse>(`/v1/tables/${data.id}/join`, {
-        method: 'POST',
-        body: JSON.stringify({
-          name: myName.trim() || 'Host',
-          seat_index: 0,
-          buy_in: data.min_buy_in ?? 0,
-        }),
-      })
-      const assignedSeatIndex = result.assigned_seat_index
-      setMySeatIndex(assignedSeatIndex)
-      setLoginSeatIndex(assignedSeatIndex)
-      setRoster(mapMembers(result.members))
-      persistSession(data.id, { name: myName.trim() || 'Host', seatIndex: assignedSeatIndex, owner: true })
-      window.history.replaceState(null, '', `?tableId=${data.id}`)
-      if (config.autoStart) await startHand(data.id, config.bigBlind)
+
+      const name = myName.trim() || 'Host'
+
+      const doJoinAndNavigate = async (buyIn: number) => {
+        setLoading(true)
+        try {
+          setGameId(data.id)
+          setGame(data.game ?? null)
+          setTable(data)
+          window.history.replaceState(null, '', `?tableId=${data.id}`)
+          await doTableJoin(data.id, name, buyIn)
+          await refreshGame(data.id)
+        } catch (err) {
+          setError(formatErrorMessage(err))
+        } finally {
+          setLoading(false)
+        }
+      }
+
+      if (data.min_buy_in > 0) {
+        setBuyInContext({
+          tableId: data.id,
+          tableName: data.name,
+          minBuyIn: data.min_buy_in,
+          maxBuyIn: data.max_buy_in,
+          bigBlind: data.stake.big_blind,
+          onConfirm: (amount) => { setBuyInContext(null); void doJoinAndNavigate(amount) },
+          onCancel: () => { setBuyInContext(null) },
+        })
+      } else {
+        await doJoinAndNavigate(0)
+      }
     } catch (err) {
       setError(formatErrorMessage(err))
     } finally {
@@ -428,30 +492,68 @@ function App() {
     await refreshTable(id)
   }
 
-  const loginAsPlayer = async (seatOverride?: number) => {
+  const loginAsPlayer = async () => {
     if (!game) { setLoginError(t('errLoadRoom')); return }
     if (!myName.trim()) { setLoginError(t('errEnterName')); return }
-    const seatIndex = seatOverride ?? loginSeatIndex
-    if (seatIndex < 0 || seatIndex >= game.players.length) { setLoginError(t('errSelectSeat')); return }
     if (!gameId) { setLoginError(t('errMissingRoom')); return }
-    setIsOwner(false)
     setLoginError('')
-    try {
-      const result = await fetchJSON<JoinResponse>(`/v1/tables/${gameId}/join`, {
-        method: 'POST',
-        body: JSON.stringify({
-          name: myName.trim(),
-          seat_index: seatIndex,
-          buy_in: table?.min_buy_in ?? 0,
-        }),
+
+    const doLogin = async (buyIn: number) => {
+      try {
+        await doTableJoin(gameId, myName.trim(), buyIn)
+      } catch (err) {
+        setLoginError(formatErrorMessage(err))
+      }
+    }
+
+    if (table && table.min_buy_in > 0) {
+      setBuyInContext({
+        tableId: gameId,
+        tableName: table.name,
+        minBuyIn: table.min_buy_in,
+        maxBuyIn: table.max_buy_in,
+        bigBlind: table.stake.big_blind,
+        onConfirm: (amount) => { setBuyInContext(null); void doLogin(amount) },
+        onCancel: () => { setBuyInContext(null) },
       })
-      const assignedSeatIndex = result.assigned_seat_index
-      setMySeatIndex(assignedSeatIndex)
-      setLoginSeatIndex(assignedSeatIndex)
-      setRoster(mapMembers(result.members))
-      persistSession(gameId, { name: myName.trim(), seatIndex: assignedSeatIndex, owner: false })
-    } catch (err) {
-      setLoginError(formatErrorMessage(err))
+    } else {
+      await doLogin(0)
+    }
+  }
+
+  const lobbyJoinWithBuyIn = async (tableId: string) => {
+    setRoomScreenMode('room')
+    let id = tableId
+    setGameId(id)
+    setTable(null)
+    setShowdown(null)
+    window.history.replaceState(null, '', `?tableId=${id}`)
+    await refreshGame(id)
+    await refreshMembers(id)
+    const fetchedTable = await refreshTable(id)
+
+    if (!myName.trim()) return
+
+    const doJoin = async (buyIn: number) => {
+      try {
+        await doTableJoin(id, myName.trim(), buyIn)
+      } catch (err) {
+        setError(formatErrorMessage(err))
+      }
+    }
+
+    if (fetchedTable && fetchedTable.min_buy_in > 0) {
+      setBuyInContext({
+        tableId: id,
+        tableName: fetchedTable.name,
+        minBuyIn: fetchedTable.min_buy_in,
+        maxBuyIn: fetchedTable.max_buy_in,
+        bigBlind: fetchedTable.stake.big_blind,
+        onConfirm: (amount) => { setBuyInContext(null); void doJoin(amount) },
+        onCancel: () => { setBuyInContext(null) },
+      })
+    } else {
+      await doJoin(0)
     }
   }
 
@@ -481,17 +583,40 @@ function App() {
     }
   }
 
-  const leaveRoom = () => {
-    if (!gameId) return
-    if (mySeatIndex !== null) {
-      void fetchJSON<{ members: RoomMemberApi[] }>(`/v1/tables/${gameId}/leave`, {
-        method: 'POST',
-        body: JSON.stringify({ seat_index: mySeatIndex }),
-      }).then((result) => setRoster(mapMembers(result.members)))
+  const navigateToLobby = () => {
+    if (gameId) {
+      window.localStorage.removeItem(`mapoker.session.${gameId}`)
+      window.history.replaceState(null, '', window.location.pathname)
     }
-    window.localStorage.removeItem(`mapoker.session.${gameId}`)
+    setGameId('')
+    setGame(null)
     setMySeatIndex(null)
-    setIsOwner(false)
+    setRoster([])
+    setLeavePending(false)
+    setShowdown(null)
+    setRoomScreenMode('lobby')
+  }
+
+  const leaveRoom = async () => {
+    if (!gameId) return
+    try {
+      const result = await fetchJSON<{ members: RoomMemberApi[] }>(`/v1/tables/${gameId}/leave`, {
+        method: 'POST',
+        body: JSON.stringify({ name: myName, seat_index: mySeatIndex }),
+      })
+      const updatedRoster = mapMembers(result.members)
+      setRoster(updatedRoster)
+      const stillInRoster = updatedRoster.some(
+        (m) => m.name === myName.trim()
+      )
+      if (stillInRoster) {
+        setLeavePending(true)
+      } else {
+        navigateToLobby()
+      }
+    } catch {
+      navigateToLobby()
+    }
   }
 
   const copyInvite = async () => {
@@ -505,11 +630,17 @@ function App() {
     }
   }
 
-  const startHand = async (id = gameId, bigBlindOverride?: number) => {
+  const startHand = async (
+    id = gameId,
+    bigBlindOverride?: number,
+    options?: { suppressError?: boolean }
+  ) => {
     if (!id) return
     setLoading(true)
     setError('')
     setShowdown(null)
+    setActionAmount(0)
+    prevIsMyTurn.current = false
     try {
       const bb = bigBlindOverride ?? game?.big_blind ?? 10
       await fetchJSON(`/v1/games/${id}/start`, {
@@ -518,7 +649,9 @@ function App() {
       })
       await refreshGame(id)
     } catch (err) {
-      setError((err as Error).message)
+      if (!options?.suppressError) {
+        setError((err as Error).message)
+      }
     } finally {
       setLoading(false)
     }
@@ -540,8 +673,8 @@ function App() {
       } else {
         setShowdown(null)
       }
-      if (data.status === 'showdown' && !showdown && isOwner) {
-        void runShowdown()
+      if (data.status === 'showdown' && !showdown) {
+        void runShowdown({ suppressError: true })
       } else {
         await refreshGame(gameId)
       }
@@ -552,7 +685,7 @@ function App() {
     }
   }
 
-  const runShowdown = async () => {
+  const runShowdown = async (options?: { suppressError?: boolean }) => {
     if (!gameId || showdownInFlight.current) return
     showdownInFlight.current = true
     setLoading(true)
@@ -562,7 +695,9 @@ function App() {
       setShowdown(data)
       await refreshGame(gameId)
     } catch (err) {
-      setError((err as Error).message)
+      if (!options?.suppressError) {
+        setError((err as Error).message)
+      }
     } finally {
       showdownInFlight.current = false
       setLoading(false)
@@ -577,27 +712,34 @@ function App() {
             {viewMode === 'auth' && (
               <AuthScreen onAuthSuccess={handleAuthSuccess} />
             )}
-            {viewMode === 'room' && (
-              roomScreenMode === 'room' ? (
-                <RoomScreen
-                  loading={loading}
-                  error={error}
-                  onCreateGame={createGame}
-                  onJoinRoom={joinRoom}
-                  currentUser={currentUser}
-                  onOpenMyPage={() => void openMyPage()}
-                  onLogout={() => void handleLogout()}
-                  onOpenLobby={() => setRoomScreenMode('lobby')}
-                />
-              ) : (
-                <LobbyScreen
-                  currentUser={currentUser}
-                  onOpenMyPage={() => void openMyPage()}
-                  onLogout={() => void handleLogout()}
-                  onJoinRoom={joinRoom}
-                  onBack={() => setRoomScreenMode('room')}
-                />
-              )
+            {viewMode === 'room' && roomScreenMode === 'gameType' && (
+              <GameTypeScreen
+                currentUser={currentUser}
+                onOpenMyPage={() => void openMyPage()}
+                onLogout={() => void handleLogout()}
+                onSelectRing={() => setRoomScreenMode('lobby')}
+              />
+            )}
+            {viewMode === 'room' && roomScreenMode === 'room' && (
+              <RoomScreen
+                loading={loading}
+                error={error}
+                onCreateGame={createGame}
+                currentUser={currentUser}
+                onOpenMyPage={() => void openMyPage()}
+                onLogout={() => void handleLogout()}
+                onBack={() => setRoomScreenMode('lobby')}
+              />
+            )}
+            {viewMode === 'room' && roomScreenMode === 'lobby' && (
+              <LobbyScreen
+                currentUser={currentUser}
+                onOpenMyPage={() => void openMyPage()}
+                onLogout={() => void handleLogout()}
+                onJoinRoom={lobbyJoinWithBuyIn}
+                onCreateTable={() => setRoomScreenMode('room')}
+                onBack={() => setRoomScreenMode('gameType')}
+              />
             )}
           </div>
         </div>
@@ -613,8 +755,8 @@ function App() {
           mySeatIndex={mySeatIndex}
           loginSeatIndex={loginSeatIndex}
           setLoginSeatIndex={setLoginSeatIndex}
-          isOwner={isOwner}
           isSpectator={isSpectator}
+          roster={roster}
           autoRefresh={autoRefresh}
           setAutoRefresh={setAutoRefresh}
           actionAmount={actionAmount}
@@ -623,6 +765,7 @@ function App() {
           error={error}
           inviteCopied={inviteCopied}
           loginError={loginError}
+          leavePending={leavePending}
           toCall={toCall}
           minRaise={minRaise}
           maxBet={maxBet}
@@ -638,9 +781,17 @@ function App() {
           onLoginAsPlayer={() => void loginAsPlayer()}
           onLeaveRoom={leaveRoom}
           onLogout={() => void handleLogout()}
-          onStartHand={() => void startHand()}
-          onRunShowdown={() => void runShowdown()}
           onSendAction={(type, amount) => void sendAction(type, amount)}
+        />
+      )}
+      {buyInContext && (
+        <BuyInPopup
+          tableName={buyInContext.tableName}
+          minBuyIn={buyInContext.minBuyIn}
+          maxBuyIn={buyInContext.maxBuyIn}
+          bigBlind={buyInContext.bigBlind}
+          onConfirm={buyInContext.onConfirm}
+          onCancel={buyInContext.onCancel}
         />
       )}
       {showMyPage && currentUser && (
