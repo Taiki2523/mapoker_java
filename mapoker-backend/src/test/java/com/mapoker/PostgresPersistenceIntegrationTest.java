@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.List;
 
@@ -20,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(classes = MapokerApplication.class)
 @Import(TestcontainersConfiguration.class)
 @ActiveProfiles("postgresql")
+@Testcontainers(disabledWithoutDocker = true)
 class PostgresPersistenceIntegrationTest {
 
     @Autowired
@@ -69,22 +71,18 @@ class PostgresPersistenceIntegrationTest {
         var created = tableService.createRingTable(new TableService.CreateRingTableInput(
                 "History Table",
                 3,
-                150,
                 10,
-                0,
-                7L,
-                OddChipRule.LOW_INDEX,
                 "public",
                 List.of("casual", "newbie")
         ));
 
-        tableService.join(created.table().id(), "history_alice", 1);
-        tableService.leave(created.table().id(), "history_alice", 1);
+        var joinResult = tableService.join(created.table().id(), "history_alice", 0);
+        tableService.leave(created.table().id(), "history_alice", null);
 
         var history = userTableHistoryService.listRecent("history_alice", 10);
         assertThat(history).hasSize(1);
         assertThat(history.get(0).tableName()).isEqualTo("History Table");
-        assertThat(history.get(0).seatIndex()).isEqualTo(1);
+        assertThat(history.get(0).seatIndex()).isEqualTo(joinResult.assignedSeatIndex());
         assertThat(history.get(0).flags()).containsExactly("casual", "newbie");
         assertThat(history.get(0).active()).isFalse();
         assertThat(history.get(0).leftAt()).isNotNull();

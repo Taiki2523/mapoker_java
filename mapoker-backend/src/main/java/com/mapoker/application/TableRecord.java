@@ -17,7 +17,8 @@ public record TableRecord(
         String visibility,
         String status,
         String gameId,
-        Instant createdAt
+        Instant createdAt,
+        boolean everSeated
 ) {
     public TableRecord {
         if (name == null || name.isBlank()) {

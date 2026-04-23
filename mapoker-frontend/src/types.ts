@@ -12,6 +12,8 @@ export type GameState = {
   status: string
   street: string
   button_index: number
+  small_blind_idx: number
+  big_blind_idx: number
   current_player: number
   current_bet: number
   last_raise_size: number
@@ -21,6 +23,8 @@ export type GameState = {
   community: string[]
   odd_chip_rule: string
   can_start_hand?: boolean
+  viewer_membership_active: boolean
+  can_rebuy: boolean
   last_showdown?: Showdown
 }
 
@@ -42,7 +46,6 @@ export type TableFlag = 'casual' | 'serious' | 'newbie' | 'short_handed'
 export type StoredSession = {
   name: string
   seatIndex: number
-  owner: boolean
   updatedAt?: string
 }
 
@@ -75,6 +78,22 @@ export type HandHistoryEntry = {
   pot: number
   street: string
   finished_at: string
+}
+
+export type WalletSummary = {
+  chip_balance: number
+  next_daily_bonus_at: string | null
+  next_recovery_at: string | null
+}
+
+export type WalletLedgerEntry = {
+  id: number
+  delta: number
+  balance_after: number
+  reason: string
+  reference_type: string | null
+  reference_id: string | null
+  created_at: string
 }
 
 export type Table = {
@@ -110,12 +129,21 @@ export type RoomMember = {
   name: string
   seatIndex: number
   joinedAt?: string
+  pendingLeave?: boolean
 }
 
 export type RoomMemberApi = {
   name: string
   seat_index: number
   joined_at: string
+  pending_leave?: boolean
+}
+
+export type Member = RoomMemberApi
+
+export type JoinResponse = {
+  assigned_seat_index: number
+  members: Member[]
 }
 
 export type BetPreset = {
@@ -131,11 +159,8 @@ export type PayoutLine = {
 export type CreateGameConfig = {
   tableName: string
   playerCount: number
-  stackSize: number
+  smallBlind: number
   bigBlind: number
-  buttonIndex: number
-  seed: string
-  autoStart: boolean
   visibility: TableVisibility
   flags: TableFlag[]
 }

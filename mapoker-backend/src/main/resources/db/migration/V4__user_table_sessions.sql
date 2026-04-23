@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS user_table_sessions CASCADE;
+
 CREATE TABLE user_table_sessions (
   id BIGSERIAL PRIMARY KEY,
   username VARCHAR(50) NOT NULL,

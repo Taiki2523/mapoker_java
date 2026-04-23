@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS hand_history CASCADE;
+
 CREATE TABLE hand_history (
   id BIGSERIAL PRIMARY KEY,
   table_id VARCHAR(64) NOT NULL,

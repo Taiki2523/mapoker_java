@@ -59,8 +59,8 @@ graph TD
     O5 --> P[stackが0以下のプレイヤーはfold扱い]
     P --> Q{チップを持つプレイヤーが2人以上か}
     Q -- No --> Z2
-    Q -- Yes --> R[SBをbutton左のactiveで決定]
-    R --> S[BBをSB左のactiveで決定]
+    Q -- Yes --> R[SBを決定<br/>2人: button=SB<br/>3人以上: button左のactive]
+    R --> S[BBを決定<br/>2人: もう1人<br/>3人以上: SB左のactive]
     S --> T[SBをpostBlind]
     T --> U[BBをpostBlind]
     U --> V[blindでstackが0になったらall-in]

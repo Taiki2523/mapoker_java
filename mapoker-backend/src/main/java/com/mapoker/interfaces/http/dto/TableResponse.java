@@ -32,14 +32,15 @@ public record TableResponse(
     public record MemberDto(
             String name,
             @JsonProperty("seat_index") int seatIndex,
-            @JsonProperty("joined_at") String joinedAt
+            @JsonProperty("joined_at") String joinedAt,
+            @JsonProperty("pending_leave") boolean pendingLeave
     ) {}
 
     public static TableResponse from(TableRecord table, List<TableMemberRecord> members, GameResponse game) {
         List<MemberDto> memberDtos = members == null
                 ? List.of()
                 : members.stream()
-                .map(member -> new MemberDto(member.name(), member.seatIndex(), member.joinedAt()))
+                .map(member -> new MemberDto(member.name(), member.seatIndex(), member.joinedAt(), member.pendingLeave()))
                 .toList();
         return new TableResponse(
                 table.id(),

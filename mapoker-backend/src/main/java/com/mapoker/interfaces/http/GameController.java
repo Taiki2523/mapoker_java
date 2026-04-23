@@ -59,7 +59,7 @@ public class GameController {
 
     @PostMapping("/{id}/start")
     public GameResponse startHand(@PathVariable String id, @Valid @RequestBody StartHandRequest req) {
-        return GameResponse.from(gameService.startHand(id, req.bigBlind()), null, false);
+        return GameResponse.from(tableService.startHand(id, req.bigBlind()), null, false);
     }
 
     @PostMapping("/{id}/actions")

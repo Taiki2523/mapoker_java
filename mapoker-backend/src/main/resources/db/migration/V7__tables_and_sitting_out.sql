@@ -1,0 +1,20 @@
+ALTER TABLE players
+ADD COLUMN IF NOT EXISTS sitting_out BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE TABLE IF NOT EXISTS tables (
+  id VARCHAR(128) PRIMARY KEY,
+  room_id VARCHAR(128) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  game_type VARCHAR(32) NOT NULL DEFAULT 'ring',
+  small_blind INT NOT NULL,
+  big_blind INT NOT NULL,
+  min_buy_in INT NOT NULL,
+  max_buy_in INT NOT NULL,
+  max_players INT NOT NULL,
+  flags TEXT[] NOT NULL DEFAULT '{}',
+  visibility VARCHAR(32) NOT NULL DEFAULT 'public',
+  status VARCHAR(32) NOT NULL DEFAULT 'inactive',
+  ever_seated BOOLEAN NOT NULL DEFAULT FALSE,
+  game_id VARCHAR(128),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

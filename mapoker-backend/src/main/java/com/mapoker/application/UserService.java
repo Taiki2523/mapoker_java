@@ -1,5 +1,6 @@
 package com.mapoker.application;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -13,10 +14,14 @@ public class UserService implements UserDetailsService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final ObjectProvider<WalletService> walletServiceProvider;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository,
+                       PasswordEncoder passwordEncoder,
+                       ObjectProvider<WalletService> walletServiceProvider) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.walletServiceProvider = walletServiceProvider;
     }
 
     public User register(String username, String password) {
@@ -24,7 +29,12 @@ public class UserService implements UserDetailsService {
         if (userRepository.findByUsername(normalizedUsername).isPresent()) {
             throw new IllegalArgumentException("Username already taken");
         }
-        return userRepository.create(normalizedUsername, passwordEncoder.encode(password));
+        User createdUser = userRepository.create(normalizedUsername, passwordEncoder.encode(password));
+        WalletService walletService = walletServiceProvider.getIfAvailable();
+        if (walletService != null) {
+            walletService.initializeWallet(normalizedUsername);
+        }
+        return createdUser;
     }
 
     public User getByUsername(String username) {

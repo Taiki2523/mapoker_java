@@ -2,13 +2,13 @@ package com.mapoker.interfaces.http.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.mapoker.domain.card.Card;
+import com.mapoker.domain.card.Rank;
 import com.mapoker.domain.game.GameState;
 import com.mapoker.domain.game.GameStatus;
 import com.mapoker.domain.game.OddChipRule;
 import com.mapoker.domain.game.Player;
 import com.mapoker.domain.game.ShowdownResult;
 import com.mapoker.domain.hand.HandRank;
-import com.mapoker.domain.card.Rank;
 import com.mapoker.domain.rules.Street;
 
 import java.util.ArrayList;
@@ -20,6 +20,8 @@ public record GameResponse(
         GameStatus status,
         Street street,
         @JsonProperty("button_index") int buttonIndex,
+        @JsonProperty("small_blind_idx") int smallBlindIdx,
+        @JsonProperty("big_blind_idx") int bigBlindIdx,
         @JsonProperty("current_player") int currentPlayer,
         @JsonProperty("current_bet") int currentBet,
         @JsonProperty("last_raise_size") int lastRaiseSize,
@@ -29,6 +31,8 @@ public record GameResponse(
         List<Card> community,
         @JsonProperty("odd_chip_rule") OddChipRule oddChipRule,
         @JsonProperty("can_start_hand") boolean canStartHand,
+        @JsonProperty("viewer_membership_active") boolean viewerMembershipActive,
+        @JsonProperty("can_rebuy") boolean canRebuy,
         @JsonProperty("last_showdown") ShowdownDto lastShowdown
 ) {
     public record PlayerResponse(
@@ -66,8 +70,14 @@ public record GameResponse(
                     p.isFolded(), p.isAllIn(), hole));
         }
 
-        boolean canStartHand = g.getStatus() == GameStatus.FINISHED
-                || (g.getPot() == 0 && g.getCommunity().isEmpty());
+        boolean canStartHand = g.canStartHand();
+        boolean viewerMembershipActive = false;
+        boolean canRebuy = false;
+        if (viewerIndex != null && viewerIndex >= 0 && viewerIndex < g.getPlayers().size()) {
+            Player vp = g.getPlayers().get(viewerIndex);
+            viewerMembershipActive = true;
+            canRebuy = (vp.getStack() == 0);
+        }
 
         ShowdownDto showdownDto = null;
         if (g.getLastShowdown() != null) {
@@ -83,9 +93,9 @@ public record GameResponse(
 
         return new GameResponse(
                 g.getId(), g.getStatus(), g.getStreet(),
-                g.getButtonIndex(), g.getCurrentPlayer(),
+                g.getButtonIndex(), g.getSmallBlindIdx(), g.getBigBlindIdx(), g.getCurrentPlayer(),
                 g.getCurrentBet(), g.getLastRaiseSize(), g.getBigBlindSize(),
                 g.getPot(), playerResponses, g.getCommunity(), g.getOddChipRule(),
-                canStartHand, showdownDto);
+                canStartHand, viewerMembershipActive, canRebuy, showdownDto);
     }
 }
