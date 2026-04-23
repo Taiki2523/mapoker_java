@@ -8,6 +8,7 @@ public class Player {
     private Card[] hole; // length 2
     private boolean folded;
     private boolean allIn;
+    private boolean sittingOut;
     private int contributed;
     private int totalContrib;
 
@@ -17,6 +18,7 @@ public class Player {
         this.hole = new Card[2];
         this.folded = false;
         this.allIn = false;
+        this.sittingOut = false;
         this.contributed = 0;
         this.totalContrib = 0;
     }
@@ -28,6 +30,7 @@ public class Player {
         this.hole = other.hole == null ? new Card[2] : other.hole.clone();
         this.folded = other.folded;
         this.allIn = other.allIn;
+        this.sittingOut = other.sittingOut;
         this.contributed = other.contributed;
         this.totalContrib = other.totalContrib;
     }
@@ -41,6 +44,8 @@ public class Player {
     public void setFolded(boolean folded) { this.folded = folded; }
     public boolean isAllIn() { return allIn; }
     public void setAllIn(boolean allIn) { this.allIn = allIn; }
+    public boolean isSittingOut() { return sittingOut; }
+    public void setSittingOut(boolean sittingOut) { this.sittingOut = sittingOut; }
     public int getContributed() { return contributed; }
     public void setContributed(int contributed) { this.contributed = contributed; }
     public int getTotalContrib() { return totalContrib; }

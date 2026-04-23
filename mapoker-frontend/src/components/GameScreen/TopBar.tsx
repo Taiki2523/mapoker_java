@@ -8,9 +8,9 @@ type Props = {
   mySeatIndex: number | null
   loginSeatIndex: number
   setLoginSeatIndex: (n: number) => void
-  isOwner: boolean
   loading: boolean
   error: string
+  leavePending: boolean
   autoRefresh: boolean
   setAutoRefresh: (v: boolean) => void
   inviteCopied: boolean
@@ -19,8 +19,6 @@ type Props = {
   onLoginAsPlayer: () => void
   onLeaveRoom: () => void
   onLogout: () => void
-  onStartHand: () => void
-  onRunShowdown: () => void
   loginError: string
   showSession: boolean
   onToggleSession: () => void
@@ -28,9 +26,9 @@ type Props = {
 
 export function TopBar({
   game, currentUser, myName, mySeatIndex, loginSeatIndex, setLoginSeatIndex,
-  isOwner, loading, error, autoRefresh, setAutoRefresh,
+  loading, error, leavePending, autoRefresh, setAutoRefresh,
   inviteCopied, onCopyInvite, onOpenMyPage, onLoginAsPlayer, onLeaveRoom, onLogout,
-  onStartHand, onRunShowdown, loginError, showSession, onToggleSession,
+  loginError, showSession, onToggleSession,
 }: Props) {
   return (
     <header className="game-topbar">
@@ -48,6 +46,11 @@ export function TopBar({
       </div>
 
       <div className="topbar-right">
+        {leavePending && (
+          <span style={{ color: '#fbbf24', fontSize: '0.78rem', fontWeight: 600 }}>
+            {t('leavePending')}
+          </span>
+        )}
         {error && <span className="topbar-error">{error}</span>}
         <label className="toggle-label" style={{ color: '#6b7280', fontSize: '0.75rem', gap: '0.3rem' }}>
           <input
@@ -104,18 +107,6 @@ export function TopBar({
             </div>
           )}
         </div>
-        {isOwner && game?.status === 'finished' && game.can_start_hand && (
-          <button className="gold" onClick={onStartHand} disabled={loading}
-            style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem' }}>
-            {t('nextHand')}
-          </button>
-        )}
-        {isOwner && game?.status === 'showdown' && (
-          <button className="primary" onClick={onRunShowdown} disabled={loading}
-            style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem' }}>
-            {t('runShowdown')}
-          </button>
-        )}
       </div>
     </header>
   )

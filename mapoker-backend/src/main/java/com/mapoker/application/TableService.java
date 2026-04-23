@@ -4,6 +4,7 @@ import com.mapoker.domain.game.GameState;
 import com.mapoker.domain.game.GameStatus;
 import com.mapoker.domain.game.OddChipRule;
 import com.mapoker.infrastructure.config.GameProperties;
+import com.mapoker.infrastructure.config.WalletProperties;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
@@ -14,6 +15,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -25,15 +27,19 @@ public class TableService {
 
     private final GameService gameService;
     private final GameProperties gameProperties;
+    private final WalletProperties walletProperties;
     private final UserTableHistoryService userTableHistoryService;
     private final ObjectProvider<WalletService> walletServiceProvider;
+    private final Random rng = new Random();
 
     public TableService(GameService gameService,
                         GameProperties gameProperties,
+                        WalletProperties walletProperties,
                         UserTableHistoryService userTableHistoryService,
                         ObjectProvider<WalletService> walletServiceProvider) {
         this.gameService = gameService;
         this.gameProperties = gameProperties;
+        this.walletProperties = walletProperties;
         this.userTableHistoryService = userTableHistoryService;
         this.walletServiceProvider = walletServiceProvider;
     }
@@ -43,20 +49,14 @@ public class TableService {
 
         List<GameService.PlayerInput> players = new ArrayList<>();
         for (int i = 0; i < input.playerCount(); i++) {
-            players.add(new GameService.PlayerInput("p" + (i + 1), input.stackSize()));
+            players.add(new GameService.PlayerInput("p" + (i + 1), 0));
         }
 
-        OddChipRule oddChipRule = input.oddChipRule() != null
-                ? input.oddChipRule()
-                : gameProperties.defaultOddChipRule();
+        OddChipRule oddChipRule = gameProperties.defaultOddChipRule();
+        GameState game = gameService.createRingGame(players, input.bigBlind(), oddChipRule);
 
-        GameState game = gameService.createGame(
-                players,
-                input.buttonIndex(),
-                input.bigBlind(),
-                input.seed(),
-                oddChipRule
-        );
+        int minBuyIn = input.bigBlind() * walletProperties.minBuyinBbMultiplier();
+        int maxBuyIn = input.bigBlind() * walletProperties.maxBuyinBbMultiplier();
 
         String normalizedVisibility = normalizeVisibility(input.visibility());
         List<String> flags = normalizeFlags(input.flags());
@@ -65,16 +65,17 @@ public class TableService {
                 game.getId(),
                 normalizeTableName(input.tableName(), game.getId()),
                 "ring",
-                Math.max(1, input.bigBlind() / 2),
+                input.smallBlind(),
                 input.bigBlind(),
-                input.stackSize(),
-                input.stackSize(),
+                minBuyIn,
+                maxBuyIn,
                 input.playerCount(),
                 flags,
                 normalizedVisibility,
-                "waiting",
+                "inactive",
                 game.getId(),
-                Instant.now()
+                Instant.now(),
+                false
         );
         tables.put(table.id(), table);
         tableMembers.putIfAbsent(table.id(), new ArrayList<>());
@@ -93,6 +94,7 @@ public class TableService {
             fromGame(game);
         });
         return tables.values().stream()
+                .filter(table -> !"inactive".equals(table.status()))
                 .filter(table -> visibilityFilter == null || table.visibility().equals(visibilityFilter))
                 .filter(table -> requiredFlags.stream().allMatch(table.flags()::contains))
                 .sorted(Comparator.comparing(TableRecord::createdAt).reversed())
@@ -117,6 +119,20 @@ public class TableService {
         return List.copyOf(tableMembers.get(table.id()));
     }
 
+    public GameState startHand(String tableId, int bigBlind) {
+        List<TableMemberRecord> members = getMembers(tableId);
+        if (!members.isEmpty()) {
+            TableRecord table = getTable(tableId);
+            int firstSeat = members.stream()
+                    .min(Comparator.comparing(TableMemberRecord::joinedAt))
+                    .map(TableMemberRecord::seatIndex)
+                    .orElse(0);
+            int buttonBefore = (firstSeat - 1 + table.maxPlayers()) % table.maxPlayers();
+            gameService.setButtonIndex(tableId, buttonBefore);
+        }
+        return gameService.startHand(tableId, bigBlind);
+    }
+
     public Integer findSeatIndex(String id, String memberName) {
         if (memberName == null || memberName.isBlank()) {
             return null;
@@ -128,11 +144,7 @@ public class TableService {
                 .orElse(null);
     }
 
-    public List<TableMemberRecord> join(String id, String requestedName, Integer requestedSeatIndex) {
-        return join(id, requestedName, requestedSeatIndex, 0);
-    }
-
-    public List<TableMemberRecord> join(String id, String requestedName, Integer requestedSeatIndex, int buyIn) {
+    public JoinResult join(String id, String requestedName, int buyIn) {
         TableRecord table = getTable(id);
         String name = normalizeMemberName(requestedName);
         List<TableMemberRecord> members = new ArrayList<>(tableMembers.computeIfAbsent(table.id(), ignored -> new ArrayList<>()));
@@ -143,16 +155,14 @@ public class TableService {
                 .orElse(null);
         if (existing != null) {
             userTableHistoryService.recordJoin(name, table, existing.seatIndex());
-            return List.copyOf(members);
+            return new JoinResult(existing.seatIndex(), List.copyOf(members));
         }
 
-        int seatIndex = requestedSeatIndex != null ? requestedSeatIndex : firstAvailableSeat(members, table.maxPlayers());
-        if (seatIndex < 0 || seatIndex >= table.maxPlayers()) {
-            throw new IllegalArgumentException("seat index out of range");
-        }
-        boolean seatTaken = members.stream().anyMatch(member -> member.seatIndex() == seatIndex);
-        if (seatTaken) {
-            throw new IllegalArgumentException("seat already taken");
+        int seatIndex = randomAvailableSeat(members, table.maxPlayers());
+        GameState state = gameService.getGame(table.gameId());
+        boolean handActive = state.getStatus() == GameStatus.IN_PROGRESS && state.getPot() > 0;
+        if (handActive) {
+            gameService.setSittingOut(table.gameId(), seatIndex, true);
         }
 
         WalletService walletService = walletServiceProvider.getIfAvailable();
@@ -161,14 +171,32 @@ public class TableService {
                 throw new IllegalArgumentException("buy-in out of range");
             }
             walletService.buyIn(name, table.id(), buyIn);
-            gameService.setSeatStack(table.gameId(), seatIndex, buyIn);
         }
+        gameService.setSeatStack(table.gameId(), seatIndex, buyIn);
+
+        tables.put(table.id(), new TableRecord(
+                table.id(),
+                table.roomId(),
+                table.name(),
+                table.gameType(),
+                table.smallBlind(),
+                table.bigBlind(),
+                table.minBuyIn(),
+                table.maxBuyIn(),
+                table.maxPlayers(),
+                table.flags(),
+                table.visibility(),
+                table.status(),
+                table.gameId(),
+                table.createdAt(),
+                true
+        ));
 
         members.add(new TableMemberRecord(name, seatIndex, Instant.now().toString()));
         members.sort(Comparator.comparingInt(TableMemberRecord::seatIndex));
         tableMembers.put(table.id(), members);
         userTableHistoryService.recordJoin(name, table, seatIndex);
-        return List.copyOf(members);
+        return new JoinResult(seatIndex, List.copyOf(members));
     }
 
     public List<TableMemberRecord> leave(String id, String name, Integer seatIndex) {
@@ -227,7 +255,18 @@ public class TableService {
             userTableHistoryService.recordLeave(member.name(), table.id(), member.seatIndex());
         }
         remainingMembers.sort(Comparator.comparingInt(TableMemberRecord::seatIndex));
-        tableMembers.put(table.id(), remainingMembers);
+        List<TableMemberRecord> finalMembers = new ArrayList<>();
+        for (TableMemberRecord member : remainingMembers) {
+            int stack = gameService.getSeatStack(table.gameId(), member.seatIndex());
+            if (stack == 0) {
+                cashOutSeatStackIfPossible(member.name(), table.gameId(), member.seatIndex());
+                userTableHistoryService.recordLeave(member.name(), table.id(), member.seatIndex());
+            } else {
+                finalMembers.add(member);
+            }
+        }
+        finalMembers.sort(Comparator.comparingInt(TableMemberRecord::seatIndex));
+        tableMembers.put(table.id(), finalMembers);
     }
 
     private TableRecord fromGame(GameState game) {
@@ -297,29 +336,29 @@ public class TableService {
         return requestedName.trim();
     }
 
-    private int firstAvailableSeat(List<TableMemberRecord> members, int maxPlayers) {
+    private int randomAvailableSeat(List<TableMemberRecord> members, int maxPlayers) {
+        List<Integer> available = new ArrayList<>();
         for (int i = 0; i < maxPlayers; i++) {
-            int candidate = i;
-            boolean taken = members.stream().anyMatch(member -> member.seatIndex() == candidate);
-            if (!taken) {
-                return candidate;
+            final int seat = i;
+            if (members.stream().noneMatch(member -> member.seatIndex() == seat)) {
+                available.add(seat);
             }
         }
-        throw new IllegalArgumentException("table is full");
+        if (available.isEmpty()) {
+            throw new IllegalArgumentException("table is full");
+        }
+        return available.get(rng.nextInt(available.size()));
     }
 
     private void validateCreateInput(CreateRingTableInput input) {
         if (input.playerCount() < 2 || input.playerCount() > 9) {
             throw new IllegalArgumentException("player count must be between 2 and 9");
         }
-        if (input.stackSize() <= 0) {
-            throw new IllegalArgumentException("stack size must be positive");
-        }
         if (input.bigBlind() <= 0) {
             throw new IllegalArgumentException("big blind must be positive");
         }
-        if (input.buttonIndex() < 0 || input.buttonIndex() >= input.playerCount()) {
-            throw new IllegalArgumentException("button index out of range");
+        if (input.smallBlind() <= 0) {
+            throw new IllegalArgumentException("small blind must be positive");
         }
     }
 
@@ -353,6 +392,7 @@ public class TableService {
     }
 
     private TableRecord mergeTableWithGame(TableRecord existing, GameState game) {
+        List<TableMemberRecord> members = tableMembers.getOrDefault(game.getId(), List.of());
         int defaultBuyIn = game.getPlayers().isEmpty() ? 0 : game.getPlayers().get(0).getStack();
         return new TableRecord(
                 game.getId(),
@@ -366,13 +406,17 @@ public class TableService {
                 game.getPlayers().size(),
                 existing != null ? existing.flags() : List.of("casual"),
                 existing != null ? existing.visibility() : "public",
-                deriveStatus(game),
+                deriveStatus(game, existing != null && existing.everSeated(), members),
                 existing != null ? existing.gameId() : game.getId(),
-                existing != null ? existing.createdAt() : Instant.now()
+                existing != null ? existing.createdAt() : Instant.now(),
+                existing != null ? existing.everSeated() : false
         );
     }
 
-    private String deriveStatus(GameState game) {
+    private String deriveStatus(GameState game, boolean everSeated, List<TableMemberRecord> members) {
+        if (everSeated && members.isEmpty()) {
+            return "inactive";
+        }
         if (game.getStatus() == null) {
             return "waiting";
         }
@@ -385,14 +429,21 @@ public class TableService {
     public record CreateRingTableInput(
             String tableName,
             int playerCount,
-            int stackSize,
+            int smallBlind,
             int bigBlind,
-            int buttonIndex,
-            Long seed,
-            OddChipRule oddChipRule,
             String visibility,
             List<String> flags
-    ) {}
+    ) {
+        public CreateRingTableInput(String tableName,
+                                    int playerCount,
+                                    int bigBlind,
+                                    String visibility,
+                                    List<String> flags) {
+            this(tableName, playerCount, Math.max(1, bigBlind / 2), bigBlind, visibility, flags);
+        }
+    }
+
+    public record JoinResult(int assignedSeatIndex, List<TableMemberRecord> members) {}
 
     public record CreateTableResult(TableRecord table, GameState game) {}
 }

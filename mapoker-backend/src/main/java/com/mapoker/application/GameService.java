@@ -64,10 +64,34 @@ public class GameService {
         return state;
     }
 
+    public GameState createRingGame(List<PlayerInput> playerInputs, int bigBlind, OddChipRule oddChipRule) {
+        List<Player> players = playerInputs.stream()
+                .map(pi -> new Player(pi.id(), pi.stack()))
+                .toList();
+        GameState state = GameState.newGame(players, 0, bigBlind, new Random(), oddChipRule);
+        String id = UUID.randomUUID().toString();
+        state.setId(id);
+        state.setStatus(GameStatus.FINISHED);
+        gameRepository.create(id, state);
+        return state;
+    }
+
+    public void setButtonIndex(String tableId, int buttonIndex) {
+        GameState state = getGame(tableId);
+        state.setButtonIndex(buttonIndex);
+        gameRepository.update(tableId, state);
+    }
+
     public void setSeatStack(String tableId, int seatIndex, int amount) {
         GameState state = getGame(tableId);
         Player player = state.getPlayers().get(seatIndex);
         player.setStack(amount);
+        gameRepository.update(tableId, state);
+    }
+
+    public void setSittingOut(String tableId, int seatIndex, boolean value) {
+        GameState state = getGame(tableId);
+        state.getPlayers().get(seatIndex).setSittingOut(value);
         gameRepository.update(tableId, state);
     }
 

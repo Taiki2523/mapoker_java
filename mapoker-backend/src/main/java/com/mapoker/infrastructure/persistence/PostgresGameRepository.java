@@ -193,12 +193,12 @@ public class PostgresGameRepository implements GameRepository {
         for (int i = 0; i < players.size(); i++) {
             Player p = players.get(i);
             jdbc.update("""
-                    INSERT INTO players (game_id, player_index, player_id, stack, contributed, total_contrib, folded, all_in, hole)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb))
+                    INSERT INTO players (game_id, player_index, player_id, stack, contributed, total_contrib, folded, all_in, hole, sitting_out)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?)
                     """,
                     id, i, p.getId(), p.getStack(), p.getContributed(),
                     p.getTotalContrib(), p.isFolded(), p.isAllIn(),
-                    toJson(p.getHole()));
+                    toJson(p.getHole()), p.isSittingOut());
         }
     }
 
@@ -213,12 +213,13 @@ public class PostgresGameRepository implements GameRepository {
                       total_contrib = ?,
                       folded        = ?,
                       all_in        = ?,
+                      sitting_out   = ?,
                       hole          = CAST(? AS jsonb),
                       updated_at    = CURRENT_TIMESTAMP
                     WHERE game_id = ? AND player_index = ?
                     """,
                     p.getStack(), p.getContributed(), p.getTotalContrib(),
-                    p.isFolded(), p.isAllIn(), toJson(p.getHole()),
+                    p.isFolded(), p.isAllIn(), p.isSittingOut(), toJson(p.getHole()),
                     id, i);
         }
     }
@@ -269,6 +270,10 @@ public class PostgresGameRepository implements GameRepository {
             p.setTotalContrib((Integer) pr.get("total_contrib"));
             p.setFolded((Boolean) pr.get("folded"));
             p.setAllIn((Boolean) pr.get("all_in"));
+            Object sittingOutRaw = pr.get("sitting_out");
+            if (sittingOutRaw != null) {
+                p.setSittingOut((Boolean) sittingOutRaw);
+            }
             p.setHole(fromJson(str(pr.get("hole")), Card[].class));
             players.add(p);
         }

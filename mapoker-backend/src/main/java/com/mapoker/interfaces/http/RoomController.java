@@ -39,9 +39,8 @@ public class RoomController {
                                 @Valid @RequestBody(required = false) TableMembershipRequest body,
                                 @AuthenticationPrincipal UserDetails principal) {
         String name = principal != null ? principal.getUsername() : body != null ? body.name() : null;
-        Integer seatIndex = body != null ? body.seatIndex() : null;
         int buyIn = body != null && body.buyIn() != null ? body.buyIn() : 0;
-        return new MembersResponse(mapMembers(tableService.join(id, name, seatIndex, buyIn)));
+        return new MembersResponse(mapMembers(tableService.join(id, name, buyIn).members()));
     }
 
     @PostMapping("/{id}/leave")
@@ -49,8 +48,7 @@ public class RoomController {
                                  @Valid @RequestBody(required = false) TableMembershipRequest body,
                                  @AuthenticationPrincipal UserDetails principal) {
         String name = principal != null ? principal.getUsername() : body != null ? body.name() : null;
-        Integer seatIndex = body != null ? body.seatIndex() : null;
-        return new MembersResponse(mapMembers(tableService.leave(id, name, seatIndex)));
+        return new MembersResponse(mapMembers(tableService.leave(id, name, null)));
     }
 
     private List<MemberRecord> mapMembers(List<TableMemberRecord> members) {
