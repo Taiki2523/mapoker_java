@@ -523,7 +523,7 @@ function App() {
 
   const lobbyJoinWithBuyIn = async (tableId: string) => {
     setRoomScreenMode('room')
-    let id = tableId
+    const id = tableId
     setGameId(id)
     setTable(null)
     setShowdown(null)
