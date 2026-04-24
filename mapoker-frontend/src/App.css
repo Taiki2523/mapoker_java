@@ -9,6 +9,34 @@
 }
 
 /* =========================================
+   USER HEADER (lobby screens)
+   ========================================= */
+.user-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.25rem;
+}
+
+.user-header .brand {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.02em;
+}
+
+.user-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* =========================================
    LOBBY SCREENS
    ========================================= */
 .lobby-screen {
@@ -22,16 +50,17 @@
 
 .lobby-panel {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 2.25rem 2rem;
-  box-shadow: var(--shadow-lg);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 2rem 2rem;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  width: min(480px, 100%);
+  width: min(500px, 100%);
   max-height: 92dvh;
   overflow-y: auto;
+  backdrop-filter: blur(20px);
 }
 
 .lobby-panel h2 {

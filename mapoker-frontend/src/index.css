@@ -26,9 +26,9 @@
   --shadow-lg: rgba(0, 0, 0, 0.5) 0px 8px 24px;
   --shadow-inset: rgb(18, 18, 18) 0px 1px 0px, rgb(124, 124, 124) 0px 0px 0px 1px inset;
 
-  --font-ui: 'SpotifyMixUI', 'Helvetica Neue', helvetica, arial, 'Hiragino Sans',
-    'Hiragino Kaku Gothic ProN', Meiryo, 'MS Gothic', sans-serif;
-  --font-title: 'SpotifyMixUITitle', var(--font-ui);
+  --font-ui: 'Plus Jakarta Sans', 'SpotifyMixUI', 'Helvetica Neue', helvetica, arial,
+    'Hiragino Sans', 'Hiragino Kaku Gothic ProN', Meiryo, 'MS Gothic', sans-serif;
+  --font-title: 'Plus Jakarta Sans', 'SpotifyMixUITitle', var(--font-ui);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
