@@ -134,15 +134,16 @@
   overflow: hidden;
 }
 
-/* ---- Poker felt ---- */
+/* ---- Poker felt (stadium / athletics-track shape) ---- */
 .poker-felt {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 56%;
-  height: 62%;
-  border-radius: 50%;
+  /* aspect-ratio keeps stadium shape on any screen size */
+  width: clamp(300px, 72%, 780px);
+  aspect-ratio: 2.8 / 1;
+  border-radius: 9999px;
   background: radial-gradient(ellipse at center, var(--felt) 0%, var(--felt) 60%, var(--felt-dark) 100%);
   border: 10px solid var(--rail);
   box-shadow:
@@ -153,6 +154,7 @@
   align-items: center;
   justify-content: center;
   z-index: 1;
+  overflow: hidden;
 }
 
 .felt-center {
@@ -164,7 +166,7 @@
 }
 
 .pot-display {
-  font-size: 1.4rem;
+  font-size: 1.7rem;
   font-weight: 700;
   color: var(--poker-gold);
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
@@ -219,11 +221,11 @@
   background: var(--surface);
   border: 1.5px solid var(--border);
   border-radius: 16px;
-  padding: 0.6rem 0.8rem;
-  min-width: 120px;
+  padding: 0.75rem 1rem;
+  min-width: 148px;
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.4rem;
   backdrop-filter: blur(6px);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
@@ -256,24 +258,24 @@
 }
 
 .player-name {
-  font-size: 0.88rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text-base);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 88px;
+  max-width: 108px;
 }
 
 .player-stack {
-  font-size: 0.8rem;
+  font-size: 0.88rem;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
 .player-stack strong {
   color: var(--text-base);
-  font-size: 0.92rem;
+  font-size: 1rem;
 }
 
 .player-hole-cards {
@@ -1113,8 +1115,8 @@ button.icon-btn {
    ========================================= */
 @media (max-width: 680px) {
   .poker-felt {
-    width: 82%;
-    height: 52%;
+    width: clamp(260px, 90%, 780px);
+    /* aspect-ratio maintained automatically */
   }
 
   .player-box {
@@ -1167,8 +1169,7 @@ button.icon-btn {
 
 @media (max-height: 600px) {
   .poker-felt {
-    width: 70%;
-    height: 58%;
+    width: clamp(260px, 65%, 680px);
   }
 
   .game-topbar {
@@ -1320,8 +1321,8 @@ button.icon-btn {
   vertical-align: middle;
 }
 
-.card--sm { padding: 0.22rem 0.38rem; font-size: 0.78rem; min-width: 1.7rem; }
-.card--md { padding: 0.35rem 0.65rem; font-size: 1rem; min-width: 2.4rem; }
+.card--sm { padding: 0.3rem 0.55rem;  font-size: 1rem;   min-width: 2.2rem; }
+.card--md { padding: 0.55rem 0.9rem;  font-size: 1.3rem; min-width: 3.2rem; }
 
 .card--front {
   background: #ffffff;
@@ -1479,9 +1480,26 @@ button.icon-btn {
   transform: translateY(-1px);
 }
 
-/* --- Oval felt (Phase 2) --- */
-.poker-felt {
-  border-radius: 50% / 38%;
+/* --- Showdown overlay (sits on top of felt-center, not replacing it) --- */
+.showdown-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.72);
+  border-radius: inherit;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+.showdown-overlay.sd-visible {
+  opacity: 1;
+  pointer-events: auto;
+  animation: mp-showdown-overlay 0.4s ease-out forwards;
 }
 
 /* =========================================

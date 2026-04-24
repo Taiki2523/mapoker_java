@@ -77,9 +77,9 @@ export function TableArea({
       setSdStep(0)
       return
     }
-    const t1 = setTimeout(() => setSdStep(1), 400)
-    const t2 = setTimeout(() => setSdStep(2), 700)
-    const t3 = setTimeout(() => setSdStep(3), 1000)
+    const t1 = setTimeout(() => setSdStep(1), 800)
+    const t2 = setTimeout(() => setSdStep(2), 1600)
+    const t3 = setTimeout(() => setSdStep(3), 2800)
     return () => {
       clearTimeout(t1)
       clearTimeout(t2)
@@ -106,28 +106,8 @@ export function TableArea({
   return (
     <div className="table-area" onClick={onCloseSession}>
       <div className="poker-felt">
-        {showdown && isShowdown ? (
-          <div className={`showdown-result ${sdStep >= 3 ? 'sd-visible' : ''}`}>
-            <div className="showdown-winner">🏆 {winnerNames}</div>
-            {showdown.best_hand?.rank && (
-              <div className="showdown-hand">
-                {t(showdown.best_hand.rank as Parameters<typeof t>[0]) ?? showdown.best_hand.rank}
-              </div>
-            )}
-            <div className="showdown-payouts">
-              {payoutLines.map((l) => `${l.name} +${l.amount}`).join('  ·  ')}
-            </div>
-            {communitySlots.some((card) => card && card !== '--') && (
-              <div className="community-cards-row" style={{ marginTop: '0.4rem' }}>
-                {communitySlots.map((card, idx) => (
-                  card && card !== '--'
-                    ? <Card key={`sd-${idx}`} card={card} variant="front" size="md" />
-                    : <Card key={`sd-${idx}`} variant="slot" size="md" />
-                ))}
-              </div>
-            )}
-          </div>
-        ) : isWaiting ? (
+        {/* ---- 常時表示: ポット + コミュニティカード (waiting 時を除く) ---- */}
+        {isWaiting ? (
           <div className="felt-center">
             <div className="waiting-status">
               <div className="waiting-members">
@@ -140,7 +120,7 @@ export function TableArea({
           </div>
         ) : (
           <div className="felt-center">
-            <div className="pot-display">POT {game.pot_total ?? 0}</div>
+            {!isShowdown && <div className="pot-display">POT {game.pot_total ?? 0}</div>}
             <div className="community-cards-row">
               {communitySlots.map((card, idx) => (
                 <span
@@ -152,6 +132,21 @@ export function TableArea({
                     : <Card variant="slot" size="md" />}
                 </span>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* ---- ショーダウン結果オーバーレイ (コミュニティカードの上に重ねる) ---- */}
+        {showdown && isShowdown && (
+          <div className={`showdown-overlay ${sdStep >= 3 ? 'sd-visible' : ''}`}>
+            <div className="showdown-winner">🏆 {winnerNames}</div>
+            {showdown.best_hand?.rank && (
+              <div className="showdown-hand">
+                {t(showdown.best_hand.rank as Parameters<typeof t>[0]) ?? showdown.best_hand.rank}
+              </div>
+            )}
+            <div className="showdown-payouts">
+              {payoutLines.map((l) => `${l.name} +${l.amount}`).join('  ·  ')}
             </div>
           </div>
         )}
