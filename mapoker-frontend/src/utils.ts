@@ -22,10 +22,10 @@ export function mapMembers(members: RoomMemberApi[] = []): RoomMember[] {
 }
 
 export function seatPosition(seatIdx: number, mySeat: number, n: number) {
-  const ORBIT_RX = 39
-  const ORBIT_RY = 40
-  const BET_RX = 26
-  const BET_RY = 27
+  const ORBIT_RX = 46
+  const ORBIT_RY = 46
+  const BET_RX = 30
+  const BET_RY = 30
   const relIdx = ((seatIdx - mySeat) + n) % n
   const angle = Math.PI / 2 + (relIdx * 2 * Math.PI / n)
   return {

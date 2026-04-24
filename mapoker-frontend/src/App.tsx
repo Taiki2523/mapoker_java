@@ -750,8 +750,6 @@ function App() {
           myName={myName}
           mySeat={mySeat}
           mySeatIndex={mySeatIndex}
-          loginSeatIndex={loginSeatIndex}
-          setLoginSeatIndex={setLoginSeatIndex}
           isSpectator={isSpectator}
           roster={roster}
           autoRefresh={autoRefresh}
@@ -761,7 +759,6 @@ function App() {
           loading={loading}
           error={error}
           inviteCopied={inviteCopied}
-          loginError={loginError}
           leavePending={leavePending}
           toCall={toCall}
           minRaise={minRaise}
@@ -775,9 +772,7 @@ function App() {
           displayName={displayName}
           onCopyInvite={() => void copyInvite()}
           onOpenMyPage={() => void openMyPage()}
-          onLoginAsPlayer={() => void loginAsPlayer()}
           onLeaveRoom={leaveRoom}
-          onLogout={() => void handleLogout()}
           onSendAction={(type, amount) => void sendAction(type, amount)}
         />
       )}
