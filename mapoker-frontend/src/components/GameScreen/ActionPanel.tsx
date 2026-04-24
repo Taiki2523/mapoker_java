@@ -26,6 +26,7 @@ export function ActionPanel({
 }: Props) {
   return (
     <div className={`action-panel ${canAct ? 'active' : 'inactive'}`}>
+      <div className="action-panel-controls">
       <div className="action-info-row">
         <div className="action-my-cards">
           {(mySeatIndex !== null && game?.players?.[mySeatIndex]?.hole?.length
@@ -107,6 +108,7 @@ export function ActionPanel({
           </button>
         </div>
       )}
+      </div>{/* end action-panel-controls */}
     </div>
   )
 }

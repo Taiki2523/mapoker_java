@@ -126,8 +126,10 @@ function App() {
     const pot = game.pot_total
     return [
       { label: t('presetMin'), amount: minRaise },
-      { label: t('presetHalf'), amount: clamp(Math.round(pot / 2)) },
-      { label: t('presetPot'), amount: clamp(pot) },
+      { label: '30%',          amount: clamp(Math.round(pot * 0.3)) },
+      { label: '50%',          amount: clamp(Math.round(pot * 0.5)) },
+      { label: '100%',         amount: clamp(pot) },
+      { label: '200%',         amount: clamp(pot * 2) },
       { label: t('presetAll'), amount: maxBet },
     ]
       .filter((p) => p.amount > 0 && p.amount <= maxBet)

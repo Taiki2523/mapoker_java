@@ -150,80 +150,81 @@ export function TableArea({
             </div>
           </div>
         )}
-      </div>
 
-      {game.players.map((player, idx) => {
-        if (!seatedIndices.has(idx)) return null
+        {/* ---- プレイヤーシート (フェルト基準で配置) ---- */}
+        {game.players.map((player, idx) => {
+          if (!seatedIndices.has(idx)) return null
 
-        const n = game.players.length
-        const anchorSeat = mySeat ?? 0
-        const pos = seatPosition(idx, anchorSeat, n)
-        const isActive = game.current_player === idx
-        const isWinnerSeat = showdown?.winners?.includes(idx) ?? false
-        const isLoserSeat = isShowdown && !isWinnerSeat
-        const showCards = mySeat === idx || isSpectator || (isShowdown && !player.folded)
-        const cards = player.hole?.length ? player.hole : ['--', '--']
-        const isMe = mySeat === idx
+          const n = game.players.length
+          const anchorSeat = mySeat ?? 0
+          const pos = seatPosition(idx, anchorSeat, n)
+          const isActive = game.current_player === idx
+          const isWinnerSeat = showdown?.winners?.includes(idx) ?? false
+          const isLoserSeat = isShowdown && !isWinnerSeat
+          const showCards = mySeat === idx || isSpectator || (isShowdown && !player.folded)
+          const cards = player.hole?.length ? player.hole : ['--', '--']
+          const isMe = mySeat === idx
 
-        return (
-          <div key={player.id}>
-            <div
-              className={[
-                'player-seat',
-                isActive ? 'active' : '',
-                player.folded || isLoserSeat ? 'folded' : '',
-                isWinnerSeat && isShowdown ? 'winner' : '',
-                isMe ? 'me' : '',
-                dealingSeats.has(idx) ? 'dealing' : '',
-                isShowdown ? 'sd-active' : '',
-              ].filter(Boolean).join(' ')}
-              style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
-            >
-              <div className="player-box">
-                <div className="seat-header">
-                  <div className="seat-avatar">
-                    {displayName(idx).slice(0, 1).toUpperCase()}
-                  </div>
-                  <div className="seat-info">
-                    <div className="player-name-row">
-                      <span className="player-name">{displayName(idx)}</span>
-                      <div className="badges">
-                        {game.button_index === idx && <span className="badge btn">D</span>}
-                        {game.small_blind_idx === idx && <span className="badge sb">SB</span>}
-                        {game.big_blind_idx === idx && <span className="badge bb">BB</span>}
-                        {player.folded && <span className="badge warn">F</span>}
-                        {player.all_in && <span className="badge accent">AI</span>}
-                      </div>
-                    </div>
-                    <div className="player-stack">
-                      Stack <strong>{player.stack}</strong>
-                    </div>
-                  </div>
-                </div>
-                <div className="player-hole-cards">
-                  {cards.map((card, ci) => (
-                    showCards
-                      ? <Card key={`${player.id}-${ci}`} card={card} variant="front" size="sm" />
-                      : <Card key={`${player.id}-${ci}`} variant="back" size="sm" />
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {player.contributed > 0 && !player.folded && (
+          return (
+            <div key={player.id}>
               <div
                 className={[
-                  betChipClass(player.contributed),
-                  newChipSeats.has(idx) ? 'chip-new' : '',
+                  'player-seat',
+                  isActive ? 'active' : '',
+                  player.folded || isLoserSeat ? 'folded' : '',
+                  isWinnerSeat && isShowdown ? 'winner' : '',
+                  isMe ? 'me' : '',
+                  dealingSeats.has(idx) ? 'dealing' : '',
+                  isShowdown ? 'sd-active' : '',
                 ].filter(Boolean).join(' ')}
-                style={{ left: `${pos.betX}%`, top: `${pos.betY}%` }}
+                style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
               >
-                {player.contributed}
+                <div className="player-box">
+                  <div className="seat-header">
+                    <div className="seat-avatar">
+                      {displayName(idx).slice(0, 1).toUpperCase()}
+                    </div>
+                    <div className="seat-info">
+                      <div className="player-name-row">
+                        <span className="player-name">{displayName(idx)}</span>
+                        <div className="badges">
+                          {game.button_index === idx && <span className="badge btn">D</span>}
+                          {game.small_blind_idx === idx && <span className="badge sb">SB</span>}
+                          {game.big_blind_idx === idx && <span className="badge bb">BB</span>}
+                          {player.folded && <span className="badge warn">F</span>}
+                          {player.all_in && <span className="badge accent">AI</span>}
+                        </div>
+                      </div>
+                      <div className="player-stack">
+                        Stack <strong>{player.stack}</strong>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="player-hole-cards">
+                    {cards.map((card, ci) => (
+                      showCards
+                        ? <Card key={`${player.id}-${ci}`} card={card} variant="front" size="sm" />
+                        : <Card key={`${player.id}-${ci}`} variant="back" size="sm" />
+                    ))}
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-        )
-      })}
+
+              {player.contributed > 0 && !player.folded && (
+                <div
+                  className={[
+                    betChipClass(player.contributed),
+                    newChipSeats.has(idx) ? 'chip-new' : '',
+                  ].filter(Boolean).join(' ')}
+                  style={{ left: `${pos.betX}%`, top: `${pos.betY}%` }}
+                >
+                  {player.contributed}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
