@@ -606,13 +606,42 @@ button.gold {
 }
 
 button.icon-btn {
-  padding: 6px 12px;
+  padding: 6px 10px;
   font-size: 0.8rem;
   background: var(--surface-2);
   color: var(--text-muted);
   border: 1px solid var(--border);
   text-transform: none;
   letter-spacing: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+/* ---- icon-btn tooltip ---- */
+button.icon-btn[data-label]::after {
+  content: attr(data-label);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface-3);
+  color: var(--text-base);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 0.28rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 200;
+}
+button.icon-btn[data-label]:hover::after {
+  opacity: 1;
 }
 
 .lobby-screen input,

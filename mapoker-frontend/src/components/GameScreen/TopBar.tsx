@@ -86,10 +86,20 @@ export function TopBar({
           />
           auto
         </label>
-        <button className="icon-btn" onClick={onCopyInvite}>{inviteCopied ? '✓' : '⎘'}</button>
-        <button className="icon-btn" onClick={onOpenMyPage}>☺</button>
+        <button className="icon-btn" onClick={onCopyInvite} data-label={inviteCopied ? 'コピー済み' : '招待URLをコピー'}>
+          {inviteCopied ? (
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          ) : (
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          )}
+        </button>
+        <button className="icon-btn" onClick={onOpenMyPage} data-label="マイページ">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </button>
         <div className="session-details">
-          <button className="icon-btn" onClick={onToggleSession}>⚙</button>
+          <button className="icon-btn" onClick={onToggleSession} data-label="セッション設定">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+          </button>
           {showSession && (
             <div className="session-popup">
               <div style={{ color: '#e5e7eb', fontWeight: 600, fontSize: '0.85rem' }}>
