@@ -6,6 +6,8 @@ type Props = {
   currentUser: AuthUser | null
   myName: string
   mySeatIndex: number | null
+  canAct?: boolean
+  displayName?: (idx: number) => string
   loginSeatIndex: number
   setLoginSeatIndex: (n: number) => void
   loading: boolean
@@ -25,34 +27,57 @@ type Props = {
 }
 
 export function TopBar({
-  game, currentUser, myName, mySeatIndex, loginSeatIndex, setLoginSeatIndex,
+  game, currentUser, myName, mySeatIndex, canAct, displayName, loginSeatIndex, setLoginSeatIndex,
   loading, error, leavePending, autoRefresh, setAutoRefresh,
   inviteCopied, onCopyInvite, onOpenMyPage, onLoginAsPlayer, onLeaveRoom, onLogout,
   loginError, showSession, onToggleSession,
 }: Props) {
+  const resolvedCanAct = canAct ?? (
+    game?.status === 'in_progress'
+    && mySeatIndex !== null
+    && game.current_player === mySeatIndex
+    && (game.players[mySeatIndex]?.stack ?? 0) > 0
+  )
+  const currentPlayerName = game?.current_player !== undefined
+    ? (displayName?.(game.current_player) ?? game.players[game.current_player]?.id ?? '')
+    : ''
+  const statusText = resolvedCanAct
+    ? t('yourTurn')
+    : game?.status === 'in_progress' && currentPlayerName
+      ? `${currentPlayerName}...`
+      : game?.status === 'showdown'
+        ? t('showdown')
+        : game?.status === 'finished'
+          ? t('finished')
+          : ''
+
   return (
     <header className="game-topbar">
-      <span className="topbar-brand">mapoker</span>
-
-      <div className="topbar-info">
+      <div className="topbar-left">
+        <span className="topbar-brand">mapoker</span>
         {game?.street && (
-          <span className="street-badge">{game.street.toUpperCase()}</span>
+          <span className={`street-badge street-badge--${game.street.toLowerCase()}`}>
+            {game.street.toUpperCase()}
+          </span>
         )}
-        <span>Pot <strong>{game?.pot_total ?? 0}</strong></span>
-        <span>Bet <strong>{game?.current_bet ?? 0}</strong></span>
-        {game?.status && game.status !== 'in_progress' && (
-          <span style={{ color: '#fbbf24', fontWeight: 600 }}>{game.status}</span>
+        {statusText && <span className="topbar-status">{statusText}</span>}
+      </div>
+
+      <div className="topbar-center">
+        <span className="topbar-stat">POT <strong>{game?.pot_total ?? 0}</strong></span>
+        {(game?.current_bet ?? 0) > 0 && (
+          <span className="topbar-stat">BET <strong>{game!.current_bet}</strong></span>
         )}
       </div>
 
       <div className="topbar-right">
         {leavePending && (
-          <span style={{ color: '#fbbf24', fontSize: '0.78rem', fontWeight: 600 }}>
+          <span style={{ color: 'var(--warning)', fontSize: '0.78rem', fontWeight: 600 }}>
             {t('leavePending')}
           </span>
         )}
         {error && <span className="topbar-error">{error}</span>}
-        <label className="toggle-label" style={{ color: '#6b7280', fontSize: '0.75rem', gap: '0.3rem' }}>
+        <label className="toggle-label" style={{ color: 'var(--text-muted)', fontSize: '0.75rem', gap: '0.3rem' }}>
           <input
             type="checkbox"
             checked={autoRefresh}
@@ -61,16 +86,10 @@ export function TopBar({
           />
           auto
         </label>
-        <button className="icon-btn" onClick={onCopyInvite} title="Copy invite link">
-          {inviteCopied ? '✓' : '🔗'}
-        </button>
-        <button className="icon-btn" onClick={onOpenMyPage} title={t('myPage')}>
-          ☺
-        </button>
+        <button className="icon-btn" onClick={onCopyInvite}>{inviteCopied ? '✓' : '⎘'}</button>
+        <button className="icon-btn" onClick={onOpenMyPage}>☺</button>
         <div className="session-details">
-          <button className="icon-btn" onClick={onToggleSession} title="Session settings">
-            ⚙
-          </button>
+          <button className="icon-btn" onClick={onToggleSession}>⚙</button>
           {showSession && (
             <div className="session-popup">
               <div style={{ color: '#e5e7eb', fontWeight: 600, fontSize: '0.85rem' }}>

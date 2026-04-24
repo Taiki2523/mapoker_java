@@ -214,6 +214,12 @@ const ja = {
   cancel: 'キャンセル',
   youHaveBeenRemovedFromTable: 'テーブルから退席しました',
   rebuy: 'リバイ',
+  presetMin: '最小',
+  presetHalf: '½P',
+  presetPot: 'Pot',
+  presetAll: 'ALL',
+  showdown: 'ショーダウン',
+  finished: '終了',
 
   // --- エラーメッセージ ---
   errEnterName: '名前を入力してください',

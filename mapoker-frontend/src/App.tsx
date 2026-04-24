@@ -123,20 +123,14 @@ function App() {
     if (!game) return []
     const cap = Math.max(maxBet, minRaise)
     const clamp = (v: number) => Math.min(cap, Math.max(minRaise, v))
-    if (toCall === 0) {
-      const pot = game.pot_total
-      return [
-        { label: '30%', amount: clamp(Math.round(pot * 0.3)) },
-        { label: '50%', amount: clamp(Math.round(pot * 0.5)) },
-        { label: '100%', amount: clamp(pot) },
-      ]
-    }
-    const cb = game.current_bet
+    const pot = game.pot_total
     return [
-      { label: '2x', amount: clamp(cb * 2) },
-      { label: '3x', amount: clamp(cb * 3) },
-      { label: '4x', amount: clamp(cb * 4) },
+      { label: t('presetMin'), amount: minRaise },
+      { label: t('presetHalf'), amount: clamp(Math.round(pot / 2)) },
+      { label: t('presetPot'), amount: clamp(pot) },
+      { label: t('presetAll'), amount: maxBet },
     ]
+      .filter((p) => p.amount > 0 && p.amount <= maxBet)
   }, [game, toCall, minRaise, maxBet])
 
   const myHandName = useMemo(() => {
