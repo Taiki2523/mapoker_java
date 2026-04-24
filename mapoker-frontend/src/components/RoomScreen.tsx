@@ -99,16 +99,6 @@ export function RoomScreen({
             <option value="private">{t('privateTable')}</option>
           </select>
         </label>
-        <label>
-          {t('visibility')}
-          <select
-            value={visibility}
-            onChange={(e) => setVisibility(e.target.value as TableVisibility)}
-          >
-            <option value="public">{t('publicTable')}</option>
-            <option value="private">{t('privateTable')}</option>
-          </select>
-        </label>
       </div>
       <div>
         <div className="label" style={{ marginBottom: '0.45rem' }}>{t('tableFlags')}</div>
@@ -125,15 +115,6 @@ export function RoomScreen({
           <button type="button" className={flags.includes('short_handed') ? 'primary' : 'secondary'} onClick={() => toggleFlag('short_handed')}>
             {t('flagShortHanded')}
           </button>
-        </div>
-      </div>
-      <div>
-        <div className="label" style={{ marginBottom: '0.45rem' }}>{t('tableFlags')}</div>
-        <div className="button-row" style={{ justifyContent: 'flex-start' }}>
-          <button type="button" className={flags.includes('casual') ? 'primary' : 'secondary'} onClick={() => toggleFlag('casual')}>{t('flagCasual')}</button>
-          <button type="button" className={flags.includes('serious') ? 'primary' : 'secondary'} onClick={() => toggleFlag('serious')}>{t('flagSerious')}</button>
-          <button type="button" className={flags.includes('newbie') ? 'primary' : 'secondary'} onClick={() => toggleFlag('newbie')}>{t('flagNewbie')}</button>
-          <button type="button" className={flags.includes('short_handed') ? 'primary' : 'secondary'} onClick={() => toggleFlag('short_handed')}>{t('flagShortHanded')}</button>
         </div>
       </div>
       <div className="button-row">
