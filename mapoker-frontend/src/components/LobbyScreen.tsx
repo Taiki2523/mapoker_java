@@ -138,7 +138,9 @@ export function LobbyScreen({ currentUser, onOpenMyPage, onLogout, onJoinRoom, o
             <div className="lobby-browser-main">
               <div className="lobby-browser-title-row">
                 <strong>{table.name}</strong>
-                <span className={`table-visibility ${table.visibility}`}>{table.visibility === 'public' ? t('publicTable') : t('privateTable')}</span>
+                <span className={table.visibility === 'public' ? 'table-visibility public' : 'table-visibility private'}>
+                  {table.visibility === 'public' ? t('publicTable') : t('privateTable')}
+                </span>
               </div>
               <div className="lobby-browser-meta">
                 <span>{t('stakeLabel')} {table.stake.small_blind}/{table.stake.big_blind}</span>

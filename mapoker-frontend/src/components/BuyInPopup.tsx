@@ -52,7 +52,7 @@ export function BuyInPopup({ tableName, minBuyIn, maxBuyIn, bigBlind, onConfirm,
         </div>
         <div className="buyin-range-labels">
           <span>{t('buyInMin')}: {minBuyIn}</span>
-          <span style={{ fontWeight: 600, color: '#4f46e5' }}>{clamped} ({bbCount} BB)</span>
+          <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{clamped} ({bbCount} BB)</span>
           <span>{t('buyInMax')}: {maxBuyIn}</span>
         </div>
 

@@ -68,6 +68,15 @@ Source roots:
 - `src/integrationTest/java` (Testcontainers-based PostgreSQL tests)
 - DB migrations: `src/main/resources/db/migration` (Flyway)
 
+### Flyway migration rule
+
+- `src/main/resources/db/migration/V*.sql` は、一度でも適用されたら編集しないこと。既存 migration の変更は禁止。
+- スキーマ変更やデータ補正が必要な場合は、必ず新しい versioned migration を追加すること。
+- `V` の番号が増えること自体は問題として扱わない。履歴を短くしたい場合は既存 `V` を潰さず、`B*.sql` の baseline migration を追加すること。
+- checksum mismatch が出た場合、まず既存 migration の編集有無を疑う。安易に `repair` しない。
+- `flyway repair` はローカル開発や合意済み環境の例外対応に限定し、理由を `docs/FLYWAY.md` か PR に残すこと。
+- 詳細ルールは `docs/FLYWAY.md` を参照。
+
 ### Key design decisions
 
 - **Domain is framework-free.** `com.mapoker.domain` has zero Spring dependencies; all poker rules are plain Java 21.

@@ -25,7 +25,8 @@ export function ActionPanel({
   myHandName, currentPlayer, displayName, onSendAction,
 }: Props) {
   return (
-    <div className="action-panel">
+    <div className={`action-panel ${canAct ? 'active' : 'inactive'}`}>
+      <div className="action-panel-controls">
       <div className="action-info-row">
         <div className="action-my-cards">
           {(mySeatIndex !== null && game?.players?.[mySeatIndex]?.hole?.length
@@ -73,38 +74,41 @@ export function ActionPanel({
         </div>
       )}
 
-      <div className="action-buttons">
-        <button
-          className="ghost danger"
-          onClick={() => onSendAction('fold', 0)}
-          disabled={!canAct || loading}
-        >
-          {t('fold')}
-        </button>
-        <button
-          className="primary"
-          onClick={() => onSendAction(toCall === 0 ? 'check' : 'call', 0)}
-          disabled={!canAct || loading}
-        >
-          {toCall === 0 ? t('check') : `${t('call')} ${toCall}`}
-        </button>
-        <button
-          className="ghost"
-          onClick={() => onSendAction(toCall === 0 ? 'bet' : 'raise', actionAmount)}
-          disabled={!canAct || loading || actionAmount <= 0}
-        >
-          {toCall === 0
-            ? `${t('betLabel')} ${actionAmount}`
-            : `${t('raiseLabel')} ${actionAmount}`}
-        </button>
-        <button
-          className="ghost"
-          onClick={() => onSendAction('all_in', 0)}
-          disabled={!canAct || loading}
-        >
-          {t('allInBtn')}
-        </button>
-      </div>
+      {canAct && (
+        <div className="action-buttons">
+          <button
+            className="fold-btn"
+            onClick={() => onSendAction('fold', 0)}
+            disabled={!canAct || loading}
+          >
+            {t('fold')}
+          </button>
+          <button
+            className="call-btn"
+            onClick={() => onSendAction(toCall === 0 ? 'check' : 'call', 0)}
+            disabled={!canAct || loading}
+          >
+            {toCall === 0 ? t('check') : `${t('call')} ${toCall}`}
+          </button>
+          <button
+            className="raise-btn"
+            onClick={() => onSendAction(toCall === 0 ? 'bet' : 'raise', actionAmount)}
+            disabled={!canAct || loading || actionAmount <= 0}
+          >
+            {toCall === 0
+              ? `${t('betLabel')} ${actionAmount}`
+              : `${t('raiseLabel')} ${actionAmount}`}
+          </button>
+          <button
+            className="allin-btn"
+            onClick={() => onSendAction('all_in', 0)}
+            disabled={!canAct || loading}
+          >
+            {t('allInBtn')}
+          </button>
+        </div>
+      )}
+      </div>{/* end action-panel-controls */}
     </div>
   )
 }

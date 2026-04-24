@@ -33,12 +33,10 @@ function App() {
   const prevIsMyTurn = useRef(false)
   const [myName, setMyName] = useState('')
   const [mySeatIndex, setMySeatIndex] = useState<number | null>(null)
-  const [loginSeatIndex, setLoginSeatIndex] = useState(0)
-  const [loginError, setLoginError] = useState('')
   const [leavePending, setLeavePending] = useState(false)
   const [roster, setRoster] = useState<RoomMember[]>([])
   const [showMyPage, setShowMyPage] = useState(false)
-  const [table, setTable] = useState<Table | null>(null)
+  const [, setTable] = useState<Table | null>(null)
   const [profileTables, setProfileTables] = useState<Table[]>([])
   const [profileHistory, setProfileHistory] = useState<UserTableHistoryEntry[]>([])
   const [profileHandHistory, setProfileHandHistory] = useState<HandHistoryEntry[]>([])
@@ -123,21 +121,27 @@ function App() {
     if (!game) return []
     const cap = Math.max(maxBet, minRaise)
     const clamp = (v: number) => Math.min(cap, Math.max(minRaise, v))
-    if (toCall === 0) {
-      const pot = game.pot_total
+    if (game.street === 'preflop') {
       return [
-        { label: '30%', amount: clamp(Math.round(pot * 0.3)) },
-        { label: '50%', amount: clamp(Math.round(pot * 0.5)) },
-        { label: '100%', amount: clamp(pot) },
+        { label: 'x1', amount: clamp(game.current_bet + (game.big_blind * 1)) },
+        { label: 'x2', amount: clamp(game.current_bet + (game.big_blind * 2)) },
+        { label: 'x3', amount: clamp(game.current_bet + (game.big_blind * 3)) },
+        { label: 'x4', amount: clamp(game.current_bet + (game.big_blind * 4)) },
+        { label: 'ALL', amount: maxBet },
       ]
+        .filter((p) => p.amount > 0 && p.amount <= maxBet)
     }
-    const cb = game.current_bet
+    const pot = game.pot_total
     return [
-      { label: '2x', amount: clamp(cb * 2) },
-      { label: '3x', amount: clamp(cb * 3) },
-      { label: '4x', amount: clamp(cb * 4) },
+      { label: t('presetMin'), amount: minRaise },
+      { label: '30%',          amount: clamp(Math.round(pot * 0.3)) },
+      { label: '50%',          amount: clamp(Math.round(pot * 0.5)) },
+      { label: '100%',         amount: clamp(pot) },
+      { label: '200%',         amount: clamp(pot * 2) },
+      { label: t('presetAll'), amount: maxBet },
     ]
-  }, [game, toCall, minRaise, maxBet])
+      .filter((p) => p.amount > 0 && p.amount <= maxBet)
+  }, [game, minRaise, maxBet])
 
   const myHandName = useMemo(() => {
     if (mySeat === null || !game) return null
@@ -193,7 +197,6 @@ function App() {
       const data = JSON.parse(raw) as StoredSession
       setMyName(data.name)
       setMySeatIndex(data.seatIndex)
-      setLoginSeatIndex(data.seatIndex)
     } catch {
       // ignore
     }
@@ -204,7 +207,6 @@ function App() {
     const member = roster.find((m) => m.name === myName.trim())
     if (member) {
       setMySeatIndex(member.seatIndex)
-      setLoginSeatIndex(member.seatIndex)
     }
   }, [gameId, myName, mySeatIndex, roster])
 
@@ -293,7 +295,6 @@ function App() {
       } else {
         setShowdown(null)
       }
-      setLoginSeatIndex((prev) => (prev < data.players.length ? prev : 0))
     } catch (err) {
       setError((err as Error).message)
     }
@@ -404,7 +405,6 @@ function App() {
     })
     const assignedSeatIndex = result.assigned_seat_index
     setMySeatIndex(assignedSeatIndex)
-    setLoginSeatIndex(assignedSeatIndex)
     setRoster(mapMembers(result.members))
     persistSession(tableId, { name, seatIndex: assignedSeatIndex })
     return assignedSeatIndex
@@ -470,7 +470,6 @@ function App() {
 
   const joinRoom = async (raw: string) => {
     if (!raw) return
-    setLoginError('')
     setRoomScreenMode('room')
     let id = raw
     try {
@@ -493,34 +492,6 @@ function App() {
     await refreshTable(id)
   }
 
-  const loginAsPlayer = async () => {
-    if (!game) { setLoginError(t('errLoadRoom')); return }
-    if (!myName.trim()) { setLoginError(t('errEnterName')); return }
-    if (!gameId) { setLoginError(t('errMissingRoom')); return }
-    setLoginError('')
-
-    const doLogin = async (buyIn: number) => {
-      try {
-        await doTableJoin(gameId, myName.trim(), buyIn)
-      } catch (err) {
-        setLoginError(formatErrorMessage(err))
-      }
-    }
-
-    if (table && table.min_buy_in > 0) {
-      setBuyInContext({
-        tableId: gameId,
-        tableName: table.name,
-        minBuyIn: table.min_buy_in,
-        maxBuyIn: table.max_buy_in,
-        bigBlind: table.stake.big_blind,
-        onConfirm: (amount) => { setBuyInContext(null); void doLogin(amount) },
-        onCancel: () => { setBuyInContext(null) },
-      })
-    } else {
-      await doLogin(0)
-    }
-  }
 
   const lobbyJoinWithBuyIn = async (tableId: string) => {
     setRoomScreenMode('room')
@@ -750,12 +721,8 @@ function App() {
           game={game}
           showdown={showdown}
           isShowdown={isShowdown ?? false}
-          currentUser={currentUser}
-          myName={myName}
           mySeat={mySeat}
           mySeatIndex={mySeatIndex}
-          loginSeatIndex={loginSeatIndex}
-          setLoginSeatIndex={setLoginSeatIndex}
           isSpectator={isSpectator}
           roster={roster}
           autoRefresh={autoRefresh}
@@ -765,7 +732,6 @@ function App() {
           loading={loading}
           error={error}
           inviteCopied={inviteCopied}
-          loginError={loginError}
           leavePending={leavePending}
           toCall={toCall}
           minRaise={minRaise}
@@ -779,9 +745,7 @@ function App() {
           displayName={displayName}
           onCopyInvite={() => void copyInvite()}
           onOpenMyPage={() => void openMyPage()}
-          onLoginAsPlayer={() => void loginAsPlayer()}
           onLeaveRoom={leaveRoom}
-          onLogout={() => void handleLogout()}
           onSendAction={(type, amount) => void sendAction(type, amount)}
         />
       )}
