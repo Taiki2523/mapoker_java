@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import type { GameState, PayoutLine, RoomMember, Showdown } from '../../types'
 import { Card } from '../Card'
 import { seatPosition } from '../../utils'
@@ -28,15 +29,85 @@ export function TableArea({
   winnerNames, payoutLines,
   displayName, onCloseSession,
 }: Props) {
+  const prevHoleRef = useRef<Record<number, number>>({})
+  const prevCommLenRef = useRef(0)
+  const prevContribRef = useRef<Record<number, number>>({})
+  const [dealingSeats, setDealingSeats] = useState<Set<number>>(new Set())
+  const [flippingIndices, setFlippingIndices] = useState<Set<number>>(new Set())
+  const [sdStep, setSdStep] = useState(0)
+  const [newChipSeats, setNewChipSeats] = useState<Set<number>>(new Set())
   const seatedIndices = new Set(roster.map((m) => m.seatIndex))
   const isWaiting = game.status === 'finished' && game.pot_total === 0 && (game.community ?? []).length === 0
   const communitySlots = Array.from({ length: 5 }, (_, i) => game.community?.[i] ?? null)
+
+  useEffect(() => {
+    const newDealing = new Set<number>()
+    game.players.forEach((p, i) => {
+      const prev = prevHoleRef.current[i] ?? 0
+      if (prev === 0 && (p.hole?.length ?? 0) > 0) {
+        newDealing.add(i)
+      }
+      prevHoleRef.current[i] = p.hole?.length ?? 0
+    })
+
+    if (newDealing.size > 0) {
+      setDealingSeats(newDealing)
+      const id = setTimeout(() => setDealingSeats(new Set()), 600)
+      return () => clearTimeout(id)
+    }
+  }, [game.players])
+
+  useEffect(() => {
+    const current = (game.community ?? []).filter((c) => c && c !== '--').length
+    if (current > prevCommLenRef.current) {
+      const newIdx = new Set<number>()
+      for (let i = prevCommLenRef.current; i < current; i += 1) {
+        newIdx.add(i)
+      }
+      setFlippingIndices(newIdx)
+      const id = setTimeout(() => setFlippingIndices(new Set()), 500)
+      prevCommLenRef.current = current
+      return () => clearTimeout(id)
+    }
+    prevCommLenRef.current = current
+  }, [game.community])
+
+  useEffect(() => {
+    if (!isShowdown) {
+      setSdStep(0)
+      return
+    }
+    const t1 = setTimeout(() => setSdStep(1), 400)
+    const t2 = setTimeout(() => setSdStep(2), 700)
+    const t3 = setTimeout(() => setSdStep(3), 1000)
+    return () => {
+      clearTimeout(t1)
+      clearTimeout(t2)
+      clearTimeout(t3)
+    }
+  }, [isShowdown])
+
+  useEffect(() => {
+    const newChips = new Set<number>()
+    game.players.forEach((p, i) => {
+      const prev = prevContribRef.current[i] ?? 0
+      if (p.contributed > prev) {
+        newChips.add(i)
+      }
+      prevContribRef.current[i] = p.contributed
+    })
+    if (newChips.size > 0) {
+      setNewChipSeats(newChips)
+      const id = setTimeout(() => setNewChipSeats(new Set()), 400)
+      return () => clearTimeout(id)
+    }
+  }, [game.players])
 
   return (
     <div className="table-area" onClick={onCloseSession}>
       <div className="poker-felt">
         {showdown && isShowdown ? (
-          <div className="showdown-result">
+          <div className={`showdown-result ${sdStep >= 3 ? 'sd-visible' : ''}`}>
             <div className="showdown-winner">🏆 {winnerNames}</div>
             {showdown.best_hand?.rank && (
               <div className="showdown-hand">
@@ -72,9 +143,14 @@ export function TableArea({
             <div className="pot-display">POT {game.pot_total ?? 0}</div>
             <div className="community-cards-row">
               {communitySlots.map((card, idx) => (
-                card && card !== '--'
-                  ? <Card key={`cc-${idx}`} card={card} variant="front" size="md" />
-                  : <Card key={`cc-${idx}`} variant="slot" size="md" />
+                <span
+                  key={`cc-wrap-${idx}`}
+                  className={flippingIndices.has(idx) ? 'card-flip-shell flipping' : 'card-flip-shell'}
+                >
+                  {card && card !== '--'
+                    ? <Card card={card} variant="front" size="md" />
+                    : <Card variant="slot" size="md" />}
+                </span>
               ))}
             </div>
           </div>
@@ -103,6 +179,8 @@ export function TableArea({
                 player.folded || isLoserSeat ? 'folded' : '',
                 isWinnerSeat && isShowdown ? 'winner' : '',
                 isMe ? 'me' : '',
+                dealingSeats.has(idx) ? 'dealing' : '',
+                isShowdown ? 'sd-active' : '',
               ].filter(Boolean).join(' ')}
               style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
             >
@@ -139,7 +217,10 @@ export function TableArea({
 
             {player.contributed > 0 && !player.folded && (
               <div
-                className={betChipClass(player.contributed)}
+                className={[
+                  betChipClass(player.contributed),
+                  newChipSeats.has(idx) ? 'chip-new' : '',
+                ].filter(Boolean).join(' ')}
                 style={{ left: `${pos.betX}%`, top: `${pos.betY}%` }}
               >
                 {player.contributed}
