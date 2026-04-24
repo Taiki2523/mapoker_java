@@ -9,7 +9,6 @@ type Props = {
   showdown: Showdown | null
   isShowdown: boolean
   currentUser: AuthUser | null
-  myName: string
   mySeat: number | null
   mySeatIndex: number | null
   isSpectator: boolean
@@ -40,7 +39,7 @@ type Props = {
 
 export function GameScreen({
   game, showdown, isShowdown,
-  currentUser: _currentUser, myName, mySeat, mySeatIndex,
+  currentUser: _currentUser, mySeat, mySeatIndex,
   isSpectator, roster, autoRefresh, setAutoRefresh,
   actionAmount, setActionAmount, loading, error,
   inviteCopied, leavePending,
@@ -54,7 +53,6 @@ export function GameScreen({
     <div className="game-layout">
       <TopBar
         game={game}
-        myName={myName}
         mySeatIndex={mySeatIndex}
         canAct={canAct}
         displayName={displayName}

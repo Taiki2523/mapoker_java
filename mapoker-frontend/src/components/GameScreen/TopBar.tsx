@@ -3,7 +3,6 @@ import { t } from '../../i18n'
 
 type Props = {
   game: GameState | null
-  myName: string
   mySeatIndex: number | null
   canAct?: boolean
   displayName?: (idx: number) => string
@@ -17,7 +16,7 @@ type Props = {
 }
 
 export function TopBar({
-  game, myName, mySeatIndex, canAct, displayName,
+  game, mySeatIndex, canAct, displayName,
   loading: _loading, error, autoRefresh, setAutoRefresh,
   inviteCopied, onCopyInvite, onOpenMyPage,
 }: Props) {

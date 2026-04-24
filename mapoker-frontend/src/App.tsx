@@ -33,12 +33,10 @@ function App() {
   const prevIsMyTurn = useRef(false)
   const [myName, setMyName] = useState('')
   const [mySeatIndex, setMySeatIndex] = useState<number | null>(null)
-  const [loginSeatIndex, setLoginSeatIndex] = useState(0)
-  const [loginError, setLoginError] = useState('')
   const [leavePending, setLeavePending] = useState(false)
   const [roster, setRoster] = useState<RoomMember[]>([])
   const [showMyPage, setShowMyPage] = useState(false)
-  const [table, setTable] = useState<Table | null>(null)
+  const [, setTable] = useState<Table | null>(null)
   const [profileTables, setProfileTables] = useState<Table[]>([])
   const [profileHistory, setProfileHistory] = useState<UserTableHistoryEntry[]>([])
   const [profileHandHistory, setProfileHandHistory] = useState<HandHistoryEntry[]>([])
@@ -189,7 +187,6 @@ function App() {
       const data = JSON.parse(raw) as StoredSession
       setMyName(data.name)
       setMySeatIndex(data.seatIndex)
-      setLoginSeatIndex(data.seatIndex)
     } catch {
       // ignore
     }
@@ -200,7 +197,6 @@ function App() {
     const member = roster.find((m) => m.name === myName.trim())
     if (member) {
       setMySeatIndex(member.seatIndex)
-      setLoginSeatIndex(member.seatIndex)
     }
   }, [gameId, myName, mySeatIndex, roster])
 
@@ -289,7 +285,6 @@ function App() {
       } else {
         setShowdown(null)
       }
-      setLoginSeatIndex((prev) => (prev < data.players.length ? prev : 0))
     } catch (err) {
       setError((err as Error).message)
     }
@@ -400,7 +395,6 @@ function App() {
     })
     const assignedSeatIndex = result.assigned_seat_index
     setMySeatIndex(assignedSeatIndex)
-    setLoginSeatIndex(assignedSeatIndex)
     setRoster(mapMembers(result.members))
     persistSession(tableId, { name, seatIndex: assignedSeatIndex })
     return assignedSeatIndex
@@ -466,7 +460,6 @@ function App() {
 
   const joinRoom = async (raw: string) => {
     if (!raw) return
-    setLoginError('')
     setRoomScreenMode('room')
     let id = raw
     try {
@@ -489,34 +482,6 @@ function App() {
     await refreshTable(id)
   }
 
-  const loginAsPlayer = async () => {
-    if (!game) { setLoginError(t('errLoadRoom')); return }
-    if (!myName.trim()) { setLoginError(t('errEnterName')); return }
-    if (!gameId) { setLoginError(t('errMissingRoom')); return }
-    setLoginError('')
-
-    const doLogin = async (buyIn: number) => {
-      try {
-        await doTableJoin(gameId, myName.trim(), buyIn)
-      } catch (err) {
-        setLoginError(formatErrorMessage(err))
-      }
-    }
-
-    if (table && table.min_buy_in > 0) {
-      setBuyInContext({
-        tableId: gameId,
-        tableName: table.name,
-        minBuyIn: table.min_buy_in,
-        maxBuyIn: table.max_buy_in,
-        bigBlind: table.stake.big_blind,
-        onConfirm: (amount) => { setBuyInContext(null); void doLogin(amount) },
-        onCancel: () => { setBuyInContext(null) },
-      })
-    } else {
-      await doLogin(0)
-    }
-  }
 
   const lobbyJoinWithBuyIn = async (tableId: string) => {
     setRoomScreenMode('room')
@@ -747,7 +712,6 @@ function App() {
           showdown={showdown}
           isShowdown={isShowdown ?? false}
           currentUser={currentUser}
-          myName={myName}
           mySeat={mySeat}
           mySeatIndex={mySeatIndex}
           isSpectator={isSpectator}
