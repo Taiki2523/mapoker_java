@@ -51,9 +51,12 @@ export function TableArea({
     })
 
     if (newDealing.size > 0) {
-      setDealingSeats(newDealing)
-      const id = setTimeout(() => setDealingSeats(new Set()), 600)
-      return () => clearTimeout(id)
+      const activateId = window.setTimeout(() => setDealingSeats(newDealing), 0)
+      const clearId = window.setTimeout(() => setDealingSeats(new Set()), 600)
+      return () => {
+        window.clearTimeout(activateId)
+        window.clearTimeout(clearId)
+      }
     }
   }, [game.players])
 
@@ -64,26 +67,31 @@ export function TableArea({
       for (let i = prevCommLenRef.current; i < current; i += 1) {
         newIdx.add(i)
       }
-      setFlippingIndices(newIdx)
-      const id = setTimeout(() => setFlippingIndices(new Set()), 500)
       prevCommLenRef.current = current
-      return () => clearTimeout(id)
+      const activateId = window.setTimeout(() => setFlippingIndices(newIdx), 0)
+      const clearId = window.setTimeout(() => setFlippingIndices(new Set()), 500)
+      return () => {
+        window.clearTimeout(activateId)
+        window.clearTimeout(clearId)
+      }
     }
     prevCommLenRef.current = current
   }, [game.community])
 
   useEffect(() => {
     if (!isShowdown) {
-      setSdStep(0)
-      return
+      const resetId = window.setTimeout(() => setSdStep(0), 0)
+      return () => window.clearTimeout(resetId)
     }
-    const t1 = setTimeout(() => setSdStep(1), 800)
-    const t2 = setTimeout(() => setSdStep(2), 1600)
-    const t3 = setTimeout(() => setSdStep(3), 2800)
+    const resetId = window.setTimeout(() => setSdStep(0), 0)
+    const t1 = window.setTimeout(() => setSdStep(1), 800)
+    const t2 = window.setTimeout(() => setSdStep(2), 1600)
+    const t3 = window.setTimeout(() => setSdStep(3), 2800)
     return () => {
-      clearTimeout(t1)
-      clearTimeout(t2)
-      clearTimeout(t3)
+      window.clearTimeout(resetId)
+      window.clearTimeout(t1)
+      window.clearTimeout(t2)
+      window.clearTimeout(t3)
     }
   }, [isShowdown])
 
@@ -97,9 +105,12 @@ export function TableArea({
       prevContribRef.current[i] = p.contributed
     })
     if (newChips.size > 0) {
-      setNewChipSeats(newChips)
-      const id = setTimeout(() => setNewChipSeats(new Set()), 400)
-      return () => clearTimeout(id)
+      const activateId = window.setTimeout(() => setNewChipSeats(newChips), 0)
+      const clearId = window.setTimeout(() => setNewChipSeats(new Set()), 400)
+      return () => {
+        window.clearTimeout(activateId)
+        window.clearTimeout(clearId)
+      }
     }
   }, [game.players])
 

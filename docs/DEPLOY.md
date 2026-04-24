@@ -5,6 +5,7 @@
 **関連ドキュメント:**
 - [docs/DOCKER.md](DOCKER.md) — Docker 構成ルール（イメージ・ボリューム・セキュリティ）
 - [docs/ENVIRONMENT.md](ENVIRONMENT.md) — 環境変数管理
+- [docs/FLYWAY.md](FLYWAY.md) — Flyway migration 運用ルール
 
 ## 構成図
 
@@ -236,6 +237,8 @@ docker compose logs backend
 # データベース接続確認
 docker compose exec backend wget -O- http://localhost:8080/actuator/health
 ```
+
+Flyway の checksum mismatch でも backend は起動失敗する。`Validate failed: Migrations have failed validation` が見えたら、既存 `V*.sql` の書き換えを疑い、`docs/FLYWAY.md` に従って対処する。
 
 ### Frontend がビルドエラーで失敗
 

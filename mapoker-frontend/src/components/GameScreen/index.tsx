@@ -1,4 +1,4 @@
-import type { AuthUser, BetPreset, GameState, PayoutLine, Player, RoomMember, Showdown } from '../../types'
+import type { BetPreset, GameState, PayoutLine, Player, RoomMember, Showdown } from '../../types'
 import { TopBar } from './TopBar'
 import { TableArea } from './TableArea'
 import { ActionPanel } from './ActionPanel'
@@ -8,7 +8,6 @@ type Props = {
   game: GameState
   showdown: Showdown | null
   isShowdown: boolean
-  currentUser: AuthUser | null
   mySeat: number | null
   mySeatIndex: number | null
   isSpectator: boolean
@@ -39,7 +38,7 @@ type Props = {
 
 export function GameScreen({
   game, showdown, isShowdown,
-  currentUser: _currentUser, mySeat, mySeatIndex,
+  mySeat, mySeatIndex,
   isSpectator, roster, autoRefresh, setAutoRefresh,
   actionAmount, setActionAmount, loading, error,
   inviteCopied, leavePending,
@@ -56,7 +55,6 @@ export function GameScreen({
         mySeatIndex={mySeatIndex}
         canAct={canAct}
         displayName={displayName}
-        loading={loading}
         error={error}
         autoRefresh={autoRefresh}
         setAutoRefresh={setAutoRefresh}

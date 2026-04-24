@@ -6,7 +6,6 @@ type Props = {
   mySeatIndex: number | null
   canAct?: boolean
   displayName?: (idx: number) => string
-  loading: boolean
   error: string
   autoRefresh: boolean
   setAutoRefresh: (v: boolean) => void
@@ -17,7 +16,7 @@ type Props = {
 
 export function TopBar({
   game, mySeatIndex, canAct, displayName,
-  loading: _loading, error, autoRefresh, setAutoRefresh,
+  error, autoRefresh, setAutoRefresh,
   inviteCopied, onCopyInvite, onOpenMyPage,
 }: Props) {
   const resolvedCanAct = canAct ?? (

@@ -121,6 +121,16 @@ function App() {
     if (!game) return []
     const cap = Math.max(maxBet, minRaise)
     const clamp = (v: number) => Math.min(cap, Math.max(minRaise, v))
+    if (game.street === 'preflop') {
+      return [
+        { label: 'x1', amount: clamp(game.current_bet + (game.big_blind * 1)) },
+        { label: 'x2', amount: clamp(game.current_bet + (game.big_blind * 2)) },
+        { label: 'x3', amount: clamp(game.current_bet + (game.big_blind * 3)) },
+        { label: 'x4', amount: clamp(game.current_bet + (game.big_blind * 4)) },
+        { label: 'ALL', amount: maxBet },
+      ]
+        .filter((p) => p.amount > 0 && p.amount <= maxBet)
+    }
     const pot = game.pot_total
     return [
       { label: t('presetMin'), amount: minRaise },
@@ -131,7 +141,7 @@ function App() {
       { label: t('presetAll'), amount: maxBet },
     ]
       .filter((p) => p.amount > 0 && p.amount <= maxBet)
-  }, [game, toCall, minRaise, maxBet])
+  }, [game, minRaise, maxBet])
 
   const myHandName = useMemo(() => {
     if (mySeat === null || !game) return null
@@ -711,7 +721,6 @@ function App() {
           game={game}
           showdown={showdown}
           isShowdown={isShowdown ?? false}
-          currentUser={currentUser}
           mySeat={mySeat}
           mySeatIndex={mySeatIndex}
           isSpectator={isSpectator}
