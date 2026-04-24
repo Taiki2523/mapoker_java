@@ -92,6 +92,7 @@ public class GameState {
         for (Player p : players) {
             p.setFolded(false);
             p.setAllIn(false);
+            p.setSittingOut(false);
             p.setContributed(0);
             p.setTotalContrib(0);
             p.setHole(new Card[PokerConstants.HOLE_CARDS]);
@@ -108,12 +109,19 @@ public class GameState {
         if (activePlayers < PokerConstants.MIN_PLAYERS)
             throw new IllegalStateException("not enough players with chips");
 
+        buttonIndex = nextActive(buttonIndex);
+
         // Shuffle fresh deck for new hand
         deck = Deck.newDeck();
         Deck.shuffle(deck, null);
 
-        smallBlindIdx = nextActive(buttonIndex);
-        bigBlindIdx = nextActive(smallBlindIdx);
+        if (activePlayers == 2) {
+            smallBlindIdx = buttonIndex;
+            bigBlindIdx = nextActive(buttonIndex);
+        } else {
+            smallBlindIdx = nextActive(buttonIndex);
+            bigBlindIdx = nextActive(smallBlindIdx);
+        }
 
         postBlind(smallBlindIdx, bigBlind / PokerConstants.SMALL_BLIND_DIVISOR);
         postBlind(bigBlindIdx, bigBlind);
@@ -214,7 +222,7 @@ public class GameState {
         }
 
         if (isBettingRoundComplete()) {
-            if (activeCount() == 0) {
+            if (activeCount() <= 1) {
                 // all players are all-in, run out the board
                 while (street != Street.RIVER) {
                     advanceStreet();
@@ -245,6 +253,7 @@ public class GameState {
         for (int i = 0; i < players.size(); i++) {
             Player p = players.get(i);
             if (p.isFolded()) continue;
+            if (p.isSittingOut()) continue;
             Card[] seven = buildSeven(p.getHole(), community);
             HandValue val = HandEvaluator.eval7(seven);
             int cmp = val.compareTo(best);
@@ -275,6 +284,14 @@ public class GameState {
         currentBet = 0;
         lastRaiseSize = bigBlindSize;
         status = GameStatus.FINISHED;
+    }
+
+    public boolean canStartHand() {
+        int eligible = 0;
+        for (Player p : players) {
+            if (p.getStack() > 0 && !p.isSittingOut()) eligible++;
+        }
+        return eligible >= 2;
     }
 
     // ---- private helpers ----
@@ -355,7 +372,9 @@ public class GameState {
 
     private int remainingActive() {
         int count = 0;
-        for (Player p : players) if (!p.isFolded()) count++;
+        for (Player p : players) {
+            if (!p.isFolded() && !p.isSittingOut()) count++;
+        }
         return count;
     }
 
@@ -378,6 +397,7 @@ public class GameState {
             Player p = players.get(i);
             if (p.isFolded()) continue;
             if (p.isAllIn()) continue;
+            if (p.isSittingOut()) continue;
             if (p.getContributed() != currentBet) return false;
             if (!acted[i]) return false;
         }
@@ -399,6 +419,7 @@ public class GameState {
             Player p = players.get(idx);
             if (p.isFolded()) continue;
             if (p.isAllIn()) continue;
+            if (p.isSittingOut()) continue;
             return idx;
         }
         return from;

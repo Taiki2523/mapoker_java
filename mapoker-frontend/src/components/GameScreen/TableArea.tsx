@@ -1,4 +1,4 @@
-import type { GameState, PayoutLine, Showdown } from '../../types'
+import type { GameState, PayoutLine, RoomMember, Showdown } from '../../types'
 import { CardFace } from '../Card'
 import { seatPosition } from '../../utils'
 import { t } from '../../i18n'
@@ -9,8 +9,7 @@ type Props = {
   isShowdown: boolean
   mySeat: number | null
   isSpectator: boolean
-  smallBlindIndex: number | null
-  bigBlindIndex: number | null
+  roster: RoomMember[]
   winnerNames: string
   payoutLines: PayoutLine[]
   displayName: (idx: number) => string
@@ -18,10 +17,14 @@ type Props = {
 }
 
 export function TableArea({
-  game, showdown, isShowdown, mySeat, isSpectator,
-  smallBlindIndex, bigBlindIndex, winnerNames, payoutLines,
+  game, showdown, isShowdown, mySeat, isSpectator, roster,
+  winnerNames, payoutLines,
   displayName, onCloseSession,
 }: Props) {
+  const seatedIndices = new Set(roster.map((m) => m.seatIndex))
+
+  const isWaiting = game.status === 'finished' && game.pot_total === 0 && (game.community ?? []).length === 0
+
   return (
     <div className="table-area" onClick={onCloseSession}>
       <div className="poker-felt">
@@ -46,6 +49,17 @@ export function TableArea({
               </div>
             )}
           </div>
+        ) : isWaiting ? (
+          <div className="felt-center">
+            <div className="waiting-status">
+              <div className="waiting-members">
+                {roster.length} / {game.players.length} {t('players')}
+              </div>
+              {!game.can_start_hand && (
+                <div className="waiting-label">{t('waitingForPlayers')}</div>
+              )}
+            </div>
+          </div>
         ) : (
           <div className="felt-center">
             <div className="pot-display">POT {game.pot_total ?? 0}</div>
@@ -63,6 +77,8 @@ export function TableArea({
       </div>
 
       {game.players.map((player, idx) => {
+        if (!seatedIndices.has(idx)) return null
+
         const n = game.players.length
         const anchorSeat = mySeat ?? 0
         const pos = seatPosition(idx, anchorSeat, n)
@@ -90,8 +106,8 @@ export function TableArea({
                   <span className="player-name">{displayName(idx)}</span>
                   <div className="badges">
                     {game.button_index === idx && <span className="badge btn">D</span>}
-                    {smallBlindIndex === idx && <span className="badge sb">SB</span>}
-                    {bigBlindIndex === idx && <span className="badge bb">BB</span>}
+                    {game.small_blind_idx === idx && <span className="badge sb">SB</span>}
+                    {game.big_blind_idx === idx && <span className="badge bb">BB</span>}
                     {player.folded && <span className="badge warn">F</span>}
                     {player.all_in && <span className="badge accent">AI</span>}
                   </div>

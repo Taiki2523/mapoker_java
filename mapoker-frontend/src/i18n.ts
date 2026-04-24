@@ -61,6 +61,7 @@ const ja = {
   joinLobby: 'ロビーに参加',
   playersJoined: '参加プレイヤー',
   waitingForPlayers: 'プレイヤーを待っています...',
+  leavePending: '退席予約中...',
 
   // --- テーブル ---
   tableTitle: 'テーブル',
@@ -102,13 +103,10 @@ const ja = {
   // --- ショーダウン ---
   showdownTitle: 'ショーダウン',
   showdownDesc: 'ハンドを解決してペイアウトを確認',
-  runShowdown: 'ショーダウン実行',
-  waitingHostShowdown: 'ホストがショーダウンを実行するまでお待ちください',
   winners: '勝者',
   bestHand: 'ベストハンド',
   payouts: 'ペイアウト',
   noShowdown: 'まだショーダウンはありません',
-  nextHand: '次のハンド',
 
   // --- フッター ---
   tip: 'ヒント',
@@ -146,7 +144,6 @@ const ja = {
   close: '閉じる',
   currentTable: '現在のテーブル',
   none: 'なし',
-  owner: 'オーナー',
   guest: 'ゲスト',
   notJoined: 'まだ着席していません',
   playHistory: 'プレイ履歴',
@@ -156,6 +153,8 @@ const ja = {
   lobbyBrowserTitle: 'ロビーブラウザ',
   lobbyBrowserDesc: '公開・非公開テーブルを絞り込んで参加先を探せます',
   backToRoomForm: '作成画面に戻る',
+  backToLobby: 'ロビーに戻る',
+  back: '戻る',
   joinTable: '参加',
   noLobbyTables: '条件に合うテーブルはありません',
   stakeLabel: 'ブラインド',
@@ -166,6 +165,8 @@ const ja = {
   tableStatusFinished: '終了',
   myTables: 'マイテーブル',
   myTablesDesc: '参加中または最近プレイしたテーブル',
+  tableList: 'テーブル一覧',
+  createTable: 'テーブル作成',
   publicTablesTitle: '公開テーブル一覧',
   publicTablesDesc: '参加先をここから選べます',
   noMyTables: 'まだ自分のテーブル履歴はありません',
@@ -185,6 +186,34 @@ const ja = {
   streetFlop: 'フロップ',
   streetTurn: 'ターン',
   streetRiver: 'リバー',
+  chipBalance: '所持チップ',
+  claimDailyBonus: 'デイリーボーナス',
+  claimRecovery: '回復チップ',
+  walletLedger: '増減履歴',
+  noWalletLedger: 'まだ増減履歴はありません',
+  REGISTER_BONUS: '新規登録ボーナス',
+  DAILY_BONUS: 'デイリーボーナス',
+  RECOVERY: '回復チップ',
+  RECOVERY_BONUS: '回復チップ',
+  ADMIN_GRANT: '管理者付与',
+  TABLE_BUY_IN: 'バイイン',
+  TABLE_CASH_OUT: 'キャッシュアウト',
+  cooldownUntil: '次回: {time}',
+  insufficientFunds: 'チップが不足しています',
+  buyIn: 'バイイン',
+  confirmBuyIn: '参加する',
+  ring: 'リングゲーム',
+  tournament: 'トーナメント',
+  comingSoon: '近日公開',
+  gameTypeTitle: 'ゲームタイプを選択',
+  gameTypeDesc: 'どのゲームで遊びますか？',
+  buyInTitle: 'バイイン',
+  buyInAmount: 'バイイン額',
+  buyInMin: '最小',
+  buyInMax: '最大',
+  cancel: 'キャンセル',
+  youHaveBeenRemovedFromTable: 'テーブルから退席しました',
+  rebuy: 'リバイ',
 
   // --- エラーメッセージ ---
   errEnterName: '名前を入力してください',
@@ -210,4 +239,8 @@ export function t(key: Key, vars?: Record<string, string | number>): string {
     }
   }
   return s
+}
+
+export function hasTranslation(key: string): key is Key {
+  return Object.prototype.hasOwnProperty.call(ja, key)
 }

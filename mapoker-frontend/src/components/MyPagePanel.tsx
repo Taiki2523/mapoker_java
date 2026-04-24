@@ -1,17 +1,28 @@
-import { t } from '../i18n'
-import type { AuthUser, HandHistoryEntry, Table, UserTableHistoryEntry } from '../types'
+import { hasTranslation, t } from '../i18n'
+import type {
+  AuthUser,
+  HandHistoryEntry,
+  Table,
+  UserTableHistoryEntry,
+  WalletLedgerEntry,
+  WalletSummary,
+} from '../types'
 
 type Props = {
   currentUser: AuthUser
   tables: Table[]
   history: UserTableHistoryEntry[]
   handHistory: HandHistoryEntry[]
+  wallet: WalletSummary | null
+  walletLedger: WalletLedgerEntry[]
   currentTableId: string
   loading: boolean
   error: string
   onClose: () => void
   onRefresh: () => void
   onOpenTable: (tableId: string) => void
+  onClaimDailyBonus: () => void
+  onClaimRecovery: () => void
 }
 
 const flagLabels: Record<string, string> = {
@@ -33,12 +44,16 @@ export function MyPagePanel({
   tables,
   history,
   handHistory,
+  wallet,
+  walletLedger,
   currentTableId,
   loading,
   error,
   onClose,
   onRefresh,
   onOpenTable,
+  onClaimDailyBonus,
+  onClaimRecovery,
 }: Props) {
   const recentTableIds = new Set(history.map((entry) => entry.table_id))
   const historyByTableId = new Map<string, UserTableHistoryEntry>()
@@ -71,6 +86,19 @@ export function MyPagePanel({
 
   const formatStreet = (street: string) => streetLabels[street] ?? street
 
+  const formatCooldown = (value: string | null) => {
+    if (!value) return null
+    const targetAt = new Date(value).getTime()
+    if (Number.isNaN(targetAt)) return null
+    return t('cooldownUntil', { time: formatDate(value) })
+  }
+
+  const formatWalletReason = (reason: string) => (
+    hasTranslation(reason) ? t(reason) : reason
+  )
+
+  const formatDelta = (delta: number) => (delta >= 0 ? `+${delta}` : `${delta}`)
+
   const tableNameFor = (tableId: string) => {
     return tablesById.get(tableId)?.name
       ?? historyByTableId.get(tableId)?.table_name
@@ -84,6 +112,9 @@ export function MyPagePanel({
     ))
     return names.length > 0 ? names.join(', ') : '—'
   }
+
+  const dailyBonusCooldown = wallet ? formatCooldown(wallet.next_daily_bonus_at) : null
+  const recoveryCooldown = wallet ? formatCooldown(wallet.next_recovery_at) : null
 
   return (
     <div className="profile-overlay" onClick={onClose} role="presentation">
@@ -107,6 +138,65 @@ export function MyPagePanel({
             </button>
           </div>
         </div>
+
+        {wallet ? (
+          <>
+            <section className="profile-section">
+              <div className="profile-card-grid">
+                <div className="profile-card">
+                  <span className="label">{t('chipBalance')}</span>
+                  <strong>{wallet.chip_balance}</strong>
+                </div>
+                <div className="profile-card">
+                  <span className="label">{t('claimDailyBonus')}</span>
+                  <button
+                    className="primary"
+                    onClick={onClaimDailyBonus}
+                    disabled={loading || dailyBonusCooldown !== null}
+                  >
+                    {t('claimDailyBonus')}
+                  </button>
+                  {dailyBonusCooldown ? <span className="muted">{dailyBonusCooldown}</span> : null}
+                </div>
+                <div className="profile-card">
+                  <span className="label">{t('claimRecovery')}</span>
+                  <button
+                    className="secondary"
+                    onClick={onClaimRecovery}
+                    disabled={loading || recoveryCooldown !== null}
+                  >
+                    {t('claimRecovery')}
+                  </button>
+                  {recoveryCooldown ? <span className="muted">{recoveryCooldown}</span> : null}
+                </div>
+              </div>
+            </section>
+
+            <section className="profile-section">
+              <div className="profile-section-head">
+                <h3>{t('walletLedger')}</h3>
+              </div>
+              <div className="profile-table-list">
+                {walletLedger.map((entry) => (
+                  <article key={entry.id} className="profile-table-card compact">
+                    <div className="profile-table-main">
+                      <div>
+                        <strong>{formatWalletReason(entry.reason)}</strong>
+                        <div className="muted-light">
+                          {t('chipBalance')} {entry.balance_after} · {formatDate(entry.created_at)}
+                        </div>
+                      </div>
+                      <strong>{formatDelta(entry.delta)}</strong>
+                    </div>
+                  </article>
+                ))}
+                {walletLedger.length === 0 && (
+                  <div className="muted" style={{ padding: '0.75rem 0' }}>{t('noWalletLedger')}</div>
+                )}
+              </div>
+            </section>
+          </>
+        ) : null}
 
         <section className="profile-section">
           <div className="profile-card-grid">
