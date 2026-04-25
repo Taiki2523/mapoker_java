@@ -51,7 +51,7 @@ export function TopBar({
       </div>
 
       <div className="topbar-center">
-        <span className="topbar-stat">POT <strong>{game?.pot_total ?? 0}</strong></span>
+        <span className="topbar-stat">POT <strong>{game ? game.pot_total - game.players.reduce((s, p) => s + p.contributed, 0) : 0}</strong></span>
         {(game?.current_bet ?? 0) > 0 && (
           <span className="topbar-stat">BET <strong>{game!.current_bet}</strong></span>
         )}

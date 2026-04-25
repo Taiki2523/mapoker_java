@@ -116,6 +116,9 @@ export function TableArea({
 
   return (
     <div className="table-area" onClick={onCloseSession}>
+      <div className="blind-info">
+        SB: {Math.floor(game.big_blind / 2)} / BB: {game.big_blind}
+      </div>
       <div className="poker-felt">
         {/* ---- 常時表示: ポット + コミュニティカード (waiting 時を除く) ---- */}
         {isWaiting ? (
@@ -131,7 +134,7 @@ export function TableArea({
           </div>
         ) : (
           <div className="felt-center">
-            {!isShowdown && <div className="pot-display">POT {game.pot_total ?? 0}</div>}
+            {!isShowdown && <div className="pot-display">POT {game.pot_total - game.players.reduce((s, p) => s + p.contributed, 0)}</div>}
             <div className="community-cards-row">
               {communitySlots.map((card, idx) => (
                 <span

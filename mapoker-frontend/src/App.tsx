@@ -123,10 +123,9 @@ function App() {
     const clamp = (v: number) => Math.min(cap, Math.max(minRaise, v))
     if (game.street === 'preflop') {
       return [
-        { label: 'x1', amount: clamp(game.current_bet + (game.big_blind * 1)) },
-        { label: 'x2', amount: clamp(game.current_bet + (game.big_blind * 2)) },
-        { label: 'x3', amount: clamp(game.current_bet + (game.big_blind * 3)) },
-        { label: 'x4', amount: clamp(game.current_bet + (game.big_blind * 4)) },
+        { label: 'x2', amount: clamp(game.current_bet * 2) },
+        { label: 'x3', amount: clamp(game.current_bet * 3) },
+        { label: 'x4', amount: clamp(game.current_bet * 4) },
         { label: 'ALL', amount: maxBet },
       ]
         .filter((p) => p.amount > 0 && p.amount <= maxBet)
@@ -453,7 +452,7 @@ function App() {
           tableId: data.id,
           tableName: data.name,
           minBuyIn: data.min_buy_in,
-          maxBuyIn: data.max_buy_in,
+          maxBuyIn: wallet ? Math.min(data.max_buy_in, wallet.chip_balance) : data.max_buy_in,
           bigBlind: data.stake.big_blind,
           onConfirm: (amount) => { setBuyInContext(null); void doJoinAndNavigate(amount) },
           onCancel: () => { setBuyInContext(null) },
@@ -519,7 +518,7 @@ function App() {
         tableId: id,
         tableName: fetchedTable.name,
         minBuyIn: fetchedTable.min_buy_in,
-        maxBuyIn: fetchedTable.max_buy_in,
+        maxBuyIn: wallet ? Math.min(fetchedTable.max_buy_in, wallet.chip_balance) : fetchedTable.max_buy_in,
         bigBlind: fetchedTable.stake.big_blind,
         onConfirm: (amount) => { setBuyInContext(null); void doJoin(amount) },
         onCancel: () => { setBuyInContext(null) },
