@@ -117,7 +117,7 @@ export function TableArea({
   return (
     <div className="table-area" onClick={onCloseSession}>
       <div className="blind-info">
-        SB: {Math.round(game.big_blind / 2)} / BB: {game.big_blind}
+        SB: {Math.floor(game.big_blind / 2)} / BB: {game.big_blind}
       </div>
       <div className="poker-felt">
         {/* ---- 常時表示: ポット + コミュニティカード (waiting 時を除く) ---- */}
