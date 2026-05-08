@@ -123,9 +123,10 @@ function App() {
     const clamp = (v: number) => Math.min(cap, Math.max(minRaise, v))
     if (game.street === 'preflop') {
       return [
-        { label: 'x2', amount: clamp(game.current_bet * 2) },
-        { label: 'x3', amount: clamp(game.current_bet * 3) },
-        { label: 'x4', amount: clamp(game.current_bet * 4) },
+        { label: 'x1', amount: clamp(game.current_bet + (game.big_blind * 1)) },
+        { label: 'x2', amount: clamp(game.current_bet + (game.big_blind * 2)) },
+        { label: 'x3', amount: clamp(game.current_bet + (game.big_blind * 3)) },
+        { label: 'x4', amount: clamp(game.current_bet + (game.big_blind * 4)) },
         { label: 'ALL', amount: maxBet },
       ]
         .filter((p) => p.amount > 0 && p.amount <= maxBet)
