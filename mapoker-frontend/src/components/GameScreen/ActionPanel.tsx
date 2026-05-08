@@ -93,7 +93,7 @@ export function ActionPanel({
           <button
             className="raise-btn"
             onClick={() => onSendAction(toCall === 0 ? 'bet' : 'raise', actionAmount)}
-            disabled={!canAct || loading || actionAmount <= 0}
+            disabled={!canAct || loading || actionAmount < minRaise}
           >
             {toCall === 0
               ? `${t('betLabel')} ${actionAmount}`

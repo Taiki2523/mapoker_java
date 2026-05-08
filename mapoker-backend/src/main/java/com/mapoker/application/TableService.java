@@ -170,6 +170,10 @@ public class TableService {
      */
     public GameState startHand(String tableId, int bigBlind) {
         synchronized (tableLock(tableId)) {
+            GameState current = gameService.getGame(tableId);
+            if (current.getStatus() == GameStatus.IN_PROGRESS) {
+                return current;
+            }
             List<TableMemberRecord> members = getMembers(tableId);
             if (!members.isEmpty()) {
                 TableRecord table = getTable(tableId);
