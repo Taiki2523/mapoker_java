@@ -11,6 +11,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * Spring の {@code @RestController} としてルーム参加者 API を提供するコントローラです。
+ */
 @RestController
 @RequestMapping("/v1/rooms")
 public class RoomController {
@@ -21,6 +24,13 @@ public class RoomController {
         this.tableService = tableService;
     }
 
+    /**
+     * 参加者表示用 DTO です。
+     *
+     * @param name 参加者名
+     * @param seatIndex 着席位置
+     * @param joinedAt 参加日時
+     */
     public record MemberRecord(
             String name,
             @JsonProperty("seat_index") int seatIndex,
@@ -29,11 +39,25 @@ public class RoomController {
 
     private record MembersResponse(List<MemberRecord> members) {}
 
+    /**
+     * ルーム参加者一覧を取得します。
+     *
+     * @param id ルーム ID
+     * @return 参加者一覧
+     */
     @GetMapping("/{id}/members")
     public MembersResponse getMembers(@PathVariable String id) {
         return new MembersResponse(mapMembers(tableService.getMembers(id)));
     }
 
+    /**
+     * 認証ユーザーまたは指定名義でルームへ参加します。
+     *
+     * @param id ルーム ID
+     * @param body 参加リクエスト
+     * @param principal 認証済みユーザー
+     * @return 更新後の参加者一覧
+     */
     @PostMapping("/{id}/join")
     public MembersResponse join(@PathVariable String id,
                                 @Valid @RequestBody(required = false) TableMembershipRequest body,
@@ -43,6 +67,14 @@ public class RoomController {
         return new MembersResponse(mapMembers(tableService.join(id, name, buyIn).members()));
     }
 
+    /**
+     * 認証ユーザーまたは指定名義でルームから退出します。
+     *
+     * @param id ルーム ID
+     * @param body 退出リクエスト
+     * @param principal 認証済みユーザー
+     * @return 更新後の参加者一覧
+     */
     @PostMapping("/{id}/leave")
     public MembersResponse leave(@PathVariable String id,
                                  @Valid @RequestBody(required = false) TableMembershipRequest body,

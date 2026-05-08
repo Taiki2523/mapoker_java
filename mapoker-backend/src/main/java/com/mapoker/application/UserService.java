@@ -9,6 +9,9 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+/**
+ * Spring の {@code @Service} としてユーザー登録と認証用ユーザー解決を担当するサービスです。
+ */
 @Service
 public class UserService implements UserDetailsService {
 
@@ -24,6 +27,14 @@ public class UserService implements UserDetailsService {
         this.walletServiceProvider = walletServiceProvider;
     }
 
+    /**
+     * 新しいユーザーを登録します。
+     *
+     * @param username ユーザー名
+     * @param password 平文パスワード
+     * @return 作成されたユーザー
+     * @throws IllegalArgumentException ユーザー名が既に使用されている場合
+     */
     public User register(String username, String password) {
         String normalizedUsername = normalizeUsername(username);
         if (userRepository.findByUsername(normalizedUsername).isPresent()) {
@@ -37,12 +48,26 @@ public class UserService implements UserDetailsService {
         return createdUser;
     }
 
+    /**
+     * ユーザー名からユーザー情報を取得します。
+     *
+     * @param username ユーザー名
+     * @return 対応するユーザー
+     * @throws UsernameNotFoundException ユーザーが存在しない場合
+     */
     public User getByUsername(String username) {
         String normalizedUsername = normalizeUsername(username);
         return userRepository.findByUsername(normalizedUsername)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + normalizedUsername));
     }
 
+    /**
+     * 認証処理用にユーザー詳細を読み込みます。
+     *
+     * @param username ユーザー名
+     * @return 認証に利用するユーザー詳細
+     * @throws UsernameNotFoundException ユーザーが存在しない場合
+     */
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         String normalizedUsername = normalizeUsername(username);

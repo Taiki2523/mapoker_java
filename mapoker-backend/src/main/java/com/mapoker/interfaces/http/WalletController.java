@@ -20,6 +20,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * Spring の {@code @RestController} としてウォレット参照とボーナス請求 API を提供するコントローラです。
+ */
 @RestController
 @Profile("postgresql")
 @RequestMapping("/v1/wallet")
@@ -33,6 +36,12 @@ public class WalletController {
         this.walletService = walletService;
     }
 
+    /**
+     * 認証ユーザーのウォレット情報を取得します。
+     *
+     * @param principal 認証済みユーザー
+     * @return ウォレット応答
+     */
     @GetMapping
     public ResponseEntity<WalletResponse> getWallet(@AuthenticationPrincipal UserDetails principal) {
         if (principal == null) {
@@ -41,6 +50,13 @@ public class WalletController {
         return ResponseEntity.ok(loadWalletResponse(principal.getUsername()));
     }
 
+    /**
+     * 認証ユーザーの台帳履歴を取得します。
+     *
+     * @param principal 認証済みユーザー
+     * @param limit 取得件数
+     * @return 台帳履歴応答
+     */
     @GetMapping("/ledger")
     public ResponseEntity<List<WalletLedgerResponse>> getLedger(
             @AuthenticationPrincipal UserDetails principal,
@@ -54,6 +70,12 @@ public class WalletController {
                 .toList());
     }
 
+    /**
+     * 日次ボーナスを請求します。
+     *
+     * @param principal 認証済みユーザー
+     * @return 更新後のウォレット応答
+     */
     @PostMapping("/daily-bonus")
     public ResponseEntity<WalletResponse> claimDailyBonus(@AuthenticationPrincipal UserDetails principal) {
         if (principal == null) {
@@ -64,6 +86,12 @@ public class WalletController {
         return ResponseEntity.ok(loadWalletResponse(username));
     }
 
+    /**
+     * 救済ボーナスを請求します。
+     *
+     * @param principal 認証済みユーザー
+     * @return 更新後のウォレット応答
+     */
     @PostMapping("/recovery")
     public ResponseEntity<WalletResponse> claimRecovery(@AuthenticationPrincipal UserDetails principal) {
         if (principal == null) {
@@ -80,6 +108,9 @@ public class WalletController {
     }
 }
 
+/**
+ * Spring の {@code @RestController} として管理者向けウォレット付与 API を提供するコントローラです。
+ */
 @RestController
 @Profile("postgresql")
 @RequestMapping("/v1/admin")
@@ -91,6 +122,13 @@ class AdminWalletController {
         this.walletService = walletService;
     }
 
+    /**
+     * 管理者権限でウォレット残高を付与します。
+     *
+     * @param principal 認証済みユーザー
+     * @param request 付与リクエスト
+     * @return 更新後のウォレット応答
+     */
     @PostMapping("/wallet/grants")
     public ResponseEntity<WalletResponse> grantWalletBalance(
             @AuthenticationPrincipal UserDetails principal,

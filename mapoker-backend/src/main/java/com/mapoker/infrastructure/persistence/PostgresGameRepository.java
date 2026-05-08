@@ -24,6 +24,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * Spring の {@code @Repository} として PostgreSQL へゲーム状態を永続化する実装です。
+ */
 @Repository
 @Profile("postgresql")
 public class PostgresGameRepository implements GameRepository {
@@ -38,6 +41,12 @@ public class PostgresGameRepository implements GameRepository {
         this.mapper = mapper;
     }
 
+    /**
+     * 新しいゲームを永続化します。
+     *
+     * @param id ゲーム ID
+     * @param state 保存するゲーム状態
+     */
     @Override
     @Transactional
     public void create(String id, GameState state) {
@@ -46,6 +55,13 @@ public class PostgresGameRepository implements GameRepository {
         insertPlayers(id, state);
     }
 
+    /**
+     * ゲーム状態とアクション履歴を更新します。
+     *
+     * @param id ゲーム ID
+     * @param state 更新後のゲーム状態
+     * @param action 追加するアクション履歴
+     */
     @Override
     @Transactional
     public void update(String id, GameState state, ActionRecord action) {
@@ -55,6 +71,12 @@ public class PostgresGameRepository implements GameRepository {
         insertAction(id, action);
     }
 
+    /**
+     * ゲーム状態のみを更新します。
+     *
+     * @param id ゲーム ID
+     * @param state 更新後のゲーム状態
+     */
     @Override
     @Transactional
     public void update(String id, GameState state) {
@@ -63,6 +85,12 @@ public class PostgresGameRepository implements GameRepository {
         updatePlayers(id, state);
     }
 
+    /**
+     * ID でゲーム状態を取得します。
+     *
+     * @param id ゲーム ID
+     * @return 見つかったゲーム状態
+     */
     @Override
     public Optional<GameState> findById(String id) {
         List<Map<String, Object>> rows = jdbc.queryForList(
@@ -73,6 +101,11 @@ public class PostgresGameRepository implements GameRepository {
         return Optional.of(toGameState(rows.get(0), playerRows));
     }
 
+    /**
+     * すべてのゲーム状態を取得します。
+     *
+     * @return ゲーム状態一覧
+     */
     @Override
     public List<GameState> findAll() {
         List<Map<String, Object>> gameRows = jdbc.queryForList(
@@ -96,6 +129,12 @@ public class PostgresGameRepository implements GameRepository {
         return result;
     }
 
+    /**
+     * 指定ゲームのアクション履歴を取得します。
+     *
+     * @param gameId ゲーム ID
+     * @return アクション履歴一覧
+     */
     @Override
     public List<ActionRecord> findActionsByGameId(String gameId) {
         return jdbc.query(

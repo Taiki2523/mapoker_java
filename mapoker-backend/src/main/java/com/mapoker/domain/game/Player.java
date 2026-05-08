@@ -2,6 +2,9 @@ package com.mapoker.domain.game;
 
 import com.mapoker.domain.card.Card;
 
+/**
+ * ゲーム内プレイヤーの可変状態を保持するドメインオブジェクトです。
+ */
 public class Player {
     private String id;
     private int stack;
@@ -12,6 +15,12 @@ public class Player {
     private int contributed;
     private int totalContrib;
 
+    /**
+     * 新しいプレイヤーを生成します。
+     *
+     * @param id プレイヤー ID
+     * @param stack 初期スタック額
+     */
     public Player(String id, int stack) {
         this.id = id;
         this.stack = stack;
@@ -23,7 +32,11 @@ public class Player {
         this.totalContrib = 0;
     }
 
-    // copy constructor
+    /**
+     * コピーコンストラクタです。ホールカード配列はディープコピーします。
+     *
+     * @param other コピー元プレイヤー
+     */
     public Player(Player other) {
         this.id = other.id;
         this.stack = other.stack;

@@ -16,6 +16,9 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 
+/**
+ * Spring の {@code @Repository} として PostgreSQL へ参加履歴を保存する実装です。
+ */
 @Repository
 @Profile("postgresql")
 public class PostgresUserTableHistoryRepository implements UserTableHistoryRepository {
@@ -30,6 +33,13 @@ public class PostgresUserTableHistoryRepository implements UserTableHistoryRepos
         this.mapper = mapper;
     }
 
+    /**
+     * テーブル参加を履歴へ記録します。
+     *
+     * @param username ユーザー名
+     * @param table 参加テーブル
+     * @param seatIndex 着席位置
+     */
     @Override
     public void recordJoin(String username, TableRecord table, int seatIndex) {
         int updated = jdbc.update("""
@@ -60,6 +70,13 @@ public class PostgresUserTableHistoryRepository implements UserTableHistoryRepos
                 toJson(table.flags()));
     }
 
+    /**
+     * テーブル退出を履歴へ記録します。
+     *
+     * @param username ユーザー名
+     * @param tableId テーブル ID
+     * @param seatIndex 着席位置
+     */
     @Override
     public void recordLeave(String username, String tableId, Integer seatIndex) {
         String sql = seatIndex != null
@@ -94,6 +111,13 @@ public class PostgresUserTableHistoryRepository implements UserTableHistoryRepos
         jdbc.update(sql, username, tableId);
     }
 
+    /**
+     * ユーザーの直近参加履歴を取得します。
+     *
+     * @param username ユーザー名
+     * @param limit 取得件数の上限
+     * @return 参加履歴一覧
+     */
     @Override
     public List<UserTableHistoryEntry> findRecentByUsername(String username, int limit) {
         return jdbc.query("""

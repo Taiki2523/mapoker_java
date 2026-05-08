@@ -5,6 +5,17 @@ import com.mapoker.application.WalletLedgerEntry;
 
 import java.time.Instant;
 
+/**
+ * ウォレット台帳レスポンスです。
+ *
+ * @param id 台帳 ID
+ * @param delta 増減量
+ * @param balanceAfter 反映後残高
+ * @param reason 取引理由
+ * @param referenceType 参照種別
+ * @param referenceId 参照 ID
+ * @param createdAt 作成日時
+ */
 public record WalletLedgerResponse(
         @JsonProperty("id") long id,
         @JsonProperty("delta") long delta,
@@ -14,6 +25,12 @@ public record WalletLedgerResponse(
         @JsonProperty("reference_id") String referenceId,
         @JsonProperty("created_at") Instant createdAt
 ) {
+    /**
+     * 台帳エントリからレスポンスを生成します。
+     *
+     * @param entry 台帳エントリ
+     * @return 生成したレスポンス
+     */
     public static WalletLedgerResponse from(WalletLedgerEntry entry) {
         return new WalletLedgerResponse(
                 entry.id(),

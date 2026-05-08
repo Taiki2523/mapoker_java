@@ -6,6 +6,19 @@ import com.mapoker.application.UserTableHistoryEntry;
 
 import java.util.List;
 
+/**
+ * ユーザーのテーブル参加履歴レスポンスです。
+ *
+ * @param tableId テーブル ID
+ * @param tableName テーブル名
+ * @param seatIndex 着席位置
+ * @param visibility 公開設定
+ * @param status テーブル状態
+ * @param flags テーブル属性一覧
+ * @param joinedAt 参加日時
+ * @param leftAt 退出日時
+ * @param active 現在も参加中かどうか
+ */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record UserTableHistoryResponse(
         @JsonProperty("table_id") String tableId,
@@ -18,6 +31,12 @@ public record UserTableHistoryResponse(
         @JsonProperty("left_at") String leftAt,
         boolean active
 ) {
+    /**
+     * 参加履歴からレスポンスを生成します。
+     *
+     * @param entry 参加履歴
+     * @return 生成したレスポンス
+     */
     public static UserTableHistoryResponse from(UserTableHistoryEntry entry) {
         return new UserTableHistoryResponse(
                 entry.tableId(),

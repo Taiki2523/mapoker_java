@@ -9,10 +9,19 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * ポーカーハンドの役判定を行うユーティリティです。
+ */
 public final class HandEvaluator {
 
     private HandEvaluator() {}
 
+    /**
+     * 5 枚のカードから役を評価します。
+     *
+     * @param cards 評価対象の 5 枚カード
+     * @return 評価結果
+     */
     public static HandValue eval5(Card[] cards) {
         int[] rankCounts = new int[PokerConstants.RANK_ARRAY_SIZE];
         int[] suitCounts = new int[PokerConstants.NUM_SUITS];
@@ -66,6 +75,12 @@ public final class HandEvaluator {
         return new HandValue(HandRank.HIGH_CARD, ranksDesc(rankCounts));
     }
 
+    /**
+     * 7 枚のカードから最良の 5 枚役を評価します。
+     *
+     * @param cards 評価対象の 7 枚カード
+     * @return 最良役の評価結果
+     */
     public static HandValue eval7(Card[] cards) {
         HandValue best = new HandValue(HandRank.HIGH_CARD, List.of(Rank.TWO));
         Card[] combo = new Card[5];

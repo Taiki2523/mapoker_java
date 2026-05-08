@@ -1,9 +1,20 @@
 package com.mapoker.domain.rules;
 
+/**
+ * テーブル状態に対してプレイヤー行動の妥当性を検証するユーティリティです。
+ */
 public final class ActionValidator {
 
     private ActionValidator() {}
 
+    /**
+     * 現在状態で指定行動が許可されるかを検証します。
+     *
+     * @param table テーブル状態
+     * @param player プレイヤー状態
+     * @param action 検証対象の行動
+     * @throws IllegalArgumentException 行動が現在状態に適合しない場合
+     */
     public static void validate(TableState table, PlayerState player, Action action) {
         if (player.hasFolded()) throw new IllegalArgumentException("player already folded");
         if (player.isAllIn()) throw new IllegalArgumentException("player is all-in");
