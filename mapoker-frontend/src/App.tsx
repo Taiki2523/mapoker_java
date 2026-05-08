@@ -17,7 +17,7 @@ import { MyPagePanel } from './components/MyPagePanel'
 import { RoomScreen } from './components/RoomScreen'
 import { GameScreen } from './components/GameScreen'
 
-const NEXT_HAND_DELAY_MS = 3000
+const NEXT_HAND_DELAY_MS = 7000
 
 function App() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
@@ -30,6 +30,7 @@ function App() {
   const [error, setError] = useState('')
   const [inviteCopied, setInviteCopied] = useState(false)
   const showdownInFlight = useRef(false)
+  const startHandInFlight = useRef(false)
   const prevIsMyTurn = useRef(false)
   const [myName, setMyName] = useState('')
   const [mySeatIndex, setMySeatIndex] = useState<number | null>(null)
@@ -607,7 +608,8 @@ function App() {
     bigBlindOverride?: number,
     options?: { suppressError?: boolean }
   ) => {
-    if (!id) return
+    if (!id || startHandInFlight.current) return
+    startHandInFlight.current = true
     setLoading(true)
     setError('')
     setShowdown(null)
@@ -625,6 +627,7 @@ function App() {
         setError((err as Error).message)
       }
     } finally {
+      startHandInFlight.current = false
       setLoading(false)
     }
   }

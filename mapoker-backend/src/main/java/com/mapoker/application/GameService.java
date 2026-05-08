@@ -104,6 +104,9 @@ public class GameService {
      */
     public GameState startHand(String id, int bigBlind) {
         GameState state = getGame(id);
+        if (state.getStatus() == GameStatus.IN_PROGRESS) {
+            throw new IllegalStateException("hand already in progress");
+        }
         state.startHand(bigBlind);
         gameRepository.update(id, state);
         return state;

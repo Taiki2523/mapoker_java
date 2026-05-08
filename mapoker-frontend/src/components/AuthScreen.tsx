@@ -40,6 +40,7 @@ export function AuthScreen({ onAuthSuccess }: Props) {
       <label>
         {t('usernameLabel')}
         <input
+          type="text"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           placeholder={t('usernamePlaceholder')}
