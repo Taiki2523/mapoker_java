@@ -19,6 +19,9 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Spring の {@code @Service} としてテーブル作成、参加管理、ゲーム連携を担うサービスです。
+ */
 @Service
 public class TableService {
 
@@ -45,6 +48,13 @@ public class TableService {
         this.walletServiceProvider = walletServiceProvider;
     }
 
+    /**
+     * リングゲーム用のテーブルを作成します。
+     *
+     * @param input テーブル作成条件
+     * @return 作成されたテーブルとゲーム
+     * @throws IllegalArgumentException 入力値が不正な場合
+     */
     public CreateTableResult createRingTable(CreateRingTableInput input) {
         validateCreateInput(input);
 
@@ -83,10 +93,23 @@ public class TableService {
         return new CreateTableResult(table, game);
     }
 
+    /**
+     * 全テーブルを既定条件で一覧取得します。
+     *
+     * @return テーブル一覧
+     */
     public List<TableRecord> listTables() {
         return listTables(null, null);
     }
 
+    /**
+     * 条件に一致するテーブルを一覧取得します。
+     *
+     * @param visibility 公開設定の絞り込み条件
+     * @param flags 必須フラグの絞り込み条件
+     * @return 条件に一致するテーブル一覧
+     * @throws IllegalArgumentException 公開設定の条件が不正な場合
+     */
     public List<TableRecord> listTables(String visibility, String flags) {
         String visibilityFilter = normalizeVisibilityFilter(visibility);
         List<String> requiredFlags = normalizeFlagFilter(flags);
@@ -102,6 +125,12 @@ public class TableService {
                 .toList();
     }
 
+    /**
+     * 指定 ID のテーブル情報を取得します。
+     *
+     * @param id テーブル ID
+     * @return テーブル情報
+     */
     public TableRecord getTable(String id) {
         TableRecord table = tables.get(id);
         if (table != null) {
@@ -110,22 +139,48 @@ public class TableService {
         return fromGame(gameService.getGame(id));
     }
 
+    /**
+     * 指定テーブルに紐づくゲーム状態を取得します。
+     *
+     * @param id テーブル ID
+     * @return ゲーム状態
+     */
     public GameState getTableGame(String id) {
         return gameService.getGame(getTable(id).gameId());
     }
 
+    /**
+     * 指定テーブルの参加者一覧を取得します。
+     *
+     * @param id テーブル ID
+     * @return 参加者一覧
+     */
     public List<TableMemberRecord> getMembers(String id) {
         TableRecord table = getTable(id);
         tableMembers.putIfAbsent(table.id(), new ArrayList<>());
         return List.copyOf(tableMembers.get(table.id()));
     }
 
+    /**
+     * 指定テーブルで新しいハンドを開始します。
+     *
+     * @param tableId テーブル ID
+     * @param bigBlind ビッグブラインド額
+     * @return 更新後のゲーム状態
+     */
     public GameState startHand(String tableId, int bigBlind) {
         synchronized (tableLock(tableId)) {
             return gameService.startHand(tableId, bigBlind);
         }
     }
 
+    /**
+     * 参加者名から着席位置を検索します。
+     *
+     * @param id テーブル ID
+     * @param memberName 参加者名
+     * @return 見つかった着席位置。見つからない場合は {@code null}
+     */
     public Integer findSeatIndex(String id, String memberName) {
         if (memberName == null || memberName.isBlank()) {
             return null;
@@ -137,6 +192,16 @@ public class TableService {
                 .orElse(null);
     }
 
+    /**
+     * 指定テーブルへ参加者を着席させます。
+     *
+     * @param id テーブル ID
+     * @param requestedName 希望参加者名
+     * @param buyIn バイイン額
+     * @return 割り当てられた席と最新参加者一覧
+     * @throws IllegalArgumentException テーブル満席やバイイン条件違反の場合
+     * @throws IllegalStateException ウォレット残高が不足している場合
+     */
     public JoinResult join(String id, String requestedName, int buyIn) {
         synchronized (tableLock(id)) {
             TableRecord table = getTable(id);
@@ -194,6 +259,14 @@ public class TableService {
         }
     }
 
+    /**
+     * 指定テーブルから参加者を離席させます。
+     *
+     * @param id テーブル ID
+     * @param name 参加者名
+     * @param seatIndex 着席位置
+     * @return 更新後の参加者一覧
+     */
     public List<TableMemberRecord> leave(String id, String name, Integer seatIndex) {
         synchronized (tableLock(id)) {
             TableRecord table = getTable(id);
@@ -234,6 +307,11 @@ public class TableService {
         }
     }
 
+    /**
+     * ハンド終了後に離席待ち参加者を確定処理します。
+     *
+     * @param tableId テーブル ID
+     */
     public void processPendingLeaves(String tableId) {
         synchronized (tableLock(tableId)) {
             TableRecord table = getTable(tableId);
@@ -429,6 +507,16 @@ public class TableService {
         return game.getStatus().getLabel();
     }
 
+    /**
+     * リングテーブル作成時の入力値です。
+     *
+     * @param tableName テーブル名
+     * @param playerCount プレイヤー人数
+     * @param smallBlind スモールブラインド額
+     * @param bigBlind ビッグブラインド額
+     * @param visibility 公開設定
+     * @param flags テーブル属性の一覧
+     */
     public record CreateRingTableInput(
             String tableName,
             int playerCount,
@@ -446,7 +534,19 @@ public class TableService {
         }
     }
 
+    /**
+     * 着席結果を返すレコードです。
+     *
+     * @param assignedSeatIndex 割り当てられた席番号
+     * @param members 更新後の参加者一覧
+     */
     public record JoinResult(int assignedSeatIndex, List<TableMemberRecord> members) {}
 
+    /**
+     * テーブル作成結果を返すレコードです。
+     *
+     * @param table 作成されたテーブル
+     * @param game 作成されたゲーム
+     */
     public record CreateTableResult(TableRecord table, GameState game) {}
 }

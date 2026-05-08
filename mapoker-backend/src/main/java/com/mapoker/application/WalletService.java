@@ -9,6 +9,9 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
+/**
+ * Spring の {@code @Service} としてウォレット残高、入出金、ボーナス付与を管理するサービスです。
+ */
 @Service
 @Profile("postgresql")
 public class WalletService {
@@ -27,10 +30,22 @@ public class WalletService {
         this.walletProperties = walletProperties;
     }
 
+    /**
+     * ユーザーのウォレットを初期化します。
+     *
+     * @param username ユーザー名
+     * @throws IllegalArgumentException ユーザー名が不正な場合
+     */
     public void initializeWallet(String username) {
         walletRepository.initializeWallet(requireUsername(username));
     }
 
+    /**
+     * 現在の残高を取得します。
+     *
+     * @param username ユーザー名
+     * @return ウォレット残高情報
+     */
     public WalletEntry getBalance(String username) {
         String normalizedUsername = normalizeUsername(username);
         if (normalizedUsername == null) {
@@ -40,6 +55,13 @@ public class WalletService {
                 .orElseGet(() -> new WalletEntry(normalizedUsername, 0L, null));
     }
 
+    /**
+     * 台帳履歴を取得します。
+     *
+     * @param username ユーザー名
+     * @param limit 取得件数の上限
+     * @return 台帳履歴一覧
+     */
     public List<WalletLedgerEntry> getLedger(String username, int limit) {
         String normalizedUsername = normalizeUsername(username);
         if (normalizedUsername == null) {
@@ -48,6 +70,12 @@ public class WalletService {
         return walletRepository.findLedger(normalizedUsername, Math.max(1, limit));
     }
 
+    /**
+     * 次回請求可能時刻を取得します。
+     *
+     * @param username ユーザー名
+     * @return 日次ボーナスと救済ボーナスの次回可能時刻
+     */
     public NextClaimTimes getNextClaimTimes(String username) {
         String normalizedUsername = normalizeUsername(username);
         if (normalizedUsername == null) {
@@ -59,6 +87,15 @@ public class WalletService {
                 nextRecoveryAt(normalizedUsername, wallet));
     }
 
+    /**
+     * テーブル参加のためにウォレットからチップを引き落とします。
+     *
+     * @param username ユーザー名
+     * @param tableId テーブル ID
+     * @param amount 引き落とし額
+     * @throws IllegalArgumentException 入力値が不正な場合
+     * @throws IllegalStateException 残高不足の場合
+     */
     public void buyIn(String username, String tableId, int amount) {
         String normalizedUsername = requireUsername(username);
         String normalizedTableId = normalizeReference(tableId);
@@ -74,6 +111,14 @@ public class WalletService {
         }
     }
 
+    /**
+     * テーブルからの持ち帰りチップをウォレットへ戻します。
+     *
+     * @param username ユーザー名
+     * @param tableId テーブル ID
+     * @param amount 入金額
+     * @throws IllegalArgumentException 入力値が不正な場合
+     */
     public void cashOut(String username, String tableId, int amount) {
         String normalizedUsername = requireUsername(username);
         String normalizedTableId = normalizeReference(tableId);
@@ -87,6 +132,13 @@ public class WalletService {
                 "CASH_OUT:" + normalizedTableId + ":" + normalizedUsername + ":" + amount);
     }
 
+    /**
+     * 日次ボーナスを付与します。
+     *
+     * @param username ユーザー名
+     * @throws IllegalArgumentException ユーザー名が不正な場合
+     * @throws IllegalStateException クールダウン中の場合
+     */
     public void claimDailyBonus(String username) {
         String normalizedUsername = requireUsername(username);
         requireCooldownElapsed(
@@ -102,6 +154,13 @@ public class WalletService {
                 "DAILY_BONUS:" + normalizedUsername + ":" + currentWindow(walletProperties.dailyBonusCooldownHours()));
     }
 
+    /**
+     * 救済ボーナスを付与します。
+     *
+     * @param username ユーザー名
+     * @throws IllegalArgumentException ユーザー名が不正な場合
+     * @throws IllegalStateException 条件未達またはクールダウン中の場合
+     */
     public void claimRecovery(String username) {
         String normalizedUsername = requireUsername(username);
         WalletEntry wallet = getBalance(normalizedUsername);
@@ -121,6 +180,15 @@ public class WalletService {
                 "RECOVERY_BONUS:" + normalizedUsername + ":" + currentWindow(walletProperties.recoveryCooldownHours()));
     }
 
+    /**
+     * 管理者権限で残高を付与します。
+     *
+     * @param adminUsername 管理者ユーザー名
+     * @param targetUsername 付与対象ユーザー名
+     * @param amount 付与額
+     * @throws IllegalArgumentException 入力値が不正な場合
+     * @throws AccessDeniedException 管理者権限がない場合
+     */
     public void adminGrant(String adminUsername, String targetUsername, long amount) {
         String normalizedAdminUsername = requireUsername(adminUsername);
         String normalizedTargetUsername = requireUsername(targetUsername);
@@ -194,6 +262,12 @@ public class WalletService {
         }
     }
 
+    /**
+     * 次回請求可能時刻をまとめて返すレコードです。
+     *
+     * @param nextDailyBonusAt 日次ボーナスの次回請求可能時刻
+     * @param nextRecoveryAt 救済ボーナスの次回請求可能時刻
+     */
     public record NextClaimTimes(
             Instant nextDailyBonusAt,
             Instant nextRecoveryAt

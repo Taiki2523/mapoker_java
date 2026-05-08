@@ -19,6 +19,29 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
+/**
+ * Texas Hold'em 1ゲームの進行状態をすべて保持するドメインオブジェクト。
+ *
+ * <p>このクラスはゲームのコアロジック（ブラインド投下・アクション適用・ストリート進行・
+ * サイドポット分配・ショーダウン解決）を担う。Spring 非依存の純粋 Java クラス。
+ *
+ * <h2>ライフサイクル</h2>
+ * <ol>
+ *   <li>{@link #newGame} でゲームインスタンスを生成する</li>
+ *   <li>{@link #startHand} で各ハンドを開始（ブラインド投下・カード配布）する</li>
+ *   <li>{@link #applyAction} でプレイヤーのアクションを適用する（バリデーション含む）</li>
+ *   <li>ストリートが進み {@code status == SHOWDOWN} になったら {@link #resolveShowdown} を呼ぶ</li>
+ *   <li>{@link #applyPayouts} でポットを配分し、ステータスが {@code FINISHED} になる</li>
+ * </ol>
+ *
+ * <h2>制約</h2>
+ * <ul>
+ *   <li>{@code bet}/{@code raise} の {@code amount} は増分ではなく合計額（raise-to total）</li>
+ *   <li>最小レイズ = {@code max(bigBlind, lastRaiseSize)}。サブミニオールインは許容するが
+ *       {@code raiseOpen=false} にしてベッティングを再オープンしない</li>
+ *   <li>奇数チップの端数配分は {@link OddChipRule} で制御する</li>
+ * </ul>
+ */
 public class GameState {
 
     private String id;
@@ -44,10 +67,30 @@ public class GameState {
 
     private GameState() {}
 
+    /**
+     * 永続化からの復元専用の空インスタンスを生成する。
+     * リポジトリ実装がデシリアライズ後に各フィールドをセッターで埋める用途に限定する。
+     *
+     * @return フィールド未設定の空 {@link GameState}
+     */
     public static GameState empty() {
         return new GameState();
     }
 
+    /**
+     * 新しいゲームインスタンスを生成する。プレイヤーリストはディープコピーされる。
+     *
+     * <p>このメソッドはデッキの生成とシャッフルのみを行い、ブラインド投下やカード配布は
+     * 行わない。ハンドを開始するには別途 {@link #startHand} を呼ぶこと。
+     *
+     * @param players     参加プレイヤーのリスト（2〜9人）
+     * @param buttonIndex ボタン位置（プレイヤーリストの 0-based インデックス）
+     * @param bigBlind    ビッグブラインド額（正の値）
+     * @param rng         シャッフル用乱数生成器。{@code null} の場合はデフォルト {@link Random}
+     * @param oddChipRule 奇数チップの配分ルール。{@code null} の場合は {@link OddChipRule#LOW_INDEX}
+     * @return 初期化済みの {@link GameState}
+     * @throws IllegalArgumentException プレイヤー数・ビッグブラインド額・ボタン位置が不正な場合
+     */
     public static GameState newGame(List<Player> players, int buttonIndex, int bigBlind, Random rng, OddChipRule oddChipRule) {
         if (players.size() < PokerConstants.MIN_PLAYERS || players.size() > PokerConstants.MAX_PLAYERS)
             throw new IllegalArgumentException("players must be 2-9");
@@ -74,6 +117,16 @@ public class GameState {
         return g;
     }
 
+    /**
+     * 新しいハンドを開始する。ボタンを次のアクティブプレイヤーに進め、ブラインドを投下し、
+     * 各プレイヤーにホールカードを2枚配布する。
+     *
+     * <p>チップが0のプレイヤーは自動的にフォールド扱いになる。
+     * ヘッズアップ（2人）のときはボタン = スモールブラインドとなる（ポーカールール準拠）。
+     *
+     * @param bigBlind ビッグブラインド額
+     * @throws IllegalStateException ショーダウンが未解決の場合、またはチップ保有者が2人未満の場合
+     */
     public void startHand(int bigBlind) {
         if (status == GameStatus.SHOWDOWN)
             throw new IllegalStateException("cannot start hand: showdown not resolved");

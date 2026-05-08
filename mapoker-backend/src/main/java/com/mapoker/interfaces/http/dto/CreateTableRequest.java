@@ -10,6 +10,16 @@ import org.springframework.lang.Nullable;
 
 import java.util.List;
 
+/**
+ * テーブル作成リクエストです。
+ *
+ * @param tableName テーブル名
+ * @param playerCount プレイヤー人数
+ * @param smallBlind スモールブラインド額
+ * @param bigBlind ビッグブラインド額
+ * @param visibility 公開設定
+ * @param flags テーブル属性の一覧
+ */
 public record CreateTableRequest(
         @JsonProperty("table_name") @Size(max = 100) String tableName,
         @JsonProperty("player_count") @Min(2) @Max(9) int playerCount,

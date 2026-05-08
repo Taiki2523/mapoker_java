@@ -4,6 +4,9 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+/**
+ * Spring の {@code @Service} としてハンド履歴の記録と参照を仲介するサービスです。
+ */
 @Service
 public class HandHistoryService {
 
@@ -19,6 +22,11 @@ public class HandHistoryService {
         this.userTableHistoryService = userTableHistoryService;
     }
 
+    /**
+     * ハンド履歴を記録します。
+     *
+     * @param entry 記録するハンド履歴
+     */
     public void record(HandHistoryEntry entry) {
         if (entry == null || entry.tableId() == null || entry.tableId().isBlank()) {
             return;
@@ -26,10 +34,23 @@ public class HandHistoryService {
         handHistoryRepository.save(entry);
     }
 
+    /**
+     * ユーザーの直近ハンド履歴を既定件数で取得します。
+     *
+     * @param username 対象ユーザー名
+     * @return 直近ハンド履歴の一覧
+     */
     public List<HandHistoryEntry> listRecentForUser(String username) {
         return listRecentForUser(username, DEFAULT_LIMIT);
     }
 
+    /**
+     * ユーザーの直近ハンド履歴を取得します。
+     *
+     * @param username 対象ユーザー名
+     * @param limit 取得件数の上限
+     * @return 直近ハンド履歴の一覧
+     */
     public List<HandHistoryEntry> listRecentForUser(String username, int limit) {
         String normalizedUsername = normalizeUsername(username);
         if (normalizedUsername == null) {

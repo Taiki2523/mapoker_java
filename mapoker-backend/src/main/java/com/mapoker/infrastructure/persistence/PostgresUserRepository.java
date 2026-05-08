@@ -10,6 +10,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Optional;
 
+/**
+ * Spring の {@code @Repository} として PostgreSQL へユーザー情報を保存する実装です。
+ */
 @Repository
 @Profile("postgresql")
 public class PostgresUserRepository implements UserRepository {
@@ -20,6 +23,13 @@ public class PostgresUserRepository implements UserRepository {
         this.jdbc = jdbc;
     }
 
+    /**
+     * 新しいユーザーを作成します。
+     *
+     * @param username ユーザー名
+     * @param passwordHash ハッシュ化済みパスワード
+     * @return 作成されたユーザー
+     */
     @Override
     public User create(String username, String passwordHash) {
         return jdbc.queryForObject(
@@ -28,6 +38,12 @@ public class PostgresUserRepository implements UserRepository {
                 username, passwordHash);
     }
 
+    /**
+     * ユーザー名でユーザーを検索します。
+     *
+     * @param username ユーザー名
+     * @return 見つかったユーザー
+     */
     @Override
     public Optional<User> findByUsername(String username) {
         var results = jdbc.query(
@@ -37,6 +53,12 @@ public class PostgresUserRepository implements UserRepository {
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
 
+    /**
+     * ユーザー名でパスワードハッシュを取得します。
+     *
+     * @param username ユーザー名
+     * @return パスワードハッシュ
+     */
     @Override
     public Optional<String> findPasswordHashByUsername(String username) {
         var results = jdbc.query(

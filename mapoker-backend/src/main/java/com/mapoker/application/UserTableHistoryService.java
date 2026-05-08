@@ -4,6 +4,9 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+/**
+ * Spring の {@code @Service} としてユーザーのテーブル参加履歴を管理するサービスです。
+ */
 @Service
 public class UserTableHistoryService {
 
@@ -15,6 +18,13 @@ public class UserTableHistoryService {
         this.historyRepository = historyRepository;
     }
 
+    /**
+     * テーブル参加を履歴へ記録します。
+     *
+     * @param username ユーザー名
+     * @param table 参加テーブル
+     * @param seatIndex 着席位置
+     */
     public void recordJoin(String username, TableRecord table, int seatIndex) {
         String normalizedUsername = normalizeUsername(username);
         if (normalizedUsername == null) {
@@ -23,6 +33,13 @@ public class UserTableHistoryService {
         historyRepository.recordJoin(normalizedUsername, table, seatIndex);
     }
 
+    /**
+     * テーブル退出を履歴へ記録します。
+     *
+     * @param username ユーザー名
+     * @param tableId テーブル ID
+     * @param seatIndex 着席位置
+     */
     public void recordLeave(String username, String tableId, Integer seatIndex) {
         String normalizedUsername = normalizeUsername(username);
         if (normalizedUsername == null || tableId == null || tableId.isBlank()) {
@@ -31,10 +48,23 @@ public class UserTableHistoryService {
         historyRepository.recordLeave(normalizedUsername, tableId, seatIndex);
     }
 
+    /**
+     * 既定件数で直近参加履歴を取得します。
+     *
+     * @param username ユーザー名
+     * @return 直近参加履歴一覧
+     */
     public List<UserTableHistoryEntry> listRecent(String username) {
         return listRecent(username, DEFAULT_HISTORY_LIMIT);
     }
 
+    /**
+     * 直近参加履歴を取得します。
+     *
+     * @param username ユーザー名
+     * @param limit 取得件数の上限
+     * @return 直近参加履歴一覧
+     */
     public List<UserTableHistoryEntry> listRecent(String username, int limit) {
         String normalizedUsername = normalizeUsername(username);
         if (normalizedUsername == null) {

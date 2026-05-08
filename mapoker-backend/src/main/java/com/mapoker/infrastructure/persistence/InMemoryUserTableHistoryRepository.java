@@ -13,12 +13,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Spring の {@code @Repository} としてローカル実行向けに参加履歴をメモリ保持する実装です。
+ */
 @Repository
 @Profile("local")
 public class InMemoryUserTableHistoryRepository implements UserTableHistoryRepository {
 
     private final Map<String, List<UserTableHistoryEntry>> store = new ConcurrentHashMap<>();
 
+    /**
+     * テーブル参加を履歴へ記録します。
+     *
+     * @param username ユーザー名
+     * @param table 参加テーブル
+     * @param seatIndex 着席位置
+     */
     @Override
     public void recordJoin(String username, TableRecord table, int seatIndex) {
         List<UserTableHistoryEntry> entries = new ArrayList<>(store.getOrDefault(username, List.of()));
@@ -44,6 +54,13 @@ public class InMemoryUserTableHistoryRepository implements UserTableHistoryRepos
         store.put(username, entries);
     }
 
+    /**
+     * テーブル退出を履歴へ記録します。
+     *
+     * @param username ユーザー名
+     * @param tableId テーブル ID
+     * @param seatIndex 着席位置
+     */
     @Override
     public void recordLeave(String username, String tableId, Integer seatIndex) {
         List<UserTableHistoryEntry> entries = new ArrayList<>(store.getOrDefault(username, List.of()));
@@ -67,6 +84,13 @@ public class InMemoryUserTableHistoryRepository implements UserTableHistoryRepos
         store.put(username, entries);
     }
 
+    /**
+     * ユーザーの直近参加履歴を取得します。
+     *
+     * @param username ユーザー名
+     * @param limit 取得件数の上限
+     * @return 参加履歴一覧
+     */
     @Override
     public List<UserTableHistoryEntry> findRecentByUsername(String username, int limit) {
         return store.getOrDefault(username, List.of()).stream()

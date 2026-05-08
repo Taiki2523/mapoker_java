@@ -17,6 +17,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Spring の {@code @Repository} として PostgreSQL へウォレット残高と台帳を保存する実装です。
+ */
 @Repository
 @Profile("postgresql")
 public class PostgresWalletRepository implements WalletRepository {
@@ -29,6 +32,11 @@ public class PostgresWalletRepository implements WalletRepository {
         this.walletProperties = walletProperties;
     }
 
+    /**
+     * ユーザーウォレットを初期化します。
+     *
+     * @param username ユーザー名
+     */
     @Override
     @Transactional
     public void initializeWallet(String username) {
@@ -65,6 +73,12 @@ public class PostgresWalletRepository implements WalletRepository {
                 idempotencyKey);
     }
 
+    /**
+     * ユーザー名からウォレット残高を取得します。
+     *
+     * @param username ユーザー名
+     * @return ウォレット情報
+     */
     @Override
     public Optional<WalletEntry> findByUsername(String username) {
         List<WalletEntry> results = jdbc.query("""
@@ -78,6 +92,17 @@ public class PostgresWalletRepository implements WalletRepository {
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
 
+    /**
+     * 指定額を出金します。
+     *
+     * @param username ユーザー名
+     * @param amount 出金額
+     * @param reason 取引理由
+     * @param refType 参照種別
+     * @param refId 参照 ID
+     * @param idempotencyKey 冪等性キー
+     * @return 出金できた場合は {@code true}
+     */
     @Override
     @Transactional
     public boolean debit(String username, long amount, String reason, String refType, String refId, String idempotencyKey) {
@@ -130,6 +155,17 @@ public class PostgresWalletRepository implements WalletRepository {
         }
     }
 
+    /**
+     * 指定額を入金します。
+     *
+     * @param username ユーザー名
+     * @param amount 入金額
+     * @param reason 取引理由
+     * @param refType 参照種別
+     * @param refId 参照 ID
+     * @param idempotencyKey 冪等性キー
+     * @throws IllegalStateException ウォレットが存在しない場合
+     */
     @Override
     @Transactional
     public void credit(String username, long amount, String reason, String refType, String refId, String idempotencyKey) {
@@ -178,6 +214,13 @@ public class PostgresWalletRepository implements WalletRepository {
         }
     }
 
+    /**
+     * 直近の台帳履歴を取得します。
+     *
+     * @param username ユーザー名
+     * @param limit 取得件数の上限
+     * @return 台帳履歴一覧
+     */
     @Override
     public List<WalletLedgerEntry> findLedger(String username, int limit) {
         return jdbc.query("""
@@ -193,6 +236,13 @@ public class PostgresWalletRepository implements WalletRepository {
                 Math.max(1, limit));
     }
 
+    /**
+     * 指定理由の最終台帳時刻を取得します。
+     *
+     * @param username ユーザー名
+     * @param reason 取引理由
+     * @return 最終台帳時刻
+     */
     @Override
     public Optional<Instant> findLastLedgerTime(String username, String reason) {
         List<Instant> results = jdbc.query("""
