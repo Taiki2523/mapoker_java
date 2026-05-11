@@ -103,6 +103,7 @@ export function GameScreen({
         setActionAmount={setActionAmount}
         myHandName={myHandName}
         currentPlayer={currentPlayer}
+        stackMode={stackMode}
         displayName={displayName}
         onSendAction={onSendAction}
       />
