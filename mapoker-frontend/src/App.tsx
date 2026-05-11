@@ -355,7 +355,6 @@ function App() {
     setTable(null)
     setMySeatIndex(null)
     setProfileHistory([])
-    setProfileHandHistory([])
     setWallet(null)
     setWalletLedger([])
     setShowMyPage(false)
@@ -466,29 +465,6 @@ function App() {
     }
   }
 
-  const joinRoom = async (raw: string) => {
-    if (!raw) return
-    setRoomScreenMode('room')
-    let id = raw
-    try {
-      if (raw.includes('://')) {
-        const url = new URL(raw)
-        id = url.searchParams.get('tableId') ?? url.searchParams.get('gameId') ?? raw
-      } else if (raw.includes('tableId=') || raw.includes('gameId=')) {
-        const url = new URL(`http://local.test/?${raw}`)
-        id = url.searchParams.get('tableId') ?? url.searchParams.get('gameId') ?? raw
-      }
-    } catch {
-      id = raw
-    }
-    setGameId(id)
-    setTable(null)
-    setShowdown(null)
-    window.history.replaceState(null, '', `?tableId=${id}`)
-    await refreshGame(id)
-    await refreshMembers(id)
-    await refreshTable(id)
-  }
 
 
   const lobbyJoinWithBuyIn = async (tableId: string) => {
