@@ -6,6 +6,7 @@ import com.mapoker.application.UserTableHistoryService;
 import com.mapoker.interfaces.http.dto.HandHistoryResponse;
 import com.mapoker.interfaces.http.dto.LoginRequest;
 import com.mapoker.interfaces.http.dto.RegisterRequest;
+import com.mapoker.interfaces.http.dto.UpdateProfileRequest;
 import com.mapoker.interfaces.http.dto.UserResponse;
 import com.mapoker.interfaces.http.dto.UserTableHistoryResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,6 +23,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -127,6 +129,45 @@ public class AuthController {
         }
         var user = userService.getByUsername(principal.getUsername());
         return ResponseEntity.ok(new UserResponse(user.id(), user.username()));
+    }
+
+    /**
+     * 認証済みユーザーのプロフィール（ユーザー名・パスワード）を更新する。
+     *
+     * <p>ユーザー名を変更した場合、セッションを再発行して新しい認証情報で継続できるようにする。
+     *
+     * @param req       更新内容（新ユーザー名・現パスワード・新パスワード）
+     * @param principal 現在の認証済みユーザー
+     * @param request   セッション再発行に使用
+     * @return 更新後のユーザー情報、または HTTP 401
+     */
+    @PutMapping("/me")
+    public ResponseEntity<UserResponse> updateMe(
+            @Valid @RequestBody UpdateProfileRequest req,
+            @AuthenticationPrincipal UserDetails principal,
+            HttpServletRequest request) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        try {
+            var updated = userService.updateProfile(
+                    principal.getUsername(),
+                    req.newUsername(),
+                    req.currentPassword(),
+                    req.newPassword());
+            if (req.newUsername() != null && !req.newUsername().isBlank()
+                    && !req.newUsername().trim().equals(principal.getUsername())) {
+                String rawPassword = req.newPassword() != null ? req.newPassword() : req.currentPassword();
+                if (rawPassword != null && !rawPassword.isBlank()) {
+                    HttpSession old = request.getSession(false);
+                    if (old != null) old.invalidate();
+                    createSessionAndReturn(updated.username(), rawPassword, request);
+                }
+            }
+            return ResponseEntity.ok(new UserResponse(updated.id(), updated.username()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     /**

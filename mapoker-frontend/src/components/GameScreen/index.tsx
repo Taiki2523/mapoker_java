@@ -1,8 +1,11 @@
+import { useEffect, useState } from 'react'
 import type { BetPreset, GameState, PayoutLine, Player, RoomMember, Showdown } from '../../types'
 import { TopBar } from './TopBar'
 import { TableArea } from './TableArea'
 import { ActionPanel } from './ActionPanel'
 import { t } from '../../i18n'
+
+const STACK_MODE_KEY = 'mapoker_stack_mode'
 
 type Props = {
   game: GameState
@@ -48,6 +51,16 @@ export function GameScreen({
   onCopyInvite, onOpenMyPage, onLeaveRoom,
   onSendAction,
 }: Props) {
+  const [stackMode, setStackMode] = useState<'chips' | 'bb'>(() => {
+    return (localStorage.getItem(STACK_MODE_KEY) as 'chips' | 'bb') ?? 'chips'
+  })
+
+  useEffect(() => {
+    localStorage.setItem(STACK_MODE_KEY, stackMode)
+  }, [stackMode])
+
+  const toggleStackMode = () => setStackMode((m) => m === 'chips' ? 'bb' : 'chips')
+
   return (
     <div className="game-layout">
       <TopBar
@@ -59,6 +72,8 @@ export function GameScreen({
         autoRefresh={autoRefresh}
         setAutoRefresh={setAutoRefresh}
         inviteCopied={inviteCopied}
+        stackMode={stackMode}
+        onToggleStackMode={toggleStackMode}
         onCopyInvite={onCopyInvite}
         onOpenMyPage={onOpenMyPage}
       />
@@ -71,6 +86,7 @@ export function GameScreen({
         roster={roster}
         winnerNames={winnerNames}
         payoutLines={payoutLines}
+        stackMode={stackMode}
         displayName={displayName}
         onCloseSession={() => {}}
       />
@@ -87,6 +103,7 @@ export function GameScreen({
         setActionAmount={setActionAmount}
         myHandName={myHandName}
         currentPlayer={currentPlayer}
+        stackMode={stackMode}
         displayName={displayName}
         onSendAction={onSendAction}
       />

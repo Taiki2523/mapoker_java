@@ -5,7 +5,7 @@ import { t } from './i18n'
 import { bestHandName } from './handEval'
 import { mapMembers } from './utils'
 import type {
-  AuthUser, BetPreset, CreateGameConfig, GameState, HandHistoryEntry, JoinResponse, PayoutLine, Table,
+  AuthUser, BetPreset, CreateGameConfig, GameState, JoinResponse, PayoutLine, Table,
   RoomMember, RoomMemberApi, Showdown, StoredSession, UserTableHistoryEntry,
   WalletLedgerEntry, WalletSummary,
 } from './types'
@@ -40,7 +40,6 @@ function App() {
   const [, setTable] = useState<Table | null>(null)
   const [profileTables, setProfileTables] = useState<Table[]>([])
   const [profileHistory, setProfileHistory] = useState<UserTableHistoryEntry[]>([])
-  const [profileHandHistory, setProfileHandHistory] = useState<HandHistoryEntry[]>([])
   const [wallet, setWallet] = useState<WalletSummary | null>(null)
   const [walletLedger, setWalletLedger] = useState<WalletLedgerEntry[]>([])
   const [profileLoading, setProfileLoading] = useState(false)
@@ -356,7 +355,6 @@ function App() {
     setTable(null)
     setMySeatIndex(null)
     setProfileHistory([])
-    setProfileHandHistory([])
     setWallet(null)
     setWalletLedger([])
     setShowMyPage(false)
@@ -378,14 +376,12 @@ function App() {
     setProfileLoading(true)
     setProfileError('')
     try {
-      const [tables, history, handHistory] = await Promise.all([
+      const [tables, history] = await Promise.all([
         fetchJSON<Table[]>('/v1/tables'),
         fetchJSON<UserTableHistoryEntry[]>('/v1/auth/history'),
-        fetchJSON<HandHistoryEntry[]>('/v1/auth/hand-history'),
       ])
       setProfileTables(tables)
       setProfileHistory(history)
-      setProfileHandHistory(handHistory)
       await refreshWallet()
     } catch (err) {
       setProfileError(formatErrorMessage(err))
@@ -469,29 +465,6 @@ function App() {
     }
   }
 
-  const joinRoom = async (raw: string) => {
-    if (!raw) return
-    setRoomScreenMode('room')
-    let id = raw
-    try {
-      if (raw.includes('://')) {
-        const url = new URL(raw)
-        id = url.searchParams.get('tableId') ?? url.searchParams.get('gameId') ?? raw
-      } else if (raw.includes('tableId=') || raw.includes('gameId=')) {
-        const url = new URL(`http://local.test/?${raw}`)
-        id = url.searchParams.get('tableId') ?? url.searchParams.get('gameId') ?? raw
-      }
-    } catch {
-      id = raw
-    }
-    setGameId(id)
-    setTable(null)
-    setShowdown(null)
-    window.history.replaceState(null, '', `?tableId=${id}`)
-    await refreshGame(id)
-    await refreshMembers(id)
-    await refreshTable(id)
-  }
 
 
   const lobbyJoinWithBuyIn = async (tableId: string) => {
@@ -691,7 +664,6 @@ function App() {
               <GameTypeScreen
                 currentUser={currentUser}
                 onOpenMyPage={() => void openMyPage()}
-                onLogout={() => void handleLogout()}
                 onSelectRing={() => setRoomScreenMode('lobby')}
               />
             )}
@@ -702,7 +674,6 @@ function App() {
                 onCreateGame={createGame}
                 currentUser={currentUser}
                 onOpenMyPage={() => void openMyPage()}
-                onLogout={() => void handleLogout()}
                 onBack={() => setRoomScreenMode('lobby')}
               />
             )}
@@ -710,7 +681,6 @@ function App() {
               <LobbyScreen
                 currentUser={currentUser}
                 onOpenMyPage={() => void openMyPage()}
-                onLogout={() => void handleLogout()}
                 onJoinRoom={lobbyJoinWithBuyIn}
                 onCreateTable={() => setRoomScreenMode('room')}
                 onBack={() => setRoomScreenMode('gameType')}
@@ -767,7 +737,6 @@ function App() {
           currentUser={currentUser}
           tables={profileTables}
           history={profileHistory}
-          handHistory={profileHandHistory}
           wallet={wallet}
           walletLedger={walletLedger}
           currentTableId={gameId}
@@ -775,12 +744,10 @@ function App() {
           error={profileError}
           onClose={() => setShowMyPage(false)}
           onRefresh={() => void refreshProfileTables()}
+          onLogout={() => void handleLogout()}
+          onUpdateUser={(user) => { setCurrentUser(user); setMyName(user.username) }}
           onClaimDailyBonus={() => void handleClaimDailyBonus()}
           onClaimRecovery={() => void handleClaimRecovery()}
-          onOpenTable={(tableId) => {
-            setShowMyPage(false)
-            void joinRoom(tableId)
-          }}
         />
       )}
     </div>

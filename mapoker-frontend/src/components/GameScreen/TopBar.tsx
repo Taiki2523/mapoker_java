@@ -10,6 +10,8 @@ type Props = {
   autoRefresh: boolean
   setAutoRefresh: (v: boolean) => void
   inviteCopied: boolean
+  stackMode: 'chips' | 'bb'
+  onToggleStackMode: () => void
   onCopyInvite: () => void
   onOpenMyPage: () => void
 }
@@ -17,8 +19,16 @@ type Props = {
 export function TopBar({
   game, mySeatIndex, canAct, displayName,
   error, autoRefresh, setAutoRefresh,
-  inviteCopied, onCopyInvite, onOpenMyPage,
+  inviteCopied, stackMode, onToggleStackMode,
+  onCopyInvite, onOpenMyPage,
 }: Props) {
+  const bb = game?.big_blind ?? 0
+  const fmt = (chips: number) => {
+    if (stackMode === 'bb' && bb > 0) {
+      return `${Math.round((chips / bb) * 10) / 10}BB`
+    }
+    return `¥${chips}`
+  }
   const resolvedCanAct = canAct ?? (
     game?.status === 'in_progress'
     && mySeatIndex !== null
@@ -51,14 +61,21 @@ export function TopBar({
       </div>
 
       <div className="topbar-center">
-        <span className="topbar-stat">POT <strong>{game ? game.pot_total - game.players.reduce((s, p) => s + p.contributed, 0) : 0}</strong></span>
+        <span className="topbar-stat">POT <strong>{fmt(game ? game.pot_total - game.players.reduce((s, p) => s + p.contributed, 0) : 0)}</strong></span>
         {(game?.current_bet ?? 0) > 0 && (
-          <span className="topbar-stat">BET <strong>{game!.current_bet}</strong></span>
+          <span className="topbar-stat">BET <strong>{fmt(game!.current_bet)}</strong></span>
         )}
       </div>
 
       <div className="topbar-right">
         {error && <span className="topbar-error">{error}</span>}
+        <button
+          className="icon-btn topbar-stack-toggle"
+          onClick={onToggleStackMode}
+          data-label={stackMode === 'chips' ? 'BB表示に切替' : 'チップ表示に切替'}
+        >
+          {stackMode === 'chips' ? 'BB' : '¥'}
+        </button>
         <label className="topbar-auto-label">
           <input
             type="checkbox"

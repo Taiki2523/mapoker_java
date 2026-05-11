@@ -15,6 +15,7 @@ type Props = {
   setActionAmount: (n: number) => void
   myHandName: string | null
   currentPlayer: Player | null
+  stackMode: 'chips' | 'bb'
   displayName: (idx: number) => string
   onSendAction: (type: string, amount: number) => void
 }
@@ -22,8 +23,15 @@ type Props = {
 export function ActionPanel({
   game, mySeatIndex, canAct, loading,
   toCall, minRaise, maxBet, betPresets, actionAmount, setActionAmount,
-  myHandName, currentPlayer, displayName, onSendAction,
+  myHandName, currentPlayer, stackMode, displayName, onSendAction,
 }: Props) {
+  const bb = game?.big_blind ?? 0
+  const fmt = (chips: number) => {
+    if (stackMode === 'bb' && bb > 0) {
+      return `${Math.round((chips / bb) * 10) / 10}BB`
+    }
+    return `¥${chips}`
+  }
   return (
     <div className={`action-panel ${canAct ? 'active' : 'inactive'}`}>
       <div className="action-panel-controls">
@@ -69,7 +77,7 @@ export function ActionPanel({
               value={actionAmount}
               onChange={(e) => setActionAmount(Number(e.target.value))}
             />
-            <span className="bet-slider-value">{actionAmount}</span>
+            <span className="bet-slider-value">{fmt(actionAmount)}</span>
           </div>
         </div>
       )}
@@ -88,7 +96,7 @@ export function ActionPanel({
             onClick={() => onSendAction(toCall === 0 ? 'check' : 'call', 0)}
             disabled={!canAct || loading}
           >
-            {toCall === 0 ? t('check') : `${t('call')} ${toCall}`}
+            {toCall === 0 ? t('check') : `${t('call')} ${fmt(toCall)}`}
           </button>
           <button
             className="raise-btn"
@@ -96,8 +104,8 @@ export function ActionPanel({
             disabled={!canAct || loading || actionAmount < minRaise}
           >
             {toCall === 0
-              ? `${t('betLabel')} ${actionAmount}`
-              : `${t('raiseLabel')} ${actionAmount}`}
+              ? `${t('betLabel')} ${fmt(actionAmount)}`
+              : `${t('raiseLabel')} ${fmt(actionAmount)}`}
           </button>
           <button
             className="allin-btn"

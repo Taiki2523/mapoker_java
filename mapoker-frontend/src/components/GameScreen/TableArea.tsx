@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { GameState, PayoutLine, RoomMember, Showdown } from '../../types'
+import type { GameState, PayoutLine, Player, RoomMember, Showdown } from '../../types'
 import { Card } from '../Card'
 import { seatPosition } from '../../utils'
 import { t } from '../../i18n'
@@ -13,6 +13,7 @@ type Props = {
   roster: RoomMember[]
   winnerNames: string
   payoutLines: PayoutLine[]
+  stackMode: 'chips' | 'bb'
   displayName: (idx: number) => string
   onCloseSession: () => void
 }
@@ -26,9 +27,16 @@ function betChipClass(amount: number): string {
 
 export function TableArea({
   game, showdown, isShowdown, mySeat, isSpectator, roster,
-  winnerNames, payoutLines,
+  winnerNames, payoutLines, stackMode,
   displayName, onCloseSession,
 }: Props) {
+  const formatStack = (stack: number) => {
+    if (stackMode === 'bb') {
+      const bb = game.big_blind
+      return bb > 0 ? `${Math.round((stack / bb) * 10) / 10}BB` : `${stack}`
+    }
+    return `¥${stack}`
+  }
   const prevHoleRef = useRef<Record<number, number>>({})
   const prevCommLenRef = useRef(0)
   const prevContribRef = useRef<Record<number, number>>({})
@@ -36,6 +44,11 @@ export function TableArea({
   const [flippingIndices, setFlippingIndices] = useState<Set<number>>(new Set())
   const [sdStep, setSdStep] = useState(0)
   const [newChipSeats, setNewChipSeats] = useState<Set<number>>(new Set())
+  const [actionBubbles, setActionBubbles] = useState<Map<number, string>>(new Map())
+  const prevCurrentPlayerRef = useRef<number>(-1)
+  const prevPlayersRef = useRef<Player[]>([])
+  const prevCurrentBetRef = useRef<number>(0)
+  const prevStreetRef = useRef<string>('')
   const seatedIndices = new Set(roster.map((m) => m.seatIndex))
   const isWaiting = game.status === 'finished' && game.pot_total === 0 && (game.community ?? []).length === 0
   const communitySlots = Array.from({ length: 5 }, (_, i) => game.community?.[i] ?? null)
@@ -114,6 +127,53 @@ export function TableArea({
     }
   }, [game.players])
 
+  useEffect(() => {
+    const prevPlayer = prevCurrentPlayerRef.current
+    const prevPlayers = prevPlayersRef.current
+    const prevBet = prevCurrentBetRef.current
+    const prevStreet = prevStreetRef.current
+
+    prevCurrentPlayerRef.current = game.current_player
+    prevPlayersRef.current = game.players
+    prevCurrentBetRef.current = game.current_bet
+    prevStreetRef.current = game.street
+
+    if (prevPlayer < 0 || prevStreet !== game.street || prevPlayer === game.current_player) return
+
+    const actingNow = game.players[prevPlayer]
+    const actingBefore = prevPlayers[prevPlayer]
+    if (!actingNow || !actingBefore) return
+
+    let label = ''
+    if (actingNow.folded && !actingBefore.folded) {
+      label = t('fold')
+    } else if (actingNow.all_in && actingNow.contributed > actingBefore.contributed) {
+      label = `${t('allIn')} ${formatStack(actingNow.contributed)}`
+    } else if (actingNow.contributed > actingBefore.contributed) {
+      const delta = actingNow.contributed - actingBefore.contributed
+      if (game.current_bet > prevBet) {
+        label = prevBet === 0 ? `${t('betLabel')} ${formatStack(actingNow.contributed)}` : `${t('raiseLabel')} ${formatStack(actingNow.contributed)}`
+      } else {
+        label = `${t('call')} ${formatStack(delta)}`
+      }
+    } else {
+      label = t('check')
+    }
+
+    if (!label) return
+
+    const seatIdx = prevPlayer
+    setActionBubbles((prev) => new Map(prev).set(seatIdx, label))
+    const timerId = window.setTimeout(() => {
+      setActionBubbles((prev) => {
+        const next = new Map(prev)
+        next.delete(seatIdx)
+        return next
+      })
+    }, 3000)
+    return () => window.clearTimeout(timerId)
+  }, [game.current_player, game.street, game.players, game.current_bet])
+
   return (
     <div className="table-area" onClick={onCloseSession}>
       <div className="blind-info">
@@ -134,7 +194,7 @@ export function TableArea({
           </div>
         ) : (
           <div className="felt-center">
-            {!isShowdown && <div className="pot-display">POT {game.pot_total - game.players.reduce((s, p) => s + p.contributed, 0)}</div>}
+            {!isShowdown && <div className="pot-display">POT {formatStack(game.pot_total - game.players.reduce((s, p) => s + p.contributed, 0))}</div>}
             <div className="community-cards-row">
               {communitySlots.map((card, idx) => (
                 <span
@@ -179,6 +239,8 @@ export function TableArea({
           const cards = player.hole?.length ? player.hole : ['--', '--']
           const isMe = mySeat === idx
 
+          const bubble = actionBubbles.get(idx)
+
           return (
             <div key={player.id}>
               <div
@@ -193,6 +255,7 @@ export function TableArea({
                 ].filter(Boolean).join(' ')}
                 style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
               >
+                {bubble && <div className="action-bubble">{bubble}</div>}
                 <div className="player-box">
                   <div className="seat-header">
                     <div className="seat-avatar">
@@ -210,7 +273,7 @@ export function TableArea({
                         </div>
                       </div>
                       <div className="player-stack">
-                        Stack <strong>{player.stack}</strong>
+                        Stack <strong>{formatStack(player.stack)}</strong>
                       </div>
                     </div>
                   </div>
@@ -232,7 +295,7 @@ export function TableArea({
                   ].filter(Boolean).join(' ')}
                   style={{ left: `${pos.betX}%`, top: `${pos.betY}%` }}
                 >
-                  {player.contributed}
+                  {formatStack(player.contributed)}
                 </div>
               )}
             </div>
