@@ -68,6 +68,19 @@ public class PostgresUserRepository implements UserRepository {
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
 
+    @Override
+    public User updateUsername(String currentUsername, String newUsername) {
+        return jdbc.queryForObject(
+                "UPDATE users SET username = ? WHERE username = ? RETURNING id, username, created_at",
+                (rs, n) -> mapUser(rs),
+                newUsername, currentUsername);
+    }
+
+    @Override
+    public void updatePasswordHash(String username, String newHash) {
+        jdbc.update("UPDATE users SET password_hash = ? WHERE username = ?", newHash, username);
+    }
+
     private User mapUser(ResultSet rs) throws SQLException {
         return new User(
                 rs.getLong("id"),

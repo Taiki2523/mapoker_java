@@ -62,6 +62,48 @@ public class UserService implements UserDetailsService {
     }
 
     /**
+     * ユーザー名またはパスワードを更新します。
+     *
+     * <p>{@code newUsername} が非 null の場合はユーザー名を変更します。
+     * {@code newPassword} が非 null の場合は {@code currentPassword} を照合してからパスワードを変更します。
+     *
+     * @param currentUsername 現在のユーザー名
+     * @param newUsername     新しいユーザー名（null なら変更なし）
+     * @param currentPassword 現在のパスワード（パスワード変更時に必要）
+     * @param newPassword     新しいパスワード（null なら変更なし）
+     * @return 更新後のユーザー
+     * @throws IllegalArgumentException ユーザー名が重複する場合、またはパスワードが不一致の場合
+     */
+    public User updateProfile(String currentUsername, String newUsername, String currentPassword, String newPassword) {
+        String workingUsername = normalizeUsername(currentUsername);
+
+        if (newPassword != null && !newPassword.isBlank()) {
+            if (currentPassword == null || currentPassword.isBlank()) {
+                throw new IllegalArgumentException("Current password is required to change password");
+            }
+            String hash = userRepository.findPasswordHashByUsername(workingUsername)
+                    .orElseThrow(() -> new UsernameNotFoundException("User not found: " + workingUsername));
+            if (!passwordEncoder.matches(currentPassword, hash)) {
+                throw new IllegalArgumentException("Current password is incorrect");
+            }
+            userRepository.updatePasswordHash(workingUsername, passwordEncoder.encode(newPassword));
+        }
+
+        if (newUsername != null && !newUsername.isBlank()) {
+            String normalizedNew = normalizeUsername(newUsername);
+            if (!normalizedNew.equals(workingUsername) && userRepository.findByUsername(normalizedNew).isPresent()) {
+                throw new IllegalArgumentException("Username already taken");
+            }
+            User updated = userRepository.updateUsername(workingUsername, normalizedNew);
+            workingUsername = normalizedNew;
+            return updated;
+        }
+
+        return userRepository.findByUsername(workingUsername)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + workingUsername));
+    }
+
+    /**
      * 認証処理用にユーザー詳細を読み込みます。
      *
      * @param username ユーザー名

@@ -262,6 +262,30 @@
   gap: 0.2rem;
 }
 
+.action-bubble {
+  position: relative;
+  background: rgba(30, 215, 96, 0.15);
+  border: 1px solid rgba(30, 215, 96, 0.5);
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  animation: bubble-in 0.2s ease-out, bubble-out 0.4s ease-in 2.6s forwards;
+  pointer-events: none;
+}
+
+@keyframes bubble-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.85); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes bubble-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
 .player-box {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1028,6 +1052,15 @@ button.icon-btn[data-label]:hover::after {
   background: rgba(243, 114, 127, 0.08);
   border: 1px solid rgba(243, 114, 127, 0.2);
   color: var(--danger);
+  padding: 0.65rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.success-msg {
+  background: rgba(30, 215, 96, 0.08);
+  border: 1px solid rgba(30, 215, 96, 0.2);
+  color: var(--accent);
   padding: 0.65rem 0.9rem;
   border-radius: 8px;
   font-size: 0.85rem;

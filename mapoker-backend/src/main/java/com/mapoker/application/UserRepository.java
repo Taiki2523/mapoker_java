@@ -31,4 +31,21 @@ public interface UserRepository {
      * @return 見つかったパスワードハッシュ
      */
     Optional<String> findPasswordHashByUsername(String username);
+
+    /**
+     * ユーザー名を変更します。
+     *
+     * @param currentUsername 現在のユーザー名
+     * @param newUsername     新しいユーザー名
+     * @return 更新後のユーザー
+     */
+    User updateUsername(String currentUsername, String newUsername);
+
+    /**
+     * パスワードハッシュを更新します。
+     *
+     * @param username    対象ユーザー名
+     * @param newHash     新しいハッシュ値
+     */
+    void updatePasswordHash(String username, String newHash);
 }

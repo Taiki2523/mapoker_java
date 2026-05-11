@@ -7,7 +7,6 @@ import { UserHeader } from './UserHeader'
 type Props = {
   currentUser: AuthUser | null
   onOpenMyPage: () => void
-  onLogout: () => void
   onJoinRoom: (tableId: string) => Promise<void>
   onCreateTable: () => void
   onBack: () => void
@@ -29,7 +28,7 @@ const statusLabels: Record<string, string> = {
   finished: t('tableStatusFinished'),
 }
 
-export function LobbyScreen({ currentUser, onOpenMyPage, onLogout, onJoinRoom, onCreateTable, onBack }: Props) {
+export function LobbyScreen({ currentUser, onOpenMyPage, onJoinRoom, onCreateTable, onBack }: Props) {
   const [tables, setTables] = useState<Table[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -72,7 +71,7 @@ export function LobbyScreen({ currentUser, onOpenMyPage, onLogout, onJoinRoom, o
 
   return (
     <>
-      <UserHeader username={currentUser?.username ?? ''} onOpenMyPage={onOpenMyPage} onLogout={onLogout} />
+      <UserHeader username={currentUser?.username ?? ''} onOpenMyPage={onOpenMyPage} />
       <div className="lobby-browser-head">
         <div>
           <h2>{t('lobbyBrowserTitle')}</h2>

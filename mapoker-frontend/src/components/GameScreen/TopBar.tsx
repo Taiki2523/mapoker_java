@@ -10,6 +10,8 @@ type Props = {
   autoRefresh: boolean
   setAutoRefresh: (v: boolean) => void
   inviteCopied: boolean
+  stackMode: 'chips' | 'bb'
+  onToggleStackMode: () => void
   onCopyInvite: () => void
   onOpenMyPage: () => void
 }
@@ -17,7 +19,8 @@ type Props = {
 export function TopBar({
   game, mySeatIndex, canAct, displayName,
   error, autoRefresh, setAutoRefresh,
-  inviteCopied, onCopyInvite, onOpenMyPage,
+  inviteCopied, stackMode, onToggleStackMode,
+  onCopyInvite, onOpenMyPage,
 }: Props) {
   const resolvedCanAct = canAct ?? (
     game?.status === 'in_progress'
@@ -59,6 +62,13 @@ export function TopBar({
 
       <div className="topbar-right">
         {error && <span className="topbar-error">{error}</span>}
+        <button
+          className="icon-btn topbar-stack-toggle"
+          onClick={onToggleStackMode}
+          data-label={stackMode === 'chips' ? 'BB表示に切替' : 'チップ表示に切替'}
+        >
+          {stackMode === 'chips' ? 'BB' : '¥'}
+        </button>
         <label className="topbar-auto-label">
           <input
             type="checkbox"

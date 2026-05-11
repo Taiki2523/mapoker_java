@@ -60,4 +60,20 @@ public class InMemoryUserRepository implements UserRepository {
     public Optional<String> findPasswordHashByUsername(String username) {
         return Optional.ofNullable(store.get(username)).map(UserRow::passwordHash);
     }
+
+    @Override
+    public User updateUsername(String currentUsername, String newUsername) {
+        UserRow old = store.remove(currentUsername);
+        if (old == null) throw new IllegalArgumentException("User not found: " + currentUsername);
+        UserRow updated = new UserRow(old.id(), newUsername, old.passwordHash(), old.createdAt());
+        store.put(newUsername, updated);
+        return new User(updated.id(), updated.username(), updated.createdAt());
+    }
+
+    @Override
+    public void updatePasswordHash(String username, String newHash) {
+        UserRow old = store.get(username);
+        if (old == null) throw new IllegalArgumentException("User not found: " + username);
+        store.put(username, new UserRow(old.id(), old.username(), newHash, old.createdAt()));
+    }
 }
