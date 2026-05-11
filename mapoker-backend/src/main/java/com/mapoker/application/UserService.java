@@ -75,32 +75,30 @@ public class UserService implements UserDetailsService {
      * @throws IllegalArgumentException ユーザー名が重複する場合、またはパスワードが不一致の場合
      */
     public User updateProfile(String currentUsername, String newUsername, String currentPassword, String newPassword) {
-        String workingUsername = normalizeUsername(currentUsername);
+        final String normalized = normalizeUsername(currentUsername);
 
         if (newPassword != null && !newPassword.isBlank()) {
             if (currentPassword == null || currentPassword.isBlank()) {
                 throw new IllegalArgumentException("Current password is required to change password");
             }
-            String hash = userRepository.findPasswordHashByUsername(workingUsername)
-                    .orElseThrow(() -> new UsernameNotFoundException("User not found: " + workingUsername));
+            String hash = userRepository.findPasswordHashByUsername(normalized)
+                    .orElseThrow(() -> new UsernameNotFoundException("User not found: " + normalized));
             if (!passwordEncoder.matches(currentPassword, hash)) {
                 throw new IllegalArgumentException("Current password is incorrect");
             }
-            userRepository.updatePasswordHash(workingUsername, passwordEncoder.encode(newPassword));
+            userRepository.updatePasswordHash(normalized, passwordEncoder.encode(newPassword));
         }
 
         if (newUsername != null && !newUsername.isBlank()) {
             String normalizedNew = normalizeUsername(newUsername);
-            if (!normalizedNew.equals(workingUsername) && userRepository.findByUsername(normalizedNew).isPresent()) {
+            if (!normalizedNew.equals(normalized) && userRepository.findByUsername(normalizedNew).isPresent()) {
                 throw new IllegalArgumentException("Username already taken");
             }
-            User updated = userRepository.updateUsername(workingUsername, normalizedNew);
-            workingUsername = normalizedNew;
-            return updated;
+            return userRepository.updateUsername(normalized, normalizedNew);
         }
 
-        return userRepository.findByUsername(workingUsername)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + workingUsername));
+        return userRepository.findByUsername(normalized)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + normalized));
     }
 
     /**
