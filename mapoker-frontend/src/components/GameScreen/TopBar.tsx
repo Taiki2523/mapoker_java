@@ -22,6 +22,13 @@ export function TopBar({
   inviteCopied, stackMode, onToggleStackMode,
   onCopyInvite, onOpenMyPage,
 }: Props) {
+  const bb = game?.big_blind ?? 0
+  const fmt = (chips: number) => {
+    if (stackMode === 'bb' && bb > 0) {
+      return `${Math.round((chips / bb) * 10) / 10}BB`
+    }
+    return `¥${chips}`
+  }
   const resolvedCanAct = canAct ?? (
     game?.status === 'in_progress'
     && mySeatIndex !== null
@@ -54,9 +61,9 @@ export function TopBar({
       </div>
 
       <div className="topbar-center">
-        <span className="topbar-stat">POT <strong>{game ? game.pot_total - game.players.reduce((s, p) => s + p.contributed, 0) : 0}</strong></span>
+        <span className="topbar-stat">POT <strong>{fmt(game ? game.pot_total - game.players.reduce((s, p) => s + p.contributed, 0) : 0)}</strong></span>
         {(game?.current_bet ?? 0) > 0 && (
-          <span className="topbar-stat">BET <strong>{game!.current_bet}</strong></span>
+          <span className="topbar-stat">BET <strong>{fmt(game!.current_bet)}</strong></span>
         )}
       </div>
 

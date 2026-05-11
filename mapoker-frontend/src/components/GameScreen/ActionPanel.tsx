@@ -30,7 +30,7 @@ export function ActionPanel({
     if (stackMode === 'bb' && bb > 0) {
       return `${Math.round((chips / bb) * 10) / 10}BB`
     }
-    return `${chips}`
+    return `¥${chips}`
   }
   return (
     <div className={`action-panel ${canAct ? 'active' : 'inactive'}`}>

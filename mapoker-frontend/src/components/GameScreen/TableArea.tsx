@@ -35,7 +35,7 @@ export function TableArea({
       const bb = game.big_blind
       return bb > 0 ? `${Math.round((stack / bb) * 10) / 10}BB` : `${stack}`
     }
-    return `${stack}`
+    return `¥${stack}`
   }
   const prevHoleRef = useRef<Record<number, number>>({})
   const prevCommLenRef = useRef(0)
@@ -148,13 +148,13 @@ export function TableArea({
     if (actingNow.folded && !actingBefore.folded) {
       label = t('fold')
     } else if (actingNow.all_in && actingNow.contributed > actingBefore.contributed) {
-      label = `${t('allIn')} ¥${actingNow.contributed}`
+      label = `${t('allIn')} ${formatStack(actingNow.contributed)}`
     } else if (actingNow.contributed > actingBefore.contributed) {
       const delta = actingNow.contributed - actingBefore.contributed
       if (game.current_bet > prevBet) {
-        label = prevBet === 0 ? `${t('betLabel')} ¥${actingNow.contributed}` : `${t('raiseLabel')} ¥${actingNow.contributed}`
+        label = prevBet === 0 ? `${t('betLabel')} ${formatStack(actingNow.contributed)}` : `${t('raiseLabel')} ${formatStack(actingNow.contributed)}`
       } else {
-        label = `${t('call')} ¥${delta}`
+        label = `${t('call')} ${formatStack(delta)}`
       }
     } else {
       label = t('check')
@@ -194,7 +194,7 @@ export function TableArea({
           </div>
         ) : (
           <div className="felt-center">
-            {!isShowdown && <div className="pot-display">POT {game.pot_total - game.players.reduce((s, p) => s + p.contributed, 0)}</div>}
+            {!isShowdown && <div className="pot-display">POT {formatStack(game.pot_total - game.players.reduce((s, p) => s + p.contributed, 0))}</div>}
             <div className="community-cards-row">
               {communitySlots.map((card, idx) => (
                 <span
@@ -295,7 +295,7 @@ export function TableArea({
                   ].filter(Boolean).join(' ')}
                   style={{ left: `${pos.betX}%`, top: `${pos.betY}%` }}
                 >
-                  {player.contributed}
+                  {formatStack(player.contributed)}
                 </div>
               )}
             </div>
