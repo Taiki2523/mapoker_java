@@ -4,10 +4,8 @@ import { Card } from '../Card'
 import { seatPosition } from '../../utils'
 import { t } from '../../i18n'
 
-// コミュニティカードアニメーション定数（モジュールスコープで固定値）
-const CARD_FLIP_MS = 600   // カードめくりアニメーション時間
-const CARD_PAUSE_MS = 1000 // めくり後にカードを確認できる時間
-const CARD_GROUP_DELAY_MS = CARD_FLIP_MS + CARD_PAUSE_MS // ストリート間の間隔
+// ストリート間の公開間隔（ms）
+const STREET_REVEAL_INTERVAL_MS = 1500
 
 type Props = {
   game: GameState
@@ -52,8 +50,7 @@ export function TableArea({
   const prevContribRef = useRef<Record<number, number>>({})
   const cardAnimEndsAtRef = useRef(0)
   const [dealingSeats, setDealingSeats] = useState<Set<number>>(new Set())
-  const [flippingIndices, setFlippingIndices] = useState<Set<number>>(new Set())
-  // アニメーションで開示済みのカード枚数（これ未満のインデックスのカードを front で描画）
+  // 公開済みコミュニティカード枚数（これ未満のインデックスだけ表示）
   // マウント時は現在の枚数で初期化（ページ再読み込み時にカードが消えない）
   const [revealedCount, setRevealedCount] = useState(_initCommCount)
   const [sdStep, setSdStep] = useState(0)
@@ -93,16 +90,14 @@ export function TableArea({
     }
   }, [game.players])
 
-  // コミュニティカードのめくりアニメーション
+  // コミュニティカードの公開順序制御
   //
-  // 設計上の注意点:
-  // 1. 依存配列を communityCount（数値）にすることで、refreshGame で参照が変わっても
-  //    タイマーをキャンセルしない（同じ枚数なら effect は再実行されない）。
-  // 2. StrictMode 対応: cleanup で prevCommLenRef を元の値に戻す。
-  //    StrictMode は effect を2回実行するため、戻さないと2回目が「変化なし」と判断して
-  //    タイマーをスケジュールしなくなる。
-  // 3. revealedCount で表示制御: アニメーション開始と同時にカードを front で描画する。
-  //    これにより、アニメーション前にカードが一瞬見えるフラッシュを防ぐ。
+  // アニメーションは除去。revealedCount を段階的に増やすことで
+  // フロップ → ターン → リバー の順に表示する。
+  //
+  // StrictMode 対応: cleanup で prevCommLenRef を元の値（prev）に戻す。
+  // StrictMode は effect を2回実行する。1回目で prevCommLenRef=5 に更新→cleanup で 5 のままだと
+  // 2回目が current=5, prev=5 → return になりタイマーが消える。prev を戻すことで2回目も動く。
   useEffect(() => {
     const current = communityCount
     const prev = prevCommLenRef.current
@@ -120,42 +115,26 @@ export function TableArea({
 
     // フロップ（インデックス 0-2）
     if (prev < 3 && current >= 3) {
-      const revealTo = Math.min(current, 3)
-      const flopCards = new Set(Array.from({ length: revealTo - prev }, (_, i) => prev + i))
-      timers.push(window.setTimeout(() => {
-        setRevealedCount(revealTo)      // カード表示
-        setFlippingIndices(flopCards)   // めくりアニメーション開始
-      }, delay))
-      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + CARD_FLIP_MS))
-      delay += CARD_GROUP_DELAY_MS
+      timers.push(window.setTimeout(() => setRevealedCount(Math.min(current, 3)), delay))
+      delay += STREET_REVEAL_INTERVAL_MS
     }
 
     // ターン（インデックス 3）
     if (prev < 4 && current >= 4) {
-      timers.push(window.setTimeout(() => {
-        setRevealedCount(4)
-        setFlippingIndices(new Set([3]))
-      }, delay))
-      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + CARD_FLIP_MS))
-      delay += CARD_GROUP_DELAY_MS
+      timers.push(window.setTimeout(() => setRevealedCount(4), delay))
+      delay += STREET_REVEAL_INTERVAL_MS
     }
 
     // リバー（インデックス 4）
     if (prev < 5 && current >= 5) {
-      timers.push(window.setTimeout(() => {
-        setRevealedCount(5)
-        setFlippingIndices(new Set([4]))
-      }, delay))
-      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + CARD_FLIP_MS))
-      delay += CARD_GROUP_DELAY_MS // リバー後の確認時間
+      timers.push(window.setTimeout(() => setRevealedCount(5), delay))
+      delay += STREET_REVEAL_INTERVAL_MS // リバー確認後にショーダウン表示
     }
 
-    // ショーダウン表示を遅らせるための終了予定時刻
     cardAnimEndsAtRef.current = Date.now() + delay
 
     return () => {
-      // StrictMode: cleanup で prev を元に戻し、2回目の実行でアニメーション再スケジュール可能にする
-      prevCommLenRef.current = prev
+      prevCommLenRef.current = prev  // StrictMode: 2回目の実行で再スケジュールできるよう戻す
       cardAnimEndsAtRef.current = 0
       timers.forEach(window.clearTimeout)
     }
@@ -269,10 +248,7 @@ export function TableArea({
             {!isShowdown && <div className="pot-display">POT {formatStack(game.pot_total - game.players.reduce((s, p) => s + p.contributed, 0))}</div>}
             <div className="community-cards-row">
               {communitySlots.map((card, idx) => (
-                <span
-                  key={`cc-wrap-${idx}`}
-                  className={flippingIndices.has(idx) ? 'card-flip-shell flipping' : 'card-flip-shell'}
-                >
+                <span key={`cc-wrap-${idx}`} className="card-flip-shell">
                   {card && card !== '--' && idx < revealedCount
                     ? <Card card={card} variant="front" size="md" />
                     : <Card variant="slot" size="md" />}
