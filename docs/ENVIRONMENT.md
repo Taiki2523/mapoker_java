@@ -1,226 +1,142 @@
 # 環境変数・機密情報の管理
 
-このドキュメントは、秘密情報（API キー、DB パスワード、Google クライアント ID など）を安全に管理するための手順です。
+秘密情報（DB パスワードなど）を安全に管理するための手順。
 
 ## 原則
 
-- **秘密情報をコードに直書きしない**
-- **`.env`, `application-secret.properties` などは `.gitignore` に記載し、リポジトリへコミットしない**
-- **ローカル開発・本番環境ごとに環境変数を切り替える**
+- 秘密情報をコードに直書きしない
+- `.env`, `application-secret.properties` などは `.gitignore` に記載してリポジトリへコミットしない
+- ローカル開発・本番環境ごとに環境変数を切り替える
 
 ---
 
 ## バックエンド（Java / Spring Boot）
 
-### ローカル開発
+### 設定ファイル構成
 
-1. **`.env.local` ファイルを作成**（`mapoker-backend/` ディレクトリ）
+| ファイル | 役割 | git 管理 |
+|---|---|---|
+| `application.properties` | 共通設定（CORS デフォルト、game / wallet プロパティなど） | ✅ コミット可 |
+| `application-local.properties` | ローカル開発用（認証無効化、インメモリ DB など） | ✅ コミット可 |
+| `application-postgresql.properties` | PostgreSQL 接続設定 | ✅ コミット可 |
+| `application-secret.properties` | 秘密情報（作成しないこと） | ❌ `.gitignore` |
+| `.env.local` | ローカル環境変数（作成しないこと） | ❌ `.gitignore` |
 
-   ```bash
-   cp mapoker-backend/.env.example mapoker-backend/.env.local
-   ```
+### ローカル開発（devcontainer 内）
 
-2. **実際の値を記入**
+`local` プロファイルでは認証が無効化され、インメモリ DB を使う。追加の環境変数は不要。
 
-   ```
-   SPRING_PROFILES_ACTIVE=local
-   SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/mapoker
-   SPRING_DATASOURCE_USERNAME=mapoker
-   SPRING_DATASOURCE_PASSWORD=your_password
-   GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-   GOOGLE_CLIENT_SECRET=your-client-secret
-   ```
-
-3. **Maven 実行時に読み込み**
-
-   ```bash
-   cd mapoker-backend
-   # .env.local から環境変数を読み込んで実行
-   export $(cat .env.local | xargs)
-   SPRING_PROFILES_ACTIVE=local ./mvnw spring-boot:run
-   ```
-
-### 本番環境（PostgreSQL + 認証）
-
-Spring Boot の `@ConfigurationProperties` を使い、環境変数から設定を読み込みます。
-
-**設定ファイル構成：**
-- `application.properties` — 共通設定（コミット済み）
-- `application-local.properties` — ローカル開発用（コミット済み）
-- `application-postgresql.properties` — PostgreSQL 設定（コミット済み）
-- `application-secret.properties` — 秘密情報（`.gitignore`、作成しない）
-
-**例：`application-secret.properties`（作成しないこと）**
-```properties
-spring.datasource.url=jdbc:postgresql://prod-db:5432/mapoker
-spring.datasource.username=mapoker_prod
-spring.datasource.password=ultra_secure_password
-google.client.id=prod-client-id
-google.client.secret=prod-client-secret
+```bash
+SPRING_PROFILES_ACTIVE=local ./mvnw spring-boot:run
 ```
 
-**環境変数での指定**
-```bash
-export SPRING_DATASOURCE_URL=jdbc:postgresql://prod-db:5432/mapoker
-export SPRING_DATASOURCE_USERNAME=mapoker_prod
-export SPRING_DATASOURCE_PASSWORD=ultra_secure_password
-export GOOGLE_CLIENT_ID=prod-client-id
-export GOOGLE_CLIENT_SECRET=prod-client-secret
-export SPRING_PROFILES_ACTIVE=postgresql,production
+PostgreSQL を使うローカル環境:
 
+```bash
+SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/mapoker \
+SPRING_DATASOURCE_USERNAME=mapoker \
+SPRING_DATASOURCE_PASSWORD=mapoker \
+SPRING_PROFILES_ACTIVE=local,postgresql \
 ./mvnw spring-boot:run
 ```
 
-### Google OAuth 設定
+### 本番環境
 
-1. [Google Cloud Console](https://console.cloud.google.com/) で OAuth 2.0 認証情報を作成
-2. **クライアント ID** と **クライアント シークレット** を取得
-3. 環境変数に設定
+環境変数で秘密情報を注入する（`application-secret.properties` は使わず環境変数を推奨）。
 
-   ```
-   GOOGLE_CLIENT_ID=YOUR_CLIENT_ID.apps.googleusercontent.com
-   GOOGLE_CLIENT_SECRET=YOUR_CLIENT_SECRET
-   ```
+```bash
+export SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/mapoker
+export SPRING_DATASOURCE_USERNAME=mapoker
+export SPRING_DATASOURCE_PASSWORD=your_secure_password
+export CORS_ALLOWED_ORIGIN_PATTERNS=https://mapoker.marciadesign.org
+export SPRING_PROFILES_ACTIVE=postgresql
+export WALLET_ADMIN_USERNAMES=admin1,admin2
+```
 
-4. Spring Security で検証
+主要な設定項目（`application.properties` の対応キー）:
+
+| 環境変数 | プロパティキー | デフォルト | 説明 |
+|---|---|---|---|
+| `CORS_ALLOWED_ORIGIN_PATTERNS` | `cors.allowed-origin-patterns` | `*` | CORS 許可オリジン |
+| `GAME_DEFAULT_ODD_CHIP_RULE` | `game.default-odd-chip-rule` | `LOW_INDEX` | 端数チップルール |
+| `WALLET_INITIAL_GRANT` | `wallet.initial-grant` | `10000` | 新規登録ボーナス |
+| `WALLET_DAILY_BONUS_AMOUNT` | `wallet.daily-bonus-amount` | `1000` | デイリーボーナス額 |
+| `WALLET_RECOVERY_THRESHOLD` | `wallet.recovery-threshold` | `1000` | 救済ボーナス発動残高 |
+| `WALLET_RECOVERY_AMOUNT` | `wallet.recovery-amount` | `5000` | 救済ボーナス額 |
+| `WALLET_ADMIN_USERNAMES` | `wallet.admin-usernames` | `""` | チップ付与権限ユーザー（カンマ区切り） |
 
 ---
 
 ## フロントエンド（Node.js / Vite）
 
-### ローカル開発
+### 設定ファイル構成
 
-1. **`.env.local` を作成**（`mapoker-frontend/` ディレクトリ）
-
-   ```bash
-   cp mapoker-frontend/.env.example mapoker-frontend/.env.local
-   ```
-
-2. **実際の値を記入**
-
-   ```
-   APPLICATION_URL=http://localhost:5173
-   BACKEND_URL=http://localhost:8080
-   VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-   VITE_APP_ENV=development
-   ```
-
-3. **実行**
-
-   ```bash
-   cd mapoker-frontend
-   npm install
-   npm run dev
-   ```
+| ファイル | 役割 | git 管理 |
+|---|---|---|
+| `.env` | 共通デフォルト値 | ✅ コミット可 |
+| `.env.local` | ローカル上書き（作成しないこと） | ❌ `.gitignore` |
+| `.env.production` | 本番ビルド用 | ✅ コミット可 |
 
 ### Vite の環境変数ルール
 
-- **ファイル名:** `.env` / `.env.local` / `.env.production`
-- **変数名プレフィックス:** 通常は `VITE_` が必要。`APPLICATION_URL` は `vite.config.ts` で明示的に公開している
-- **読み込み順序:**
-  1. `.env` （デフォルト、コミット可）
-  2. `.env.local` （ローカル上書き、`.gitignore`）
-  3. `.env.production` または環境別ファイル
+- `VITE_` プレフィックスを持つ変数のみブラウザから参照可能
+- `APPLICATION_URL` は `vite.config.ts` で明示的に公開している
 
-`APPLICATION_URL` は公開されるフロントエンドのオリジンです。ブラウザは同一オリジンの `/api/v1/...` を呼び、ローカルの `npm run dev` と Docker の nginx はどちらも `/api` をバックエンドへプロキシします。
-そのためローカル Docker 環境では `APPLICATION_URL` を `http://localhost:3000` に設定します。`http://localhost:8080` を入れるとブラウザがバックエンドへ直接アクセスし、`/api/...` がそのまま届いて 403 になります。
+### ローカル開発
 
-**ローカル開発:**
 ```bash
-npm run dev  # .env + .env.local を使用
+cp mapoker-frontend/.env.example mapoker-frontend/.env.local
+# 必要に応じて値を編集
+cd mapoker-frontend && npm run dev
 ```
 
-**本番ビルド:**
+主な設定値:
+
+```
+APPLICATION_URL=http://localhost:3000
+VITE_APP_ENV=development
+```
+
+`APPLICATION_URL` はブラウザが `/api/v1/...` を呼ぶ起点となる URL。ローカル Docker 環境では `http://localhost:3000`（nginx がプロキシ）を指定する。`http://localhost:8080` を直接指定すると `/api/...` が 403 になる。
+
+### 本番ビルド
+
 ```bash
 npm run build  # .env + .env.production を使用
 ```
 
-### Google Sign-In の設定
-
-1. [Google Cloud Console](https://console.cloud.google.com/) で OAuth 2.0 認証情報を作成
-2. **クライアント ID** を取得
-3. `.env.local` に設定
-
-   ```
-   VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-   ```
-
-4. フロントエンド コンポーネントで使用
-
-   ```typescript
-   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-   ```
-
 ---
 
-## Docker/devcontainer での管理
+## Docker Compose
 
-### devcontainer の場合
+`.env.local`（開発）/ `.env.prd`（本番）をプロジェクトルートに配置して利用する。
 
-`.devcontainer/devcontainer.json` で環境変数を注入（ただし秘密は環境変数から）：
-
-```json
-{
-  "remoteEnv": {
-    "SPRING_PROFILES_ACTIVE": "local"
-  },
-  "remoteUser": "root"
-}
-```
-
-**秘密値は外部から注入：**
 ```bash
-docker compose up -d
-# または
-devcontainer open --workspace-folder . --log-level trace
+# 開発
+docker compose --env-file .env.local up -d
+
+# 本番
+docker compose --env-file .env.prd up -d
 ```
 
-`.env.local` は devcontainer マウント内に配置してから実行。
+主要な Docker 環境変数:
 
-### Docker Compose の場合
-
-```yaml
-version: '3.8'
-services:
-  backend:
-    build: ./mapoker-backend
-    env_file:
-      - .env.local
-    environment:
-      SPRING_PROFILES_ACTIVE: postgresql
-    ports:
-      - "8080:8080"
-  
-  db:
-    image: postgres:16
-    environment:
-      POSTGRES_DB: mapoker
-      POSTGRES_USER: mapoker
-      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
-    secrets:
-      - db_password
-
-secrets:
-  db_password:
-    file: ./secrets/db_password.txt  # .gitignore に記載
+```bash
+POSTGRES_DB=mapoker
+POSTGRES_USER=mapoker
+POSTGRES_PASSWORD=your_secure_password
+DB_DATA_LOCATION=/srv/mapoker/data/db  # DB データディレクトリのホストパス
+APPLICATION_URL=https://mapoker.marciadesign.org
+VITE_APP_ENV=production
+CORS_ALLOWED_ORIGIN_PATTERNS=https://mapoker.marciadesign.org
+SPRING_PROFILES_ACTIVE=postgresql
 ```
 
 ---
 
 ## チェックリスト
 
-- [ ] `.gitignore` に `.env`, `.env.local`, `application-secret.properties` を記載
-- [ ] `.env.example` を作成（テンプレート用）
-- [ ] ローカル開発用に `.env.local` を作成・機密値を設定
-- [ ] `SPRING_PROFILES_ACTIVE=local` で起動確認
-- [ ] Google OAuth の設定が完了
-- [ ] 本番環境でも同じ仕組みで環境変数を注入できるか検証
-- [ ] CI/CD パイプライン（GitHub Actions など）で秘密値を `Secrets` として設定
-
----
-
-## 参考リンク
-
-- [Spring Boot Externalized Configuration](https://docs.spring.io/spring-boot/docs/current/reference/html/features.html#features.external-config)
-- [Vite Environment Variables](https://vitejs.dev/guide/env-and-modes)
-- [Google Cloud OAuth 2.0](https://developers.google.com/identity/protocols/oauth2)
+- [ ] `.gitignore` に `.env.local`, `application-secret.properties` を記載
+- [ ] `.env.example` テンプレートが最新の状態か確認
+- [ ] `SPRING_PROFILES_ACTIVE=local` でローカル起動確認
+- [ ] 本番環境で必要な環境変数が CI/CD Secrets に設定済み

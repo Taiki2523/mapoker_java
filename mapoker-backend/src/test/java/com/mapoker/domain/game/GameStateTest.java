@@ -77,6 +77,37 @@ class GameStateTest {
     }
 
     @Test
+    void headsUpButtonRotatesEachHand() {
+        GameState g = newGame2P();
+
+        g.startHand(10);
+        int btn1 = g.getButtonIndex();
+        int sb1  = g.getSmallBlindIdx();
+        int bb1  = g.getBigBlindIdx();
+        finishHandByFoldingToWinner(g);
+
+        g.startHand(10);
+        int btn2 = g.getButtonIndex();
+        int sb2  = g.getSmallBlindIdx();
+        int bb2  = g.getBigBlindIdx();
+        finishHandByFoldingToWinner(g);
+
+        g.startHand(10);
+        int btn3 = g.getButtonIndex();
+
+        // ボタンは毎ハンド移動する
+        assertThat(btn2).isNotEqualTo(btn1);
+        // 3ハンド目は1ハンド目と同じ位置に戻る（2人卓）
+        assertThat(btn3).isEqualTo(btn1);
+        // SBとBBが入れ替わっている
+        assertThat(sb2).isEqualTo(bb1);
+        assertThat(bb2).isEqualTo(sb1);
+        // ヘッズアップ: SB=ボタン
+        assertThat(sb1).isEqualTo(btn1);
+        assertThat(sb2).isEqualTo(btn2);
+    }
+
+    @Test
     void multiPlayerBlindsFollowButton() {
         GameState g = newGame3P();
 

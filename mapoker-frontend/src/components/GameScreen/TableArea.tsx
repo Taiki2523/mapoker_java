@@ -1,8 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { GameState, PayoutLine, Player, RoomMember, Showdown } from '../../types'
 import { Card } from '../Card'
 import { seatPosition } from '../../utils'
 import { t } from '../../i18n'
+
+const STREET_REVEAL_INTERVAL_MS = 1500 // ストリート間の公開間隔（ms）
+const FLIP_ANIM_MS = 500              // CSS mp-card-flip の duration と同値
 
 type Props = {
   game: GameState
@@ -37,10 +40,19 @@ export function TableArea({
     }
     return `¥${stack}`
   }
+  // マウント時点のコミュニティ枚数（ページ読み込み時に途中ゲームなら即表示、新規なら0）
+  // useState / useRef は初回レンダーの値のみ使用するため、毎レンダー計算しても問題なし
+  const _initCommCount = (game?.community ?? []).filter((c) => c && c !== '--').length
+
   const prevHoleRef = useRef<Record<number, number>>({})
-  const prevCommLenRef = useRef(0)
+  // StrictMode 対応: cleanup で元の値に戻すため prevCommLenRef をマウント時の枚数で初期化
+  const prevCommLenRef = useRef(_initCommCount)
   const prevContribRef = useRef<Record<number, number>>({})
+  const cardAnimEndsAtRef = useRef(0)
   const [dealingSeats, setDealingSeats] = useState<Set<number>>(new Set())
+  // 公開済みコミュニティカード枚数（これ未満のインデックスだけ表示）
+  // マウント時は現在の枚数で初期化（ページ再読み込み時にカードが消えない）
+  const [revealedCount, setRevealedCount] = useState(_initCommCount)
   const [flippingIndices, setFlippingIndices] = useState<Set<number>>(new Set())
   const [sdStep, setSdStep] = useState(0)
   const [newChipSeats, setNewChipSeats] = useState<Set<number>>(new Set())
@@ -49,6 +61,12 @@ export function TableArea({
   const prevPlayersRef = useRef<Player[]>([])
   const prevCurrentBetRef = useRef<number>(0)
   const prevStreetRef = useRef<string>('')
+
+  // 枚数のみで変化検知（同じ枚数で参照が変わっても effect を再実行しない）
+  const communityCount = useMemo(
+    () => (game.community ?? []).filter((c) => c && c !== '--').length,
+    [game.community]
+  )
   const seatedIndices = new Set(roster.map((m) => m.seatIndex))
   const isWaiting = game.status === 'finished' && game.pot_total === 0 && (game.community ?? []).length === 0
   const communitySlots = Array.from({ length: 5 }, (_, i) => game.community?.[i] ?? null)
@@ -73,38 +91,81 @@ export function TableArea({
     }
   }, [game.players])
 
+  // コミュニティカードの公開順序制御
+  //
+  // StrictMode 対応: cleanup で prevCommLenRef を元の値（prev）に戻す。
   useEffect(() => {
-    const current = (game.community ?? []).filter((c) => c && c !== '--').length
-    if (current > prevCommLenRef.current) {
-      const newIdx = new Set<number>()
-      for (let i = prevCommLenRef.current; i < current; i += 1) {
-        newIdx.add(i)
-      }
-      prevCommLenRef.current = current
-      const activateId = window.setTimeout(() => setFlippingIndices(newIdx), 0)
-      const clearId = window.setTimeout(() => setFlippingIndices(new Set()), 500)
-      return () => {
-        window.clearTimeout(activateId)
-        window.clearTimeout(clearId)
-      }
-    }
-    prevCommLenRef.current = current
-  }, [game.community])
+    const current = communityCount
+    const prev = prevCommLenRef.current
 
-  useEffect(() => {
-    if (!isShowdown) {
-      const resetId = window.setTimeout(() => setSdStep(0), 0)
-      return () => window.clearTimeout(resetId)
+    if (current <= prev) {
+      prevCommLenRef.current = current
+      if (current === 0) window.setTimeout(() => setRevealedCount(0), 0)
+      return
     }
-    const resetId = window.setTimeout(() => setSdStep(0), 0)
-    const t1 = window.setTimeout(() => setSdStep(1), 800)
-    const t2 = window.setTimeout(() => setSdStep(2), 1600)
-    const t3 = window.setTimeout(() => setSdStep(3), 2800)
+
+    prevCommLenRef.current = current
+
+    const timers: number[] = []
+    let delay = 0
+
+    // フロップ（インデックス 0-2）
+    if (prev < 3 && current >= 3) {
+      const revealTo = Math.min(current, 3)
+      const flopSet = new Set(Array.from({ length: revealTo - prev }, (_, i) => prev + i))
+      timers.push(window.setTimeout(() => {
+        setRevealedCount(revealTo)
+        setFlippingIndices(flopSet)
+      }, delay))
+      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + FLIP_ANIM_MS))
+      delay += STREET_REVEAL_INTERVAL_MS
+    }
+
+    // ターン（インデックス 3）
+    if (prev < 4 && current >= 4) {
+      timers.push(window.setTimeout(() => {
+        setRevealedCount(4)
+        setFlippingIndices(new Set([3]))
+      }, delay))
+      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + FLIP_ANIM_MS))
+      delay += STREET_REVEAL_INTERVAL_MS
+    }
+
+    // リバー（インデックス 4）
+    if (prev < 5 && current >= 5) {
+      timers.push(window.setTimeout(() => {
+        setRevealedCount(5)
+        setFlippingIndices(new Set([4]))
+      }, delay))
+      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + FLIP_ANIM_MS))
+      delay += STREET_REVEAL_INTERVAL_MS
+    }
+
+    cardAnimEndsAtRef.current = Date.now() + delay
+
     return () => {
-      window.clearTimeout(resetId)
+      prevCommLenRef.current = prev  // StrictMode: 2回目の実行で再スケジュールできるよう戻す
+      cardAnimEndsAtRef.current = 0
+      setFlippingIndices(new Set())
+      timers.forEach(window.clearTimeout)
+    }
+  }, [communityCount])
+
+  // ショーダウン結果のオーバーレイ表示（カードアニメーション完了後に開始）
+  // setSdStep は setTimeout 経由で呼ぶ（react-hooks/set-state-in-effect 対策）
+  useEffect(() => {
+    if (!isShowdown) return
+    const cardWait = Math.max(0, cardAnimEndsAtRef.current - Date.now())
+    const t0 = window.setTimeout(() => setSdStep(0), 0)
+    const t1 = window.setTimeout(() => setSdStep(1), cardWait)
+    const t2 = window.setTimeout(() => setSdStep(2), cardWait + 800)
+    const t3 = window.setTimeout(() => setSdStep(3), cardWait + 1600)
+    return () => {
+      window.clearTimeout(t0)
       window.clearTimeout(t1)
       window.clearTimeout(t2)
       window.clearTimeout(t3)
+      setSdStep(0)
     }
   }, [isShowdown])
 
@@ -172,6 +233,7 @@ export function TableArea({
       })
     }, 3000)
     return () => window.clearTimeout(timerId)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.current_player, game.street, game.players, game.current_bet])
 
   return (
@@ -201,7 +263,7 @@ export function TableArea({
                   key={`cc-wrap-${idx}`}
                   className={flippingIndices.has(idx) ? 'card-flip-shell flipping' : 'card-flip-shell'}
                 >
-                  {card && card !== '--'
+                  {card && card !== '--' && idx < revealedCount
                     ? <Card card={card} variant="front" size="md" />
                     : <Card variant="slot" size="md" />}
                 </span>
@@ -233,9 +295,11 @@ export function TableArea({
           const anchorSeat = mySeat ?? 0
           const pos = seatPosition(idx, anchorSeat, n)
           const isActive = game.current_player === idx
-          const isWinnerSeat = showdown?.winners?.includes(idx) ?? false
-          const isLoserSeat = isShowdown && !isWinnerSeat
-          const showCards = mySeat === idx || isSpectator || (isShowdown && !player.folded)
+          // カード公開が完了するまでネタバレしない（sdStep >= 3 = result表示タイミング）
+          const showResult = sdStep >= 3
+          const isWinnerSeat = showResult && (showdown?.winners?.includes(idx) ?? false)
+          const isLoserSeat = showResult && !(showdown?.winners?.includes(idx) ?? false) && !player.folded
+          const showCards = mySeat === idx || isSpectator || (showResult && !player.folded)
           const cards = player.hole?.length ? player.hole : ['--', '--']
           const isMe = mySeat === idx
 
@@ -248,10 +312,10 @@ export function TableArea({
                   'player-seat',
                   isActive ? 'active' : '',
                   player.folded || isLoserSeat ? 'folded' : '',
-                  isWinnerSeat && isShowdown ? 'winner' : '',
+                  isWinnerSeat ? 'winner' : '',
                   isMe ? 'me' : '',
                   dealingSeats.has(idx) ? 'dealing' : '',
-                  isShowdown ? 'sd-active' : '',
+                  showResult ? 'sd-active' : '',
                 ].filter(Boolean).join(' ')}
                 style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
               >

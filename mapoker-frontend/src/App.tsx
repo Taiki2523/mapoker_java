@@ -18,6 +18,8 @@ import { RoomScreen } from './components/RoomScreen'
 import { GameScreen } from './components/GameScreen'
 
 const NEXT_HAND_DELAY_MS = 7000
+// TableArea.tsx の STREET_REVEAL_INTERVAL_MS と同じ値で管理すること
+const CARD_REVEAL_MS_PER_STREET = 1500
 
 function App() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
@@ -32,12 +34,17 @@ function App() {
   const showdownInFlight = useRef(false)
   const startHandInFlight = useRef(false)
   const prevIsMyTurn = useRef(false)
+  // コミュニティカード公開アニメーションの終了予定時刻（ネタバレ防止用）
+  const cardRevealEndsAtRef = useRef(0)
+  const prevCommLenRef = useRef(0)
+  // リバイポップアップを同じハンドで2度出さないためのフラグ
+  const rebuyShownForHandRef = useRef(false)
   const [myName, setMyName] = useState('')
   const [mySeatIndex, setMySeatIndex] = useState<number | null>(null)
   const [leavePending, setLeavePending] = useState(false)
   const [roster, setRoster] = useState<RoomMember[]>([])
   const [showMyPage, setShowMyPage] = useState(false)
-  const [, setTable] = useState<Table | null>(null)
+  const [table, setTable] = useState<Table | null>(null)
   const [profileTables, setProfileTables] = useState<Table[]>([])
   const [profileHistory, setProfileHistory] = useState<UserTableHistoryEntry[]>([])
   const [wallet, setWallet] = useState<WalletSummary | null>(null)
@@ -108,9 +115,9 @@ function App() {
 
   const minRaise = useMemo(() => {
     if (!game) return 0
-    if (toCall === 0) return game.big_blind
+    if (game.current_bet === 0) return game.big_blind
     return game.current_bet + Math.max(game.big_blind, game.last_raise_size || game.big_blind)
-  }, [game, toCall])
+  }, [game])
 
   const maxBet = useMemo(() => {
     if (!game || mySeat === null) return 0
@@ -244,6 +251,72 @@ function App() {
     prevIsMyTurn.current = isMyTurn
   }, [isMyTurn, minRaise])
 
+  // コミュニティカード公開アニメーションの終了時刻を追跡（強制退席・勝者表示ネタバレ防止）
+  useEffect(() => {
+    const current = (game?.community ?? []).filter(c => c && c !== '--').length
+    const prev = prevCommLenRef.current
+    prevCommLenRef.current = current
+
+    if (current <= prev) {
+      if (current === 0) cardRevealEndsAtRef.current = 0
+      return
+    }
+
+    let ms = 0
+    if (prev < 3 && current >= 3) ms += CARD_REVEAL_MS_PER_STREET
+    if (prev < 4 && current >= 4) ms += CARD_REVEAL_MS_PER_STREET
+    if (prev < 5 && current >= 5) ms += CARD_REVEAL_MS_PER_STREET
+    // +1600 = TableArea の sdStep(3) 発火タイミングと揃える
+    if (ms > 0) cardRevealEndsAtRef.current = Date.now() + ms + 1600
+  }, [game?.community])
+
+  // 新ハンド開始でリバイフラグをリセット
+  useEffect(() => {
+    if (game?.status === 'in_progress') {
+      rebuyShownForHandRef.current = false
+    }
+  }, [game?.status])
+
+  // 手が終了してチップが 0 になったら自動でリバイ画面を表示
+  // game.can_rebuy は viewer_index 依存のため、ローカルの players スタックを直接参照する
+  const myCurrentStack = mySeat !== null ? (game?.players?.[mySeat]?.stack ?? null) : null
+  useEffect(() => {
+    if (game?.status !== 'finished') return
+    if (myCurrentStack !== 0) return
+    if (mySeat === null || !myName.trim()) return
+    if (rebuyShownForHandRef.current) return
+
+    rebuyShownForHandRef.current = true
+
+    const minBuyIn = table?.min_buy_in ?? game.big_blind * 10
+    const maxBuyIn = table?.max_buy_in ?? game.big_blind * 100
+    const walletCap = wallet?.chip_balance ?? Infinity
+
+    // runShowdown は即座に実行されるので game.status='finished' は ~300ms で来る。
+    // カード公開アニメーション完了後にポップアップを表示するため cardRevealEndsAtRef で遅延する。
+    const waitMs = Math.max(500, cardRevealEndsAtRef.current - Date.now())
+    const timer = window.setTimeout(() => {
+      setBuyInContext({
+        tableId: gameId,
+        tableName: table?.name ?? 'Table',
+        minBuyIn,
+        maxBuyIn: Math.min(maxBuyIn, walletCap),
+        bigBlind: game.big_blind,
+        onConfirm: (amount) => {
+          setBuyInContext(null)
+          void doTableJoin(gameId, myName, amount).then(() => refreshGame(gameId)).catch(err => setError(formatErrorMessage(err)))
+        },
+        onCancel: () => {
+          setBuyInContext(null)
+          void leaveRoom()
+        },
+      })
+    }, waitMs)
+
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game?.status, myCurrentStack, mySeat, myName])
+
   // Bug3: 退席予約が解消されたらロビーに戻る
   useEffect(() => {
     if (!leavePending || !myName.trim()) return
@@ -302,6 +375,8 @@ function App() {
 
   const refreshMembers = async (id = gameId) => {
     if (!id) return
+    // カード公開アニメーション中はロスター更新をスキップ（強制退席のネタバレ防止）
+    if (Date.now() < cardRevealEndsAtRef.current) return
     try {
       const data = await fetchJSON<{ members: RoomMemberApi[] }>(`/v1/tables/${id}/members`)
       setRoster(mapMembers(data.members))

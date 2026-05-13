@@ -20,7 +20,9 @@
 
 | ファイル | 機能 | ステータス |
 |---|---|---|
-| [tournament-mode.md](tournament-mode.md) | トーナメントモード | `planned` |
+| [tournament.md](tournament.md) | トーナメントモード | `in-design` |
+| [offline.md](offline.md) | オフラインモード（リアルカード補助） | `in-design` |
 | [hand-history-viewer.md](hand-history-viewer.md) | ハンド履歴ビューアー | `planned` |
 | [spectator-mode.md](spectator-mode.md) | 観戦モード | `planned` |
 | [table-chat.md](table-chat.md) | テーブルチャット | `planned` |
+| [websocket-migration.md](websocket-migration.md) | WebSocket 移行（リアルタイム同期） | `planned` |

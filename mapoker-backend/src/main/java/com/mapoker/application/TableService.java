@@ -174,16 +174,6 @@ public class TableService {
             if (current.getStatus() == GameStatus.IN_PROGRESS) {
                 return current;
             }
-            List<TableMemberRecord> members = getMembers(tableId);
-            if (!members.isEmpty()) {
-                TableRecord table = getTable(tableId);
-                int firstSeat = members.stream()
-                        .min(Comparator.comparing(TableMemberRecord::joinedAt))
-                        .map(TableMemberRecord::seatIndex)
-                        .orElse(0);
-                int buttonBefore = (firstSeat - 1 + table.maxPlayers()) % table.maxPlayers();
-                gameService.setButtonIndex(tableId, buttonBefore);
-            }
             return gameService.startHand(tableId, bigBlind);
         }
     }
@@ -227,23 +217,39 @@ public class TableService {
                     .findFirst()
                     .orElse(null);
             if (existing != null) {
+                // スタックが 0 かつ buyIn > 0 の場合はリバイとして処理
+                int currentStack = gameService.getSeatStack(table.gameId(), existing.seatIndex());
+                if (currentStack == 0 && buyIn > 0) {
+                    WalletService walletService = walletServiceProvider.getIfAvailable();
+                    if (walletService != null) {
+                        if (buyIn < table.minBuyIn() || buyIn > table.maxBuyIn()) {
+                            throw new IllegalArgumentException("buy-in out of range");
+                        }
+                        walletService.buyIn(name, table.id(), buyIn);
+                    }
+                    gameService.setSeatStack(table.gameId(), existing.seatIndex(), buyIn);
+                    gameService.setSittingOut(table.gameId(), existing.seatIndex(), false);
+                }
                 userTableHistoryService.recordJoin(name, table, existing.seatIndex());
                 return new JoinResult(existing.seatIndex(), List.copyOf(members));
             }
 
             int seatIndex = randomAvailableSeat(members, table.maxPlayers());
-            GameState state = gameService.getGame(table.gameId());
-            boolean handActive = state.getStatus() == GameStatus.IN_PROGRESS && state.getPot() > 0;
-            if (handActive) {
-                gameService.setSittingOut(table.gameId(), seatIndex, true);
-            }
 
+            // ウォレット処理を先に行う。ここで例外が発生してもゲーム状態は未変更
             WalletService walletService = walletServiceProvider.getIfAvailable();
             if (walletService != null && buyIn > 0) {
                 if (buyIn < table.minBuyIn() || buyIn > table.maxBuyIn()) {
                     throw new IllegalArgumentException("buy-in out of range");
                 }
                 walletService.buyIn(name, table.id(), buyIn);
+            }
+
+            // ウォレット確定後にゲーム状態を変更する
+            GameState state = gameService.getGame(table.gameId());
+            boolean handActive = state.getStatus() == GameStatus.IN_PROGRESS && state.getPot() > 0;
+            if (handActive) {
+                gameService.setSittingOut(table.gameId(), seatIndex, true);
             }
             gameService.setSeatStack(table.gameId(), seatIndex, buyIn);
 
@@ -336,6 +342,8 @@ public class TableService {
             }
 
 
+            // pendingLeave=true のプレイヤーのみ除去・キャッシュアウト。
+            // スタックが 0 でも pendingLeave でないプレイヤーはリバイ待ちなので残す。
             List<TableMemberRecord> remainingMembers = new ArrayList<>();
             for (TableMemberRecord member : members) {
                 if (!member.pendingLeave()) {
@@ -346,18 +354,7 @@ public class TableService {
                 userTableHistoryService.recordLeave(member.name(), table.id(), member.seatIndex());
             }
             remainingMembers.sort(Comparator.comparingInt(TableMemberRecord::seatIndex));
-            List<TableMemberRecord> finalMembers = new ArrayList<>();
-            for (TableMemberRecord member : remainingMembers) {
-                int stack = gameService.getSeatStack(table.gameId(), member.seatIndex());
-                if (stack == 0) {
-                    cashOutSeatStackIfPossible(member.name(), table.gameId(), member.seatIndex());
-                    userTableHistoryService.recordLeave(member.name(), table.id(), member.seatIndex());
-                } else {
-                    finalMembers.add(member);
-                }
-            }
-            finalMembers.sort(Comparator.comparingInt(TableMemberRecord::seatIndex));
-            tableMembers.put(table.id(), finalMembers);
+            tableMembers.put(table.id(), remainingMembers);
         }
     }
 
