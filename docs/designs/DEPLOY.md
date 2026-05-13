@@ -60,12 +60,20 @@ docker compose logs -f
 ```bash
 # .env.prd を編集（秘密情報を入力）
 vim .env.prd
+```
 
-# または新規作成
-cat > .env.prd << EOF
+`.env.prd` に設定が必要な主な項目：
+
+```env
+# === バージョン管理 ===
+# ghcr.io から pull するイメージのバージョンを指定
+# 未設定の場合は latest を使用（ローカルビルドが優先される）
+APP_VERSION=v1.0.0
+
+# === Database ===
 POSTGRES_DB=mapoker
 POSTGRES_USER=mapoker
-POSTGRES_PASSWORD=$(openssl rand -base64 32)
+POSTGRES_PASSWORD=<strong-password>
 
 SPRING_PROFILES_ACTIVE=postgresql,production
 
@@ -77,7 +85,6 @@ GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 
 CORS_ALLOWED_ORIGINS=https://mapoker.marciadesign.org
-EOF
 ```
 
 **重要**: `.env.prd` は `.gitignore` に記載されているため、リポジトリにコミットされません。
@@ -103,10 +110,21 @@ sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-
 sudo chmod +x /usr/local/bin/docker-compose
 ```
 
+### 2.5. ghcr.io へのログイン（初回のみ）
+
+ghcr.io のイメージを pull するため、GitHub の Personal Access Token（`read:packages` 権限）が必要です：
+
+```bash
+echo <GITHUB_TOKEN> | docker login ghcr.io -u <GitHubユーザー名> --password-stdin
+```
+
 ### 3. コンテナの起動
 
 ```bash
-# 本番環境で起動
+# ghcr.io からイメージを pull（APP_VERSION で指定したバージョン）
+docker compose --env-file .env.prd pull
+
+# 起動（ローカルビルドは行わない）
 docker compose --env-file .env.prd up -d
 
 # ログ確認
@@ -116,6 +134,9 @@ docker compose logs -f frontend
 # ステータス確認
 docker compose ps
 ```
+
+> **ポイント**: `--build` を付けなければローカルビルドは走らず、ghcr.io の
+> `APP_VERSION` イメージをそのまま起動します。
 
 ### 4. リバースプロキシ設定
 
