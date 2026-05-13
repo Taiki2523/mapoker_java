@@ -342,6 +342,8 @@ public class TableService {
             }
 
 
+            // pendingLeave=true のプレイヤーのみ除去・キャッシュアウト。
+            // スタックが 0 でも pendingLeave でないプレイヤーはリバイ待ちなので残す。
             List<TableMemberRecord> remainingMembers = new ArrayList<>();
             for (TableMemberRecord member : members) {
                 if (!member.pendingLeave()) {
@@ -352,18 +354,7 @@ public class TableService {
                 userTableHistoryService.recordLeave(member.name(), table.id(), member.seatIndex());
             }
             remainingMembers.sort(Comparator.comparingInt(TableMemberRecord::seatIndex));
-            List<TableMemberRecord> finalMembers = new ArrayList<>();
-            for (TableMemberRecord member : remainingMembers) {
-                int stack = gameService.getSeatStack(table.gameId(), member.seatIndex());
-                if (stack == 0) {
-                    cashOutSeatStackIfPossible(member.name(), table.gameId(), member.seatIndex());
-                    userTableHistoryService.recordLeave(member.name(), table.id(), member.seatIndex());
-                } else {
-                    finalMembers.add(member);
-                }
-            }
-            finalMembers.sort(Comparator.comparingInt(TableMemberRecord::seatIndex));
-            tableMembers.put(table.id(), finalMembers);
+            tableMembers.put(table.id(), remainingMembers);
         }
     }
 

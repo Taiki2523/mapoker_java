@@ -281,7 +281,7 @@ function App() {
   useEffect(() => {
     if (game?.status !== 'finished') return
     if (!game.can_rebuy) return
-    if (mySeat === null || mySeatIndex === null || !myName.trim()) return
+    if (mySeat === null || !myName.trim()) return
     if (rebuyShownForHandRef.current) return
 
     rebuyShownForHandRef.current = true
