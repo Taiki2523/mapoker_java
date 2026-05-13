@@ -4,6 +4,11 @@ import { Card } from '../Card'
 import { seatPosition } from '../../utils'
 import { t } from '../../i18n'
 
+// コミュニティカードアニメーション定数（モジュールスコープで固定値）
+const CARD_FLIP_MS = 600   // カードめくりアニメーション時間
+const CARD_PAUSE_MS = 1000 // めくり後にカードを確認できる時間
+const CARD_GROUP_DELAY_MS = CARD_FLIP_MS + CARD_PAUSE_MS // ストリート間の間隔
+
 type Props = {
   game: GameState
   showdown: Showdown | null
@@ -37,16 +42,20 @@ export function TableArea({
     }
     return `¥${stack}`
   }
-  // カードアニメーションのタイミング定数
-  const FLIP_MS = 600   // カードめくりアニメーション時間
-  const PAUSE_MS = 1000 // めくり後にカードを確認できる時間
+  // マウント時点のコミュニティ枚数（ページ読み込み時に途中ゲームなら即表示、新規なら0）
+  // useState / useRef は初回レンダーの値のみ使用するため、毎レンダー計算しても問題なし
+  const _initCommCount = (game?.community ?? []).filter((c) => c && c !== '--').length
 
   const prevHoleRef = useRef<Record<number, number>>({})
-  const prevCommLenRef = useRef(0)
+  // StrictMode 対応: cleanup で元の値に戻すため prevCommLenRef をマウント時の枚数で初期化
+  const prevCommLenRef = useRef(_initCommCount)
   const prevContribRef = useRef<Record<number, number>>({})
-  const cardAnimEndsAtRef = useRef(0) // カードアニメーション終了予定時刻（ms）
+  const cardAnimEndsAtRef = useRef(0)
   const [dealingSeats, setDealingSeats] = useState<Set<number>>(new Set())
   const [flippingIndices, setFlippingIndices] = useState<Set<number>>(new Set())
+  // アニメーションで開示済みのカード枚数（これ未満のインデックスのカードを front で描画）
+  // マウント時は現在の枚数で初期化（ページ再読み込み時にカードが消えない）
+  const [revealedCount, setRevealedCount] = useState(_initCommCount)
   const [sdStep, setSdStep] = useState(0)
   const [newChipSeats, setNewChipSeats] = useState<Set<number>>(new Set())
   const [actionBubbles, setActionBubbles] = useState<Map<number, string>>(new Map())
@@ -55,7 +64,7 @@ export function TableArea({
   const prevCurrentBetRef = useRef<number>(0)
   const prevStreetRef = useRef<string>('')
 
-  // 枚数のみで変化検知する（同じ内容で参照が変わっても再実行しない）
+  // 枚数のみで変化検知（同じ枚数で参照が変わっても effect を再実行しない）
   const communityCount = useMemo(
     () => (game.community ?? []).filter((c) => c && c !== '--').length,
     [game.community]
@@ -85,49 +94,71 @@ export function TableArea({
   }, [game.players])
 
   // コミュニティカードのめくりアニメーション
-  // communityCount（枚数）が変化したときだけ実行し、同じ枚数で参照が変わっても
-  // タイマーをキャンセルしない。これによりリフレッシュでアニメーションが途切れない。
+  //
+  // 設計上の注意点:
+  // 1. 依存配列を communityCount（数値）にすることで、refreshGame で参照が変わっても
+  //    タイマーをキャンセルしない（同じ枚数なら effect は再実行されない）。
+  // 2. StrictMode 対応: cleanup で prevCommLenRef を元の値に戻す。
+  //    StrictMode は effect を2回実行するため、戻さないと2回目が「変化なし」と判断して
+  //    タイマーをスケジュールしなくなる。
+  // 3. revealedCount で表示制御: アニメーション開始と同時にカードを front で描画する。
+  //    これにより、アニメーション前にカードが一瞬見えるフラッシュを防ぐ。
   useEffect(() => {
     const current = communityCount
     const prev = prevCommLenRef.current
+
     if (current <= prev) {
       prevCommLenRef.current = current
+      if (current === 0) setRevealedCount(0) // 新ハンド開始時にリセット
       return
     }
+
     prevCommLenRef.current = current
 
-    const GROUP_DELAY = FLIP_MS + PAUSE_MS // 各ストリート間の間隔
     const timers: number[] = []
     let delay = 0
 
     // フロップ（インデックス 0-2）
     if (prev < 3 && current >= 3) {
-      const flopCards = new Set(
-        Array.from({ length: Math.min(current, 3) - prev }, (_, i) => prev + i)
-      )
-      timers.push(window.setTimeout(() => setFlippingIndices(flopCards), delay))
-      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + FLIP_MS))
-      delay += GROUP_DELAY
+      const revealTo = Math.min(current, 3)
+      const flopCards = new Set(Array.from({ length: revealTo - prev }, (_, i) => prev + i))
+      timers.push(window.setTimeout(() => {
+        setRevealedCount(revealTo)      // カード表示
+        setFlippingIndices(flopCards)   // めくりアニメーション開始
+      }, delay))
+      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + CARD_FLIP_MS))
+      delay += CARD_GROUP_DELAY_MS
     }
 
     // ターン（インデックス 3）
     if (prev < 4 && current >= 4) {
-      timers.push(window.setTimeout(() => setFlippingIndices(new Set([3])), delay))
-      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + FLIP_MS))
-      delay += GROUP_DELAY
+      timers.push(window.setTimeout(() => {
+        setRevealedCount(4)
+        setFlippingIndices(new Set([3]))
+      }, delay))
+      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + CARD_FLIP_MS))
+      delay += CARD_GROUP_DELAY_MS
     }
 
     // リバー（インデックス 4）
     if (prev < 5 && current >= 5) {
-      timers.push(window.setTimeout(() => setFlippingIndices(new Set([4])), delay))
-      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + FLIP_MS))
-      delay += GROUP_DELAY // リバー後も確認する間を確保
+      timers.push(window.setTimeout(() => {
+        setRevealedCount(5)
+        setFlippingIndices(new Set([4]))
+      }, delay))
+      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + CARD_FLIP_MS))
+      delay += CARD_GROUP_DELAY_MS // リバー後の確認時間
     }
 
-    // ショーダウン表示タイミングの計算に使う終了予定時刻を記録
+    // ショーダウン表示を遅らせるための終了予定時刻
     cardAnimEndsAtRef.current = Date.now() + delay
 
-    return () => timers.forEach(window.clearTimeout)
+    return () => {
+      // StrictMode: cleanup で prev を元に戻し、2回目の実行でアニメーション再スケジュール可能にする
+      prevCommLenRef.current = prev
+      cardAnimEndsAtRef.current = 0
+      timers.forEach(window.clearTimeout)
+    }
   }, [communityCount]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ショーダウン結果のオーバーレイ表示（カードアニメーション完了後に開始）
@@ -242,7 +273,7 @@ export function TableArea({
                   key={`cc-wrap-${idx}`}
                   className={flippingIndices.has(idx) ? 'card-flip-shell flipping' : 'card-flip-shell'}
                 >
-                  {card && card !== '--'
+                  {card && card !== '--' && idx < revealedCount
                     ? <Card card={card} variant="front" size="md" />
                     : <Card variant="slot" size="md" />}
                 </span>
