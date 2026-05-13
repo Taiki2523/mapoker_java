@@ -81,3 +81,6 @@ coverage/
 *.bak
 *.backup
 dump.sql
+
+# Implementation plans (local only)
+docs/plans/

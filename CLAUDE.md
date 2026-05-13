@@ -74,14 +74,14 @@ Source roots:
 - スキーマ変更やデータ補正が必要な場合は、必ず新しい versioned migration を追加すること。
 - `V` の番号が増えること自体は問題として扱わない。履歴を短くしたい場合は既存 `V` を潰さず、`B*.sql` の baseline migration を追加すること。
 - checksum mismatch が出た場合、まず既存 migration の編集有無を疑う。安易に `repair` しない。
-- `flyway repair` はローカル開発や合意済み環境の例外対応に限定し、理由を `docs/FLYWAY.md` か PR に残すこと。
-- 詳細ルールは `docs/FLYWAY.md` を参照。
+- `flyway repair` はローカル開発や合意済み環境の例外対応に限定し、理由を `docs/designs/FLYWAY.md` か PR に残すこと。
+- 詳細ルールは `docs/designs/FLYWAY.md` を参照。
 
 ### Key design decisions
 
 - **Domain is framework-free.** `com.mapoker.domain` has zero Spring dependencies; all poker rules are plain Java 21.
 - **Repository port.** Application layer depends on a `GameRepository` interface. Two implementations: in-memory (tests/local) and PostgreSQL (prod). Swap via Spring profile.
-- **Transactional writes.** Updating `games`/`players` and inserting into `actions` must happen in a single transaction. See `docs/db_schema.md`.
+- **Transactional writes.** Updating `games`/`players` and inserting into `actions` must happen in a single transaction. See `docs/designs/db_schema.md`.
 - **Explicit SQL.** Use `JdbcTemplate` / Spring JDBC — no ORM. JSON columns serialized/deserialized with Jackson.
 - **`bet`/`raise` amount is raise-to total** (not the increment). `call` with `amount=0` is auto-call.
 - **Minimum raise** = `max(big blind, last raise size)`. Sub-min all-in is allowed but does not reopen betting (`raiseOpen=false`).
@@ -95,7 +95,7 @@ Source roots:
 CreateGame → StartHand → [preflop → flop → turn → river] → showdown → finished
 ```
 
-Status values: `in_progress`, `showdown`, `finished`. See `docs/GAME_FLOW.md` for full Mermaid diagrams of each transition.
+Status values: `in_progress`, `showdown`, `finished`. See `docs/designs/GAME_FLOW.md` for full Mermaid diagrams of each transition.
 
 ### HTTP API (13 endpoints)
 
@@ -117,7 +117,7 @@ POST   /v1/auth/logout
 
 ### Database schema (4 tables)
 
-`games`, `players`, `actions`, `users` — see `docs/db_schema.md` for DDL. Key: `deck`, `community`, `hole`, `acted` are JSON columns.
+`games`, `players`, `actions`, `users` — see `docs/designs/db_schema.md` for DDL. Key: `deck`, `community`, `hole`, `acted` are JSON columns.
 
 ### Testing priorities (80% coverage target)
 
@@ -143,7 +143,7 @@ When porting logic, read the Go source at `/home/taiki/projects/mapoker/internal
 
 ### 個人情報・機密情報の扱い
 
-**詳細は `docs/ENVIRONMENT.md` を参照。**
+**詳細は `docs/designs/ENVIRONMENT.md` を参照。**
 
 - CLAUDE.md（およびリポジトリにコミットするすべてのファイル）に個人名・メールアドレス・APIキーなどを直書きしない。
 - 環境依存の機密値は `.env` / `.env.local` で注入し、`.gitignore` に追加すること。
