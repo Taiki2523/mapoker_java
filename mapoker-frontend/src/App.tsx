@@ -4,6 +4,7 @@ import { fetchJSON } from './api'
 import { t } from './i18n'
 import { bestHandName } from './handEval'
 import { mapMembers } from './utils'
+import { createStompClient, subscribeGame, subscribeHoleCards, subscribeMembers } from './ws'
 import type {
   AuthUser, BetPreset, CreateGameConfig, GameState, JoinResponse, PayoutLine, Table,
   RoomMember, RoomMemberApi, Showdown, StoredSession, UserTableHistoryEntry,
@@ -37,6 +38,7 @@ function App() {
   // コミュニティカード公開アニメーションの終了予定時刻（ネタバレ防止用）
   const cardRevealEndsAtRef = useRef(0)
   const prevCommLenRef = useRef(0)
+  const stompClientRef = useRef<ReturnType<typeof createStompClient> | null>(null)
   // リバイポップアップを同じハンドで2度出さないためのフラグ
   const rebuyShownForHandRef = useRef(false)
   const [myName, setMyName] = useState('')
@@ -219,11 +221,48 @@ function App() {
 
   useEffect(() => {
     if (!autoRefresh || !gameId) return
-    const timer = window.setInterval(() => {
+    const client = createStompClient()
+    stompClientRef.current = client
+
+    client.onConnect = () => {
+      subscribeGame(client, gameId, (payload) => {
+        const nextGame = payload.game as GameState
+        setShowdown(nextGame.last_showdown ?? null)
+        setGame((prev) => {
+          if (!prev) return nextGame
+          // broadcast は全プレイヤーのホールカードをマスク済みで送信する。
+          // 既知のカード（subscribeHoleCards 受信済み or 初回 REST で取得済み）は上書きしない。
+          const players = nextGame.players.map((p, i) => {
+            const prevHole = prev.players[i]?.hole
+            const hasKnownCards = Array.isArray(prevHole) &&
+              prevHole.some((c) => c && c !== '??' && c !== '--')
+            return hasKnownCards ? { ...p, hole: prevHole } : p
+          })
+          return { ...nextGame, players }
+        })
+      })
+      subscribeMembers(client, gameId, (payload) => {
+        setRoster(mapMembers(payload.members as RoomMemberApi[]))
+      })
+      subscribeHoleCards(client, (payload) => {
+        if (payload.tableId !== gameId) return
+        setGame((prev) => {
+          if (!prev) return prev
+          const players = prev.players.map((p, i) =>
+            i === payload.seatIndex ? { ...p, hole: payload.hole } : p
+          )
+          return { ...prev, players }
+        })
+      })
       void refreshGame(gameId)
       void refreshMembers(gameId)
-    }, 2000)
-    return () => window.clearInterval(timer)
+    }
+
+    client.activate()
+    return () => {
+      void client.deactivate()
+      stompClientRef.current = null
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRefresh, gameId])
 

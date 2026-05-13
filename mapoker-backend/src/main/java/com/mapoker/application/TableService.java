@@ -5,6 +5,7 @@ import com.mapoker.domain.game.GameStatus;
 import com.mapoker.domain.game.OddChipRule;
 import com.mapoker.infrastructure.config.GameProperties;
 import com.mapoker.infrastructure.config.WalletProperties;
+import com.mapoker.infrastructure.messaging.GameEventPublisher;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
@@ -34,18 +35,21 @@ public class TableService {
     private final WalletProperties walletProperties;
     private final UserTableHistoryService userTableHistoryService;
     private final ObjectProvider<WalletService> walletServiceProvider;
+    private final ObjectProvider<GameEventPublisher> eventPublisherProvider;
     private final Random rng = new Random();
 
     public TableService(GameService gameService,
                         GameProperties gameProperties,
                         WalletProperties walletProperties,
                         UserTableHistoryService userTableHistoryService,
-                        ObjectProvider<WalletService> walletServiceProvider) {
+                        ObjectProvider<WalletService> walletServiceProvider,
+                        ObjectProvider<GameEventPublisher> eventPublisherProvider) {
         this.gameService = gameService;
         this.gameProperties = gameProperties;
         this.walletProperties = walletProperties;
         this.userTableHistoryService = userTableHistoryService;
         this.walletServiceProvider = walletServiceProvider;
+        this.eventPublisherProvider = eventPublisherProvider;
     }
 
     /**
@@ -211,6 +215,7 @@ public class TableService {
             TableRecord table = getTable(id);
             String name = normalizeMemberName(requestedName);
             List<TableMemberRecord> members = new ArrayList<>(tableMembers.computeIfAbsent(table.id(), ignored -> new ArrayList<>()));
+            JoinResult result;
 
             TableMemberRecord existing = members.stream()
                     .filter(member -> member.name().equals(name))
@@ -231,7 +236,9 @@ public class TableService {
                     gameService.setSittingOut(table.gameId(), existing.seatIndex(), false);
                 }
                 userTableHistoryService.recordJoin(name, table, existing.seatIndex());
-                return new JoinResult(existing.seatIndex(), List.copyOf(members));
+                result = new JoinResult(existing.seatIndex(), List.copyOf(members));
+                publishMembers(table.id(), result.members());
+                return result;
             }
 
             int seatIndex = randomAvailableSeat(members, table.maxPlayers());
@@ -275,7 +282,9 @@ public class TableService {
             members.sort(Comparator.comparingInt(TableMemberRecord::seatIndex));
             tableMembers.put(table.id(), members);
             userTableHistoryService.recordJoin(name, table, seatIndex);
-            return new JoinResult(seatIndex, List.copyOf(members));
+            result = new JoinResult(seatIndex, List.copyOf(members));
+            publishMembers(table.id(), result.members());
+            return result;
         }
     }
 
@@ -293,7 +302,9 @@ public class TableService {
             List<TableMemberRecord> members = new ArrayList<>(tableMembers.computeIfAbsent(table.id(), ignored -> new ArrayList<>()));
             TableMemberRecord member = findMember(members, name, seatIndex);
             if (member == null) {
-                return List.copyOf(members);
+                List<TableMemberRecord> result = List.copyOf(members);
+                publishMembers(table.id(), result);
+                return result;
             }
 
             GameState state = gameService.getGame(table.gameId());
@@ -315,7 +326,9 @@ public class TableService {
                 }
                 updatedMembers.sort(Comparator.comparingInt(TableMemberRecord::seatIndex));
                 tableMembers.put(table.id(), updatedMembers);
-                return List.copyOf(updatedMembers);
+                List<TableMemberRecord> result = List.copyOf(updatedMembers);
+                publishMembers(table.id(), result);
+                return result;
             }
 
             members.removeIf(current -> current.name().equals(member.name()) && current.seatIndex() == member.seatIndex());
@@ -323,7 +336,9 @@ public class TableService {
             tableMembers.put(table.id(), members);
             cashOutSeatStackIfPossible(member.name(), table.gameId(), member.seatIndex());
             userTableHistoryService.recordLeave(member.name(), table.id(), member.seatIndex());
-            return List.copyOf(members);
+            List<TableMemberRecord> result = List.copyOf(members);
+            publishMembers(table.id(), result);
+            return result;
         }
     }
 
@@ -355,6 +370,14 @@ public class TableService {
             }
             remainingMembers.sort(Comparator.comparingInt(TableMemberRecord::seatIndex));
             tableMembers.put(table.id(), remainingMembers);
+            publishMembers(tableId, List.copyOf(remainingMembers));
+        }
+    }
+
+    private void publishMembers(String tableId, List<TableMemberRecord> members) {
+        GameEventPublisher pub = eventPublisherProvider.getIfAvailable();
+        if (pub != null) {
+            pub.publishMembers(tableId, members);
         }
     }
 
