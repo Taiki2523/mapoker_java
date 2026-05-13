@@ -108,3 +108,45 @@ STOMP を選ぶ理由:
 | 認証セッション | Spring Security の WebSocket ハンドシェイク認証で既存と統合 |
 | スケールアウト | 複数インスタンス時は Redis Pub/Sub ブローカー（将来対応） |
 | 移行期間 | REST エンドポイントは残したまま段階移行できる |
+
+---
+
+## 実装計画
+
+### 対象ファイル
+
+**新規作成（バックエンド）**
+
+| ファイル | パッケージ |
+|---|---|
+| `WebSocketConfig.java` | `com.mapoker.infrastructure.config` |
+| `WebSocketSecurityConfig.java` | `com.mapoker.infrastructure.config` |
+| `GameEventPublisher.java` | `com.mapoker.infrastructure.messaging` |
+| `GameBroadcastPayload.java` | `com.mapoker.interfaces.ws.dto` |
+| `MembersBroadcastPayload.java` | `com.mapoker.interfaces.ws.dto` |
+| `HoleCardsPayload.java` (Phase 4) | `com.mapoker.interfaces.ws.dto` |
+
+**変更（バックエンド）**
+
+| ファイル | 変更内容 |
+|---|---|
+| `pom.xml` | `spring-boot-starter-websocket`, `spring-security-messaging` を追加 |
+| `SecurityConfig.java` | 本番 chain に `/ws/**` の `permitAll()` を追加 |
+| `GameService.java` | `ObjectProvider<GameEventPublisher>` を注入、3メソッドに publish 追加 |
+| `TableService.java` | `ObjectProvider<GameEventPublisher>` を注入、3メソッドに publish 追加 |
+
+**新規作成・変更（フロントエンド）**
+
+| ファイル | 変更内容 |
+|---|---|
+| `mapoker-frontend/src/ws.ts` | STOMP クライアントラッパー（新規） |
+| `package.json` | `@stomp/stompjs`, `sockjs-client` を追加 |
+| `App.tsx:220-228` | `setInterval` ポーリングを WebSocket サブスクリプションに置き換え |
+
+### 設計の要点
+
+- **認証**: `HttpSessionHandshakeInterceptor` でセッション Cookie を WebSocket セッションに引き継ぐ。追加実装不要
+- **セキュリティ設定**: `@Profile("local")` で全許可、`@Profile("!local")` でサブスクリプションを認証必須に
+- **循環依存回避**: `GameService → GameEventPublisher` の注入は既存の `ObjectProvider<TableService>` パターンと同様に `ObjectProvider` を使う
+- **REST は維持**: アクション送信・初回ロード・再接続時の状態復元は引き続き REST。WebSocket はサーバ→クライアントの push 専用
+- **ストリートタイムスタンプ**: Phase 3 で `GameEventPublisher` がストリート変化を検知し `streetRevealedAt: Instant.now()` を付加。`ConcurrentHashMap<tableId, Street>` で前回値をキャッシュ
