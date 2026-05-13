@@ -19,7 +19,7 @@ import { GameScreen } from './components/GameScreen'
 
 const NEXT_HAND_DELAY_MS = 7000
 // TableArea.tsx の STREET_REVEAL_INTERVAL_MS と同じ値で管理すること
-const CARD_REVEAL_MS_PER_STREET = 3000
+const CARD_REVEAL_MS_PER_STREET = 1500
 
 function App() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)

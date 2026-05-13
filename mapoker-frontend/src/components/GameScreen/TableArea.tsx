@@ -4,8 +4,8 @@ import { Card } from '../Card'
 import { seatPosition } from '../../utils'
 import { t } from '../../i18n'
 
-// ストリート間の公開間隔（ms）デバッグ用に3000
-const STREET_REVEAL_INTERVAL_MS = 3000
+const STREET_REVEAL_INTERVAL_MS = 1500 // ストリート間の公開間隔（ms）
+const FLIP_ANIM_MS = 500              // CSS mp-card-flip の duration と同値
 
 type Props = {
   game: GameState
@@ -52,10 +52,8 @@ export function TableArea({
   const [dealingSeats, setDealingSeats] = useState<Set<number>>(new Set())
   // 公開済みコミュニティカード枚数（これ未満のインデックスだけ表示）
   // マウント時は現在の枚数で初期化（ページ再読み込み時にカードが消えない）
-  const [revealedCount, setRevealedCount] = useState(() => {
-    console.log(`[init] revealedCount=${_initCommCount}`)
-    return _initCommCount
-  })
+  const [revealedCount, setRevealedCount] = useState(_initCommCount)
+  const [flippingIndices, setFlippingIndices] = useState<Set<number>>(new Set())
   const [sdStep, setSdStep] = useState(0)
   const [newChipSeats, setNewChipSeats] = useState<Set<number>>(new Set())
   const [actionBubbles, setActionBubbles] = useState<Map<number, string>>(new Map())
@@ -114,19 +112,32 @@ export function TableArea({
     // フロップ（インデックス 0-2）
     if (prev < 3 && current >= 3) {
       const revealTo = Math.min(current, 3)
-      timers.push(window.setTimeout(() => setRevealedCount(revealTo), delay))
+      const flopSet = new Set(Array.from({ length: revealTo - prev }, (_, i) => prev + i))
+      timers.push(window.setTimeout(() => {
+        setRevealedCount(revealTo)
+        setFlippingIndices(flopSet)
+      }, delay))
+      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + FLIP_ANIM_MS))
       delay += STREET_REVEAL_INTERVAL_MS
     }
 
     // ターン（インデックス 3）
     if (prev < 4 && current >= 4) {
-      timers.push(window.setTimeout(() => setRevealedCount(4), delay))
+      timers.push(window.setTimeout(() => {
+        setRevealedCount(4)
+        setFlippingIndices(new Set([3]))
+      }, delay))
+      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + FLIP_ANIM_MS))
       delay += STREET_REVEAL_INTERVAL_MS
     }
 
     // リバー（インデックス 4）
     if (prev < 5 && current >= 5) {
-      timers.push(window.setTimeout(() => setRevealedCount(5), delay))
+      timers.push(window.setTimeout(() => {
+        setRevealedCount(5)
+        setFlippingIndices(new Set([4]))
+      }, delay))
+      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + FLIP_ANIM_MS))
       delay += STREET_REVEAL_INTERVAL_MS
     }
 
@@ -135,6 +146,7 @@ export function TableArea({
     return () => {
       prevCommLenRef.current = prev  // StrictMode: 2回目の実行で再スケジュールできるよう戻す
       cardAnimEndsAtRef.current = 0
+      setFlippingIndices(new Set())
       timers.forEach(window.clearTimeout)
     }
   }, [communityCount]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -247,7 +259,10 @@ export function TableArea({
             {!isShowdown && <div className="pot-display">POT {formatStack(game.pot_total - game.players.reduce((s, p) => s + p.contributed, 0))}</div>}
             <div className="community-cards-row">
               {communitySlots.map((card, idx) => (
-                <span key={`cc-wrap-${idx}`}>
+                <span
+                  key={`cc-wrap-${idx}`}
+                  className={flippingIndices.has(idx) ? 'card-flip-shell flipping' : 'card-flip-shell'}
+                >
                   {card && card !== '--' && idx < revealedCount
                     ? <Card card={card} variant="front" size="md" />
                     : <Card variant="slot" size="md" />}
