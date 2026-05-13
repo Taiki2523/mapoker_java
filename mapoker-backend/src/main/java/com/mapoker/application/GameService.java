@@ -8,6 +8,7 @@ import com.mapoker.domain.game.Player;
 import com.mapoker.domain.game.ShowdownResult;
 import com.mapoker.domain.rules.Action;
 import com.mapoker.domain.rules.ActionType;
+import com.mapoker.domain.rules.Street;
 import com.mapoker.infrastructure.messaging.GameEventPublisher;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -210,13 +211,15 @@ public class GameService {
      */
     public GameState applyAction(String id, int playerIndex, ActionType type, int amount) {
         GameState state = getGame(id);
+        Street streetBefore = state.getStreet();
         Action action = Action.of(type, amount);
         state.applyAction(playerIndex, action);
+        Instant streetRevealedAt = state.getStreet() != streetBefore ? Instant.now() : null;
         ActionRecord record = new ActionRecord(
                 gameRepository.findActionsByGameId(id).size() + 1,
                 playerIndex, type, amount);
         gameRepository.update(id, state, record);
-        publishGame(id, state);
+        publishGame(id, state, streetRevealedAt);
         recordHandHistoryIfFinished(id, state);
         if (state.isFoldWin()) {
             TableService tableService = tableServiceProvider.getIfAvailable();
@@ -265,9 +268,13 @@ public class GameService {
     }
 
     private void publishGame(String tableId, GameState state) {
+        publishGame(tableId, state, null);
+    }
+
+    private void publishGame(String tableId, GameState state, Instant streetRevealedAt) {
         GameEventPublisher pub = eventPublisherProvider.getIfAvailable();
         if (pub != null) {
-            pub.publishGameState(tableId, state);
+            pub.publishGameState(tableId, state, streetRevealedAt);
         }
     }
 

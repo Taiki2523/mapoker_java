@@ -37,6 +37,7 @@ function App() {
   const prevIsMyTurn = useRef(false)
   // コミュニティカード公開アニメーションの終了予定時刻（ネタバレ防止用）
   const cardRevealEndsAtRef = useRef(0)
+  const streetRevealedAtRef = useRef<number>(0)
   const prevCommLenRef = useRef(0)
   const stompClientRef = useRef<ReturnType<typeof createStompClient> | null>(null)
   // リバイポップアップを同じハンドで2度出さないためのフラグ
@@ -226,6 +227,9 @@ function App() {
 
     client.onConnect = () => {
       subscribeGame(client, gameId, (payload) => {
+        if (payload.streetRevealedAt) {
+          streetRevealedAtRef.current = new Date(payload.streetRevealedAt).getTime()
+        }
         const nextGame = payload.game as GameState
         setShowdown(nextGame.last_showdown ?? null)
         setGame((prev) => {
@@ -306,7 +310,11 @@ function App() {
     if (prev < 4 && current >= 4) ms += CARD_REVEAL_MS_PER_STREET
     if (prev < 5 && current >= 5) ms += CARD_REVEAL_MS_PER_STREET
     // +1600 = TableArea の sdStep(3) 発火タイミングと揃える
-    if (ms > 0) cardRevealEndsAtRef.current = Date.now() + ms + 1600
+    if (ms > 0) {
+      const base = streetRevealedAtRef.current > 0 ? streetRevealedAtRef.current : Date.now()
+      streetRevealedAtRef.current = 0
+      cardRevealEndsAtRef.current = base + ms + 1600
+    }
   }, [game?.community])
 
   // 新ハンド開始でリバイフラグをリセット

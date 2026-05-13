@@ -13,6 +13,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -30,10 +31,14 @@ public class GameEventPublisher {
     }
 
     public void publishGameState(String tableId, GameState state) {
+        publishGameState(tableId, state, null);
+    }
+
+    public void publishGameState(String tableId, GameState state, Instant streetRevealedAt) {
         GameResponse response = GameResponse.from(state, null, false);
         messaging.convertAndSend(
                 "/topic/tables/" + tableId + "/game",
-                new GameBroadcastPayload(response, null)
+                new GameBroadcastPayload(response, streetRevealedAt)
         );
     }
 
