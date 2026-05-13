@@ -264,6 +264,51 @@ public class TableService {
     }
 
     /**
+     * チップが 0 になったプレイヤーがリバイするメソッドです。
+     *
+     * <p>既存メンバーであり、かつスタックが 0 であることを前提とします。
+     * 有効なウォレットがある場合はバイイン額を差し引き、シートのスタックに加算します。
+     *
+     * @param id     テーブル ID
+     * @param name   プレイヤー名
+     * @param buyIn  リバイ額（チップ）
+     * @return 割り当てシートと参加者一覧
+     * @throws IllegalArgumentException メンバーでない・スタックが残っている・バイイン額範囲外の場合
+     */
+    public JoinResult rebuy(String id, String name, int buyIn) {
+        synchronized (tableLock(id)) {
+            TableRecord table = getTable(id);
+            String normalized = normalizeMemberName(name);
+            List<TableMemberRecord> members = List.copyOf(
+                    tableMembers.computeIfAbsent(table.id(), ignored -> new ArrayList<>()));
+
+            TableMemberRecord existing = members.stream()
+                    .filter(m -> m.name().equals(normalized))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("not a member of this table"));
+
+            int currentStack = gameService.getSeatStack(table.gameId(), existing.seatIndex());
+            if (currentStack > 0) {
+                throw new IllegalArgumentException("player still has chips: " + currentStack);
+            }
+
+            if (table.minBuyIn() > 0 && (buyIn < table.minBuyIn() || buyIn > table.maxBuyIn())) {
+                throw new IllegalArgumentException("buy-in out of range");
+            }
+
+            WalletService walletService = walletServiceProvider.getIfAvailable();
+            if (walletService != null && buyIn > 0) {
+                walletService.buyIn(normalized, table.id(), buyIn);
+            }
+
+            gameService.setSeatStack(table.gameId(), existing.seatIndex(), buyIn);
+            gameService.setSittingOut(table.gameId(), existing.seatIndex(), false);
+
+            return new JoinResult(existing.seatIndex(), members);
+        }
+    }
+
+    /**
      * 指定テーブルから参加者を離席させます。
      *
      * @param id テーブル ID

@@ -37,12 +37,14 @@ function App() {
   // コミュニティカード公開アニメーションの終了予定時刻（ネタバレ防止用）
   const cardRevealEndsAtRef = useRef(0)
   const prevCommLenRef = useRef(0)
+  // リバイポップアップを同じハンドで2度出さないためのフラグ
+  const rebuyShownForHandRef = useRef(false)
   const [myName, setMyName] = useState('')
   const [mySeatIndex, setMySeatIndex] = useState<number | null>(null)
   const [leavePending, setLeavePending] = useState(false)
   const [roster, setRoster] = useState<RoomMember[]>([])
   const [showMyPage, setShowMyPage] = useState(false)
-  const [, setTable] = useState<Table | null>(null)
+  const [table, setTable] = useState<Table | null>(null)
   const [profileTables, setProfileTables] = useState<Table[]>([])
   const [profileHistory, setProfileHistory] = useState<UserTableHistoryEntry[]>([])
   const [wallet, setWallet] = useState<WalletSummary | null>(null)
@@ -267,6 +269,53 @@ function App() {
     // +1600 = TableArea の sdStep(3) 発火タイミングと揃える
     if (ms > 0) cardRevealEndsAtRef.current = Date.now() + ms + 1600
   }, [game?.community])
+
+  // 新ハンド開始でリバイフラグをリセット
+  useEffect(() => {
+    if (game?.status === 'in_progress') {
+      rebuyShownForHandRef.current = false
+    }
+  }, [game?.status])
+
+  // 手が終了してチップが 0 になったら自動でリバイ画面を表示
+  useEffect(() => {
+    if (game?.status !== 'finished') return
+    if (!game.can_rebuy) return
+    if (mySeat === null || mySeatIndex === null || !myName.trim()) return
+    if (rebuyShownForHandRef.current) return
+
+    rebuyShownForHandRef.current = true
+
+    const minBuyIn = table?.min_buy_in ?? game.big_blind * 10
+    const maxBuyIn = table?.max_buy_in ?? game.big_blind * 100
+    const walletCap = wallet?.chip_balance ?? Infinity
+    setBuyInContext({
+      tableId: gameId,
+      tableName: table?.name ?? 'Table',
+      minBuyIn,
+      maxBuyIn: Math.min(maxBuyIn, walletCap),
+      bigBlind: game.big_blind,
+      onConfirm: (amount) => {
+        setBuyInContext(null)
+        void (async () => {
+          try {
+            await fetchJSON(`/v1/tables/${gameId}/rebuy`, {
+              method: 'POST',
+              body: JSON.stringify({ name: myName, buy_in: amount }),
+            })
+            await refreshGame(gameId)
+          } catch (err) {
+            setError(formatErrorMessage(err))
+          }
+        })()
+      },
+      onCancel: () => {
+        setBuyInContext(null)
+        void leaveRoom()
+      },
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game?.status, game?.can_rebuy, mySeat, mySeatIndex, myName])
 
   // Bug3: 退席予約が解消されたらロビーに戻る
   useEffect(() => {
