@@ -322,6 +322,55 @@ docker run -d \
 
 ---
 
+## リリース手順
+
+バージョンは `vMAJOR.MINOR.PATCH` の git タグで管理する。タグを push すると GitHub Actions が自動でイメージビルド・ghcr.io push・GitHub Release 作成まで行う。
+
+### 1. バージョンを更新してコミット
+
+```bash
+# pom.xml の <version> と package.json の "version" を新バージョンに更新
+vim mapoker-backend/pom.xml
+vim mapoker-frontend/package.json
+
+git add mapoker-backend/pom.xml mapoker-frontend/package.json
+git commit -m "chore: bump version to 1.1.0"
+git push origin main
+```
+
+### 2. git タグを push してリリース
+
+```bash
+git tag v1.1.0
+git push origin v1.1.0
+```
+
+GitHub Actions (`.github/workflows/release.yml`) が自動で以下を実行：
+- `ghcr.io/taiki2523/mapoker-backend:v1.1.0` + `:latest` をビルド・push
+- `ghcr.io/taiki2523/mapoker-frontend:v1.1.0` + `:latest` をビルド・push
+- GitHub Releases ページにリリースノートを自動生成
+
+### 3. サーバへのデプロイ
+
+```bash
+# .env.prd の APP_VERSION を新バージョンに更新
+echo "APP_VERSION=v1.1.0" >> .env.prd
+
+# イメージを pull して再起動
+docker compose --env-file .env.prd pull
+docker compose --env-file .env.prd up -d
+```
+
+### バージョン番号の付け方
+
+| 変更内容 | 上げるもの | 例 |
+|---|---|---|
+| 破壊的変更（API 変更など） | MAJOR | `1.0.0` → `2.0.0` |
+| 新機能追加 | MINOR | `1.0.0` → `1.1.0` |
+| バグ修正・軽微な変更 | PATCH | `1.0.0` → `1.0.1` |
+
+---
+
 ## スケーリング
 
 複数インスタンスで運用する場合は Kubernetes や Docker Swarm 検討。
