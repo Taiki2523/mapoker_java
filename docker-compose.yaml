@@ -27,6 +27,7 @@ services:
 
   # Backend (Spring Boot)
   backend:
+    image: ghcr.io/taiki2523/mapoker-backend:${APP_VERSION:-latest}
     build:
       context: ./mapoker-backend
       dockerfile: Dockerfile
@@ -76,6 +77,7 @@ services:
 
   # Frontend (React/Vite + nginx)
   frontend:
+    image: ghcr.io/taiki2523/mapoker-frontend:${APP_VERSION:-latest}
     build:
       context: ./mapoker-frontend
       dockerfile: Dockerfile

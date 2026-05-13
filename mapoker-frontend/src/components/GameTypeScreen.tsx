@@ -6,12 +6,13 @@ type Props = {
   currentUser: AuthUser | null
   onOpenMyPage: () => void
   onSelectRing: () => void
+  appVersion?: string
 }
 
-export function GameTypeScreen({ currentUser, onOpenMyPage, onSelectRing }: Props) {
+export function GameTypeScreen({ currentUser, onOpenMyPage, onSelectRing, appVersion }: Props) {
   return (
     <>
-      <UserHeader username={currentUser?.username ?? ''} onOpenMyPage={onOpenMyPage} />
+      <UserHeader username={currentUser?.username ?? ''} onOpenMyPage={onOpenMyPage} appVersion={appVersion} />
       <div>
         <h2>{t('gameTypeTitle')}</h2>
         <p>{t('gameTypeDesc')}</p>

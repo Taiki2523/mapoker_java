@@ -10,6 +10,7 @@ type Props = {
   onJoinRoom: (tableId: string) => Promise<void>
   onCreateTable: () => void
   onBack: () => void
+  appVersion?: string
 }
 
 const filterFlags: TableFlag[] = ['casual', 'serious', 'newbie', 'short_handed']
@@ -28,7 +29,7 @@ const statusLabels: Record<string, string> = {
   finished: t('tableStatusFinished'),
 }
 
-export function LobbyScreen({ currentUser, onOpenMyPage, onJoinRoom, onCreateTable, onBack }: Props) {
+export function LobbyScreen({ currentUser, onOpenMyPage, onJoinRoom, onCreateTable, onBack, appVersion }: Props) {
   const [tables, setTables] = useState<Table[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -71,7 +72,7 @@ export function LobbyScreen({ currentUser, onOpenMyPage, onJoinRoom, onCreateTab
 
   return (
     <>
-      <UserHeader username={currentUser?.username ?? ''} onOpenMyPage={onOpenMyPage} />
+      <UserHeader username={currentUser?.username ?? ''} onOpenMyPage={onOpenMyPage} appVersion={appVersion} />
       <div className="lobby-browser-head">
         <div>
           <h2>{t('lobbyBrowserTitle')}</h2>

@@ -11,6 +11,7 @@ type Props = {
   currentUser: AuthUser | null
   onOpenMyPage: () => void
   onBack: () => void
+  appVersion?: string
 }
 
 export function RoomScreen({
@@ -20,6 +21,7 @@ export function RoomScreen({
   currentUser,
   onOpenMyPage,
   onBack,
+  appVersion,
 }: Props) {
   const [tableName, setTableName] = useState('Cash Orbit')
   const [playerCount, setPlayerCount] = useState(2)
@@ -37,7 +39,7 @@ export function RoomScreen({
 
   return (
     <>
-      <UserHeader username={currentUser?.username ?? ''} onOpenMyPage={onOpenMyPage} />
+      <UserHeader username={currentUser?.username ?? ''} onOpenMyPage={onOpenMyPage} appVersion={appVersion} />
       <div>
         <h2>{t('createRoomTitle')}</h2>
         <p>{t('createRoomDesc')}</p>
