@@ -1,4 +1,5 @@
-import { Client, IMessage } from '@stomp/stompjs'
+import { Client } from '@stomp/stompjs'
+import type { IMessage } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 
 export interface GameBroadcastPayload {
