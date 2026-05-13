@@ -217,6 +217,19 @@ public class TableService {
                     .findFirst()
                     .orElse(null);
             if (existing != null) {
+                // スタックが 0 かつ buyIn > 0 の場合はリバイとして処理
+                int currentStack = gameService.getSeatStack(table.gameId(), existing.seatIndex());
+                if (currentStack == 0 && buyIn > 0) {
+                    WalletService walletService = walletServiceProvider.getIfAvailable();
+                    if (walletService != null) {
+                        if (buyIn < table.minBuyIn() || buyIn > table.maxBuyIn()) {
+                            throw new IllegalArgumentException("buy-in out of range");
+                        }
+                        walletService.buyIn(name, table.id(), buyIn);
+                    }
+                    gameService.setSeatStack(table.gameId(), existing.seatIndex(), buyIn);
+                    gameService.setSittingOut(table.gameId(), existing.seatIndex(), false);
+                }
                 userTableHistoryService.recordJoin(name, table, existing.seatIndex());
                 return new JoinResult(existing.seatIndex(), List.copyOf(members));
             }
@@ -260,51 +273,6 @@ public class TableService {
             tableMembers.put(table.id(), members);
             userTableHistoryService.recordJoin(name, table, seatIndex);
             return new JoinResult(seatIndex, List.copyOf(members));
-        }
-    }
-
-    /**
-     * チップが 0 になったプレイヤーがリバイするメソッドです。
-     *
-     * <p>既存メンバーであり、かつスタックが 0 であることを前提とします。
-     * 有効なウォレットがある場合はバイイン額を差し引き、シートのスタックに加算します。
-     *
-     * @param id     テーブル ID
-     * @param name   プレイヤー名
-     * @param buyIn  リバイ額（チップ）
-     * @return 割り当てシートと参加者一覧
-     * @throws IllegalArgumentException メンバーでない・スタックが残っている・バイイン額範囲外の場合
-     */
-    public JoinResult rebuy(String id, String name, int buyIn) {
-        synchronized (tableLock(id)) {
-            TableRecord table = getTable(id);
-            String normalized = normalizeMemberName(name);
-            List<TableMemberRecord> members = List.copyOf(
-                    tableMembers.computeIfAbsent(table.id(), ignored -> new ArrayList<>()));
-
-            TableMemberRecord existing = members.stream()
-                    .filter(m -> m.name().equals(normalized))
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("not a member of this table"));
-
-            int currentStack = gameService.getSeatStack(table.gameId(), existing.seatIndex());
-            if (currentStack > 0) {
-                throw new IllegalArgumentException("player still has chips: " + currentStack);
-            }
-
-            if (table.minBuyIn() > 0 && (buyIn < table.minBuyIn() || buyIn > table.maxBuyIn())) {
-                throw new IllegalArgumentException("buy-in out of range");
-            }
-
-            WalletService walletService = walletServiceProvider.getIfAvailable();
-            if (walletService != null && buyIn > 0) {
-                walletService.buyIn(normalized, table.id(), buyIn);
-            }
-
-            gameService.setSeatStack(table.gameId(), existing.seatIndex(), buyIn);
-            gameService.setSittingOut(table.gameId(), existing.seatIndex(), false);
-
-            return new JoinResult(existing.seatIndex(), members);
         }
     }
 

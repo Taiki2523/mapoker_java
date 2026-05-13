@@ -106,27 +106,6 @@ public class TableController {
     }
 
     /**
-     * チップが 0 になったプレイヤーがリバイします。
-     *
-     * <p>既存メンバーかつスタック 0 が条件です。
-     * バイイン額がウォレットから差し引かれ、シートのスタックに加算されます。
-     *
-     * @param id     テーブル ID
-     * @param body   リバイリクエスト（名前・バイイン額）
-     * @param principal 認証済みユーザー
-     * @return 割り当て席と参加者一覧
-     */
-    @PostMapping("/{id}/rebuy")
-    public JoinResponse rebuy(@PathVariable String id,
-                              @Valid @RequestBody(required = false) TableMembershipRequest body,
-                              @AuthenticationPrincipal UserDetails principal) {
-        String name = principal != null ? principal.getUsername() : body != null ? body.name() : null;
-        int buyIn = body != null && body.buyIn() != null ? body.buyIn() : 0;
-        TableService.JoinResult result = tableService.rebuy(id, name, buyIn);
-        return new JoinResponse(result.assignedSeatIndex(), toMembers(result.members()));
-    }
-
-    /**
      * 認証ユーザーまたは指定名義でテーブルから退出します。
      *
      * @param id テーブル ID

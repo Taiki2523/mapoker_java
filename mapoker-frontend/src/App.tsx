@@ -296,18 +296,9 @@ function App() {
       maxBuyIn: Math.min(maxBuyIn, walletCap),
       bigBlind: game.big_blind,
       onConfirm: (amount) => {
+        // /join を再度呼ぶだけでリバイが完結する（スタック 0 + buyIn > 0 でリバイ判定）
         setBuyInContext(null)
-        void (async () => {
-          try {
-            await fetchJSON(`/v1/tables/${gameId}/rebuy`, {
-              method: 'POST',
-              body: JSON.stringify({ name: myName, buy_in: amount }),
-            })
-            await refreshGame(gameId)
-          } catch (err) {
-            setError(formatErrorMessage(err))
-          }
-        })()
+        void doTableJoin(gameId, myName, amount).then(() => refreshGame(gameId)).catch(err => setError(formatErrorMessage(err)))
       },
       onCancel: () => {
         setBuyInContext(null)
