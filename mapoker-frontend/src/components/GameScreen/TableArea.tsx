@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { GameState, PayoutLine, Player, RoomMember, Showdown } from '../../types'
 import { Card } from '../Card'
 import { seatPosition } from '../../utils'
@@ -37,9 +37,14 @@ export function TableArea({
     }
     return `¥${stack}`
   }
+  // カードアニメーションのタイミング定数
+  const FLIP_MS = 600   // カードめくりアニメーション時間
+  const PAUSE_MS = 1000 // めくり後にカードを確認できる時間
+
   const prevHoleRef = useRef<Record<number, number>>({})
   const prevCommLenRef = useRef(0)
   const prevContribRef = useRef<Record<number, number>>({})
+  const cardAnimEndsAtRef = useRef(0) // カードアニメーション終了予定時刻（ms）
   const [dealingSeats, setDealingSeats] = useState<Set<number>>(new Set())
   const [flippingIndices, setFlippingIndices] = useState<Set<number>>(new Set())
   const [sdStep, setSdStep] = useState(0)
@@ -49,6 +54,12 @@ export function TableArea({
   const prevPlayersRef = useRef<Player[]>([])
   const prevCurrentBetRef = useRef<number>(0)
   const prevStreetRef = useRef<string>('')
+
+  // 枚数のみで変化検知する（同じ内容で参照が変わっても再実行しない）
+  const communityCount = useMemo(
+    () => (game.community ?? []).filter((c) => c && c !== '--').length,
+    [game.community]
+  )
   const seatedIndices = new Set(roster.map((m) => m.seatIndex))
   const isWaiting = game.status === 'finished' && game.pot_total === 0 && (game.community ?? []).length === 0
   const communitySlots = Array.from({ length: 5 }, (_, i) => game.community?.[i] ?? null)
@@ -73,8 +84,11 @@ export function TableArea({
     }
   }, [game.players])
 
+  // コミュニティカードのめくりアニメーション
+  // communityCount（枚数）が変化したときだけ実行し、同じ枚数で参照が変わっても
+  // タイマーをキャンセルしない。これによりリフレッシュでアニメーションが途切れない。
   useEffect(() => {
-    const current = (game.community ?? []).filter((c) => c && c !== '--').length
+    const current = communityCount
     const prev = prevCommLenRef.current
     if (current <= prev) {
       prevCommLenRef.current = current
@@ -82,44 +96,53 @@ export function TableArea({
     }
     prevCommLenRef.current = current
 
-    // Group new cards by street: flop=0-2, turn=3, river=4
-    const flopCards = Array.from({ length: Math.min(current, 3) - Math.min(prev, 3) }, (_, i) => Math.min(prev, 3) + i).filter(i => i < 3)
-    const hasTurn = prev < 4 && current >= 4
-    const hasRiver = prev < 5 && current >= 5
-
+    const GROUP_DELAY = FLIP_MS + PAUSE_MS // 各ストリート間の間隔
     const timers: number[] = []
     let delay = 0
 
-    if (flopCards.length > 0) {
-      const flop = new Set(flopCards)
-      timers.push(window.setTimeout(() => setFlippingIndices(flop), delay))
-      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + 500))
-      if (hasTurn || hasRiver) delay += 600
+    // フロップ（インデックス 0-2）
+    if (prev < 3 && current >= 3) {
+      const flopCards = new Set(
+        Array.from({ length: Math.min(current, 3) - prev }, (_, i) => prev + i)
+      )
+      timers.push(window.setTimeout(() => setFlippingIndices(flopCards), delay))
+      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + FLIP_MS))
+      delay += GROUP_DELAY
     }
-    if (hasTurn) {
+
+    // ターン（インデックス 3）
+    if (prev < 4 && current >= 4) {
       timers.push(window.setTimeout(() => setFlippingIndices(new Set([3])), delay))
-      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + 500))
-      if (hasRiver) delay += 600
+      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + FLIP_MS))
+      delay += GROUP_DELAY
     }
-    if (hasRiver) {
+
+    // リバー（インデックス 4）
+    if (prev < 5 && current >= 5) {
       timers.push(window.setTimeout(() => setFlippingIndices(new Set([4])), delay))
-      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + 500))
+      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + FLIP_MS))
+      delay += GROUP_DELAY // リバー後も確認する間を確保
     }
+
+    // ショーダウン表示タイミングの計算に使う終了予定時刻を記録
+    cardAnimEndsAtRef.current = Date.now() + delay
 
     return () => timers.forEach(window.clearTimeout)
-  }, [game.community])
+  }, [communityCount]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ショーダウン結果のオーバーレイ表示（カードアニメーション完了後に開始）
   useEffect(() => {
     if (!isShowdown) {
-      const resetId = window.setTimeout(() => setSdStep(0), 0)
-      return () => window.clearTimeout(resetId)
+      setSdStep(0)
+      return
     }
-    const resetId = window.setTimeout(() => setSdStep(0), 0)
-    const t1 = window.setTimeout(() => setSdStep(1), 800)
-    const t2 = window.setTimeout(() => setSdStep(2), 1600)
-    const t3 = window.setTimeout(() => setSdStep(3), 2800)
+    setSdStep(0)
+    // カードめくりアニメーションが終わるまで待ってから結果を表示
+    const cardWait = Math.max(0, cardAnimEndsAtRef.current - Date.now())
+    const t1 = window.setTimeout(() => setSdStep(1), cardWait)
+    const t2 = window.setTimeout(() => setSdStep(2), cardWait + 800)
+    const t3 = window.setTimeout(() => setSdStep(3), cardWait + 1600)
     return () => {
-      window.clearTimeout(resetId)
       window.clearTimeout(t1)
       window.clearTimeout(t2)
       window.clearTimeout(t3)
