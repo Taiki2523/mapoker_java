@@ -1,6 +1,5 @@
 import { Client } from '@stomp/stompjs'
 import type { IMessage } from '@stomp/stompjs'
-import SockJS from 'sockjs-client'
 
 export interface GameBroadcastPayload {
   game: unknown
@@ -19,8 +18,10 @@ export interface HoleCardsPayload {
 }
 
 export function createStompClient(): Client {
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const brokerURL = `${wsProtocol}//${window.location.host}/ws/websocket`
   return new Client({
-    webSocketFactory: () => new SockJS('/ws'),
+    brokerURL,
     reconnectDelay: 3000,
   })
 }
