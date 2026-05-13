@@ -75,20 +75,38 @@ export function TableArea({
 
   useEffect(() => {
     const current = (game.community ?? []).filter((c) => c && c !== '--').length
-    if (current > prevCommLenRef.current) {
-      const newIdx = new Set<number>()
-      for (let i = prevCommLenRef.current; i < current; i += 1) {
-        newIdx.add(i)
-      }
+    const prev = prevCommLenRef.current
+    if (current <= prev) {
       prevCommLenRef.current = current
-      const activateId = window.setTimeout(() => setFlippingIndices(newIdx), 0)
-      const clearId = window.setTimeout(() => setFlippingIndices(new Set()), 500)
-      return () => {
-        window.clearTimeout(activateId)
-        window.clearTimeout(clearId)
-      }
+      return
     }
     prevCommLenRef.current = current
+
+    // Group new cards by street: flop=0-2, turn=3, river=4
+    const flopCards = Array.from({ length: Math.min(current, 3) - Math.min(prev, 3) }, (_, i) => Math.min(prev, 3) + i).filter(i => i < 3)
+    const hasTurn = prev < 4 && current >= 4
+    const hasRiver = prev < 5 && current >= 5
+
+    const timers: number[] = []
+    let delay = 0
+
+    if (flopCards.length > 0) {
+      const flop = new Set(flopCards)
+      timers.push(window.setTimeout(() => setFlippingIndices(flop), delay))
+      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + 500))
+      if (hasTurn || hasRiver) delay += 600
+    }
+    if (hasTurn) {
+      timers.push(window.setTimeout(() => setFlippingIndices(new Set([3])), delay))
+      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + 500))
+      if (hasRiver) delay += 600
+    }
+    if (hasRiver) {
+      timers.push(window.setTimeout(() => setFlippingIndices(new Set([4])), delay))
+      timers.push(window.setTimeout(() => setFlippingIndices(new Set()), delay + 500))
+    }
+
+    return () => timers.forEach(window.clearTimeout)
   }, [game.community])
 
   useEffect(() => {

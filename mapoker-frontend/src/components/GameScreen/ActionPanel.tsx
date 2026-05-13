@@ -100,10 +100,10 @@ export function ActionPanel({
           </button>
           <button
             className="raise-btn"
-            onClick={() => onSendAction(toCall === 0 ? 'bet' : 'raise', actionAmount)}
+            onClick={() => onSendAction(game?.current_bet === 0 ? 'bet' : 'raise', actionAmount)}
             disabled={!canAct || loading || actionAmount < minRaise}
           >
-            {toCall === 0
+            {game?.current_bet === 0
               ? `${t('betLabel')} ${fmt(actionAmount)}`
               : `${t('raiseLabel')} ${fmt(actionAmount)}`}
           </button>
