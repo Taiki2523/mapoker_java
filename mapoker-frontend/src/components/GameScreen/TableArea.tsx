@@ -93,17 +93,6 @@ export function TableArea({
     }
   }, [game.players])
 
-  // 新ハンド開始（in_progress）で revealedCount を確実にリセット。
-  // communityCount effect だけでは StrictMode の cleanup タイミングによっては
-  // 前のハンドの revealedCount=5 が残ったまま新ハンドに入ることがあるため、
-  // より明示的なリセットをここで行う。
-  useEffect(() => {
-    if (game.status !== 'in_progress') return
-    setRevealedCount(0)
-    prevCommLenRef.current = 0
-    cardAnimEndsAtRef.current = 0
-  }, [game.status]) // eslint-disable-line react-hooks/exhaustive-deps
-
   // コミュニティカードの公開順序制御
   //
   // StrictMode 対応: cleanup で prevCommLenRef を元の値（prev）に戻す。

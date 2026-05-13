@@ -278,12 +278,11 @@ function App() {
   }, [game?.status])
 
   // 手が終了してチップが 0 になったら自動でリバイ画面を表示
-  // game.can_rebuy は viewer_index が正しく送られていないと false になるため、
-  // ローカルの players スタックを直接参照して判定する
+  // game.can_rebuy は viewer_index 依存のため、ローカルの players スタックを直接参照する
   const myCurrentStack = mySeat !== null ? (game?.players?.[mySeat]?.stack ?? null) : null
   useEffect(() => {
     if (game?.status !== 'finished') return
-    if (myCurrentStack !== 0) return   // スタックが 0 でなければスキップ
+    if (myCurrentStack !== 0) return
     if (mySeat === null || !myName.trim()) return
     if (rebuyShownForHandRef.current) return
 
@@ -292,22 +291,29 @@ function App() {
     const minBuyIn = table?.min_buy_in ?? game.big_blind * 10
     const maxBuyIn = table?.max_buy_in ?? game.big_blind * 100
     const walletCap = wallet?.chip_balance ?? Infinity
-    setBuyInContext({
-      tableId: gameId,
-      tableName: table?.name ?? 'Table',
-      minBuyIn,
-      maxBuyIn: Math.min(maxBuyIn, walletCap),
-      bigBlind: game.big_blind,
-      onConfirm: (amount) => {
-        // /join を再度呼ぶだけでリバイが完結する（スタック 0 + buyIn > 0 でリバイ判定）
-        setBuyInContext(null)
-        void doTableJoin(gameId, myName, amount).then(() => refreshGame(gameId)).catch(err => setError(formatErrorMessage(err)))
-      },
-      onCancel: () => {
-        setBuyInContext(null)
-        void leaveRoom()
-      },
-    })
+
+    // runShowdown は即座に実行されるので game.status='finished' は ~300ms で来る。
+    // カード公開アニメーション完了後にポップアップを表示するため cardRevealEndsAtRef で遅延する。
+    const waitMs = Math.max(500, cardRevealEndsAtRef.current - Date.now())
+    const timer = window.setTimeout(() => {
+      setBuyInContext({
+        tableId: gameId,
+        tableName: table?.name ?? 'Table',
+        minBuyIn,
+        maxBuyIn: Math.min(maxBuyIn, walletCap),
+        bigBlind: game.big_blind,
+        onConfirm: (amount) => {
+          setBuyInContext(null)
+          void doTableJoin(gameId, myName, amount).then(() => refreshGame(gameId)).catch(err => setError(formatErrorMessage(err)))
+        },
+        onCancel: () => {
+          setBuyInContext(null)
+          void leaveRoom()
+        },
+      })
+    }, waitMs)
+
+    return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.status, myCurrentStack, mySeat, myName])
 
@@ -709,11 +715,6 @@ function App() {
     setError('')
     try {
       const data = await fetchJSON<Showdown>(`/v1/games/${gameId}/showdown`, { method: 'POST' })
-      // カード公開アニメーション完了まで待機してからUIを更新（ネタバレ防止）
-      const waitMs = Math.max(0, cardRevealEndsAtRef.current - Date.now())
-      if (waitMs > 0) {
-        await new Promise<void>(resolve => setTimeout(resolve, waitMs))
-      }
       setShowdown(data)
       await refreshGame(gameId)
     } catch (err) {
