@@ -1,39 +1,38 @@
-# テスト・起動計画（Java）
+# テスト・起動ガイド
 
-現時点のリポジトリには設計書しかありません。以下のコマンドは、今後 Java 実装を作る際に標準フローとして用意したい内容です。
+> **重要**: 以下のコマンドはすべて devcontainer 内で実行する必要がある。
 
 ## フォーマット
+
 ```bash
 ./mvnw spotless:apply
 ./mvnw spotless:check
 ```
 
 ## 単体テスト
+
 ```bash
 ./mvnw test
 ./mvnw jacoco:report
 ```
 
 ## 結合テスト
-PostgreSQL を使う結合テストは、高速な単体テストとは分けて実行する。
+
+PostgreSQL を使う結合テストは Testcontainers で自動起動する。単体テストと分離して実行可能。
 
 ```bash
 ./mvnw verify
 ```
 
-推奨構成:
-- 通常のローカル実行 / CI では Testcontainers を使う
-- 手動確認向けには `docker compose` ベースの PostgreSQL 起動手段も用意する
-
 ## API をローカル起動
-移行初期は匿名ローカルプロファイルで起動できるようにする。
+
+`local` プロファイルでは認証が無効化される。
 
 ```bash
 SPRING_PROFILES_ACTIVE=local ./mvnw spring-boot:run
 ```
 
 ## PostgreSQL 付きで API を起動
-環境変数の例:
 
 ```bash
 SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/mapoker \
@@ -43,7 +42,7 @@ SPRING_PROFILES_ACTIVE=local,postgresql \
 ./mvnw spring-boot:run
 ```
 
-後で Docker Compose を用意する場合の想定フロー:
+Docker Compose で DB だけ起動する場合:
 
 ```bash
 docker compose up -d db
@@ -51,35 +50,50 @@ docker compose up -d db
 ```
 
 ## DB マイグレーション
-ローカル開発ではアプリ起動時に Flyway が実行される想定にする。手動実行もできるようにする。
+
+アプリ起動時に Flyway が自動実行される。手動実行する場合:
 
 ```bash
 ./mvnw flyway:migrate
 ```
 
-## HTTP シナリオ
-フロントエンドが無くても、`curl` で最低限の疎通確認ができるようにする。
+## curl による疎通確認
 
-### 作成
+フロントエンドなしでも `curl` だけで完全なゲームを実行できる。
+
+### ユーザー登録（セッション Cookie 取得）
+
+```bash
+curl -s -c /tmp/cookies.txt \
+  -X POST http://localhost:8080/v1/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"alice","password":"secret"}'
+```
+
+### ゲーム作成（匿名）
+
 ```bash
 curl -s -X POST http://localhost:8080/v1/games \
   -H 'Content-Type: application/json' \
-  -d '{"players":[{"id":"p1","stack":100},{"id":"p2","stack":100}],"button_index":0,"big_blind":10,"odd_chip_rule":"low_index"}'
+  -d '{"players":[{"id":"p1","stack":100},{"id":"p2","stack":100}],"button_index":0,"big_blind":10}'
 ```
 
-### 開始
+### ハンド開始
+
 ```bash
 curl -s -X POST http://localhost:8080/v1/games/{game_id}/start \
   -H 'Content-Type: application/json' \
   -d '{"big_blind":10}'
 ```
 
-### 取得
+### ゲーム状態取得
+
 ```bash
-curl -s http://localhost:8080/v1/games/{game_id}
+curl -s http://localhost:8080/v1/games/{game_id}?viewer_index=0
 ```
 
 ### アクション実行
+
 ```bash
 curl -s -X POST http://localhost:8080/v1/games/{game_id}/actions \
   -H 'Content-Type: application/json' \
@@ -87,10 +101,11 @@ curl -s -X POST http://localhost:8080/v1/games/{game_id}/actions \
 ```
 
 ## カバレッジ目標
-- 全体目標: 80% 以上
-- 特に優先して厚くテストする箇所:
-  - hand evaluator
-  - action validation
-  - street progression
-  - showdown / side-pot distribution
-  - repository のトランザクション挙動
+
+全体 80% 以上。特に優先するテスト対象:
+
+- hand evaluator
+- action validation
+- street progression
+- showdown / side-pot distribution
+- repository のトランザクション挙動
