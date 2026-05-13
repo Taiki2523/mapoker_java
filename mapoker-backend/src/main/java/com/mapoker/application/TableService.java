@@ -235,18 +235,21 @@ public class TableService {
             }
 
             int seatIndex = randomAvailableSeat(members, table.maxPlayers());
-            GameState state = gameService.getGame(table.gameId());
-            boolean handActive = state.getStatus() == GameStatus.IN_PROGRESS && state.getPot() > 0;
-            if (handActive) {
-                gameService.setSittingOut(table.gameId(), seatIndex, true);
-            }
 
+            // ウォレット処理を先に行う。ここで例外が発生してもゲーム状態は未変更
             WalletService walletService = walletServiceProvider.getIfAvailable();
             if (walletService != null && buyIn > 0) {
                 if (buyIn < table.minBuyIn() || buyIn > table.maxBuyIn()) {
                     throw new IllegalArgumentException("buy-in out of range");
                 }
                 walletService.buyIn(name, table.id(), buyIn);
+            }
+
+            // ウォレット確定後にゲーム状態を変更する
+            GameState state = gameService.getGame(table.gameId());
+            boolean handActive = state.getStatus() == GameStatus.IN_PROGRESS && state.getPot() > 0;
+            if (handActive) {
+                gameService.setSittingOut(table.gameId(), seatIndex, true);
             }
             gameService.setSeatStack(table.gameId(), seatIndex, buyIn);
 
