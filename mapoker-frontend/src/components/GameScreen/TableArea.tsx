@@ -93,26 +93,27 @@ export function TableArea({
     }
   }, [game.players])
 
+  // 新ハンド開始（in_progress）で revealedCount を確実にリセット。
+  // communityCount effect だけでは StrictMode の cleanup タイミングによっては
+  // 前のハンドの revealedCount=5 が残ったまま新ハンドに入ることがあるため、
+  // より明示的なリセットをここで行う。
+  useEffect(() => {
+    if (game.status !== 'in_progress') return
+    setRevealedCount(0)
+    prevCommLenRef.current = 0
+    cardAnimEndsAtRef.current = 0
+  }, [game.status]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // コミュニティカードの公開順序制御
   //
-  // アニメーションは除去。revealedCount を段階的に増やすことで
-  // フロップ → ターン → リバー の順に表示する。
-  //
   // StrictMode 対応: cleanup で prevCommLenRef を元の値（prev）に戻す。
-  // StrictMode は effect を2回実行する。1回目で prevCommLenRef=5 に更新→cleanup で 5 のままだと
-  // 2回目が current=5, prev=5 → return になりタイマーが消える。prev を戻すことで2回目も動く。
   useEffect(() => {
     const current = communityCount
     const prev = prevCommLenRef.current
 
-    console.log(`[community effect] current=${current} prev=${prev}`)
-
     if (current <= prev) {
       prevCommLenRef.current = current
-      if (current === 0) {
-        console.log('[community effect] reset: setRevealedCount(0)')
-        setRevealedCount(0)
-      }
+      if (current === 0) setRevealedCount(0)
       return
     }
 
@@ -124,39 +125,26 @@ export function TableArea({
     // フロップ（インデックス 0-2）
     if (prev < 3 && current >= 3) {
       const revealTo = Math.min(current, 3)
-      console.log(`[community effect] flop: setRevealedCount(${revealTo}) at ${delay}ms`)
-      timers.push(window.setTimeout(() => {
-        console.log(`[timer] setRevealedCount(${revealTo})`)
-        setRevealedCount(revealTo)
-      }, delay))
+      timers.push(window.setTimeout(() => setRevealedCount(revealTo), delay))
       delay += STREET_REVEAL_INTERVAL_MS
     }
 
     // ターン（インデックス 3）
     if (prev < 4 && current >= 4) {
-      console.log(`[community effect] turn: setRevealedCount(4) at ${delay}ms`)
-      timers.push(window.setTimeout(() => {
-        console.log('[timer] setRevealedCount(4)')
-        setRevealedCount(4)
-      }, delay))
+      timers.push(window.setTimeout(() => setRevealedCount(4), delay))
       delay += STREET_REVEAL_INTERVAL_MS
     }
 
     // リバー（インデックス 4）
     if (prev < 5 && current >= 5) {
-      console.log(`[community effect] river: setRevealedCount(5) at ${delay}ms`)
-      timers.push(window.setTimeout(() => {
-        console.log('[timer] setRevealedCount(5)')
-        setRevealedCount(5)
-      }, delay))
+      timers.push(window.setTimeout(() => setRevealedCount(5), delay))
       delay += STREET_REVEAL_INTERVAL_MS
     }
 
     cardAnimEndsAtRef.current = Date.now() + delay
 
     return () => {
-      console.log(`[community effect cleanup] prevCommLenRef: ${prevCommLenRef.current} → ${prev}`)
-      prevCommLenRef.current = prev
+      prevCommLenRef.current = prev  // StrictMode: 2回目の実行で再スケジュールできるよう戻す
       cardAnimEndsAtRef.current = 0
       timers.forEach(window.clearTimeout)
     }

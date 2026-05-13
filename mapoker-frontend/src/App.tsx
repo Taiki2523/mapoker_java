@@ -278,9 +278,12 @@ function App() {
   }, [game?.status])
 
   // 手が終了してチップが 0 になったら自動でリバイ画面を表示
+  // game.can_rebuy は viewer_index が正しく送られていないと false になるため、
+  // ローカルの players スタックを直接参照して判定する
+  const myCurrentStack = mySeat !== null ? (game?.players?.[mySeat]?.stack ?? null) : null
   useEffect(() => {
     if (game?.status !== 'finished') return
-    if (!game.can_rebuy) return
+    if (myCurrentStack !== 0) return   // スタックが 0 でなければスキップ
     if (mySeat === null || !myName.trim()) return
     if (rebuyShownForHandRef.current) return
 
@@ -306,7 +309,7 @@ function App() {
       },
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game?.status, game?.can_rebuy, mySeat, mySeatIndex, myName])
+  }, [game?.status, myCurrentStack, mySeat, myName])
 
   // Bug3: 退席予約が解消されたらロビーに戻る
   useEffect(() => {
