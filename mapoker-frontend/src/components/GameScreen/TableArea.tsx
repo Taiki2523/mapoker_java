@@ -248,7 +248,7 @@ export function TableArea({
             {!isShowdown && <div className="pot-display">POT {formatStack(game.pot_total - game.players.reduce((s, p) => s + p.contributed, 0))}</div>}
             <div className="community-cards-row">
               {communitySlots.map((card, idx) => (
-                <span key={`cc-wrap-${idx}`} className="card-flip-shell">
+                <span key={`cc-wrap-${idx}`}>
                   {card && card !== '--' && idx < revealedCount
                     ? <Card card={card} variant="front" size="md" />
                     : <Card variant="slot" size="md" />}
