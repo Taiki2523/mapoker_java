@@ -8,6 +8,8 @@ import com.mapoker.domain.game.Player;
 import com.mapoker.domain.game.ShowdownResult;
 import com.mapoker.domain.rules.Action;
 import com.mapoker.domain.rules.ActionType;
+import com.mapoker.domain.rules.Street;
+import com.mapoker.infrastructure.messaging.GameEventPublisher;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
@@ -39,13 +41,16 @@ public class GameService {
     private final GameRepository gameRepository;
     private final HandHistoryService handHistoryService;
     private final ObjectProvider<TableService> tableServiceProvider;
+    private final ObjectProvider<GameEventPublisher> eventPublisherProvider;
 
     public GameService(GameRepository gameRepository,
                        HandHistoryService handHistoryService,
-                       ObjectProvider<TableService> tableServiceProvider) {
+                       ObjectProvider<TableService> tableServiceProvider,
+                       ObjectProvider<GameEventPublisher> eventPublisherProvider) {
         this.gameRepository = gameRepository;
         this.handHistoryService = handHistoryService;
         this.tableServiceProvider = tableServiceProvider;
+        this.eventPublisherProvider = eventPublisherProvider;
     }
 
     /**
@@ -106,6 +111,8 @@ public class GameService {
         GameState state = getGame(id);
         state.startHand(bigBlind);
         gameRepository.update(id, state);
+        publishGame(id, state);
+        publishHoleCards(id, state);
         return state;
     }
 
@@ -204,12 +211,15 @@ public class GameService {
      */
     public GameState applyAction(String id, int playerIndex, ActionType type, int amount) {
         GameState state = getGame(id);
+        Street streetBefore = state.getStreet();
         Action action = Action.of(type, amount);
         state.applyAction(playerIndex, action);
+        Instant streetRevealedAt = state.getStreet() != streetBefore ? Instant.now() : null;
         ActionRecord record = new ActionRecord(
                 gameRepository.findActionsByGameId(id).size() + 1,
                 playerIndex, type, amount);
         gameRepository.update(id, state, record);
+        publishGame(id, state, streetRevealedAt);
         recordHandHistoryIfFinished(id, state);
         if (state.isFoldWin()) {
             TableService tableService = tableServiceProvider.getIfAvailable();
@@ -253,7 +263,26 @@ public class GameService {
         if (tableService != null) {
             tableService.processPendingLeaves(id);
         }
+        publishGame(id, getGame(id));
         return result;
+    }
+
+    private void publishGame(String tableId, GameState state) {
+        publishGame(tableId, state, null);
+    }
+
+    private void publishGame(String tableId, GameState state, Instant streetRevealedAt) {
+        GameEventPublisher pub = eventPublisherProvider.getIfAvailable();
+        if (pub != null) {
+            pub.publishGameState(tableId, state, streetRevealedAt);
+        }
+    }
+
+    private void publishHoleCards(String tableId, GameState state) {
+        GameEventPublisher pub = eventPublisherProvider.getIfAvailable();
+        if (pub != null) {
+            pub.publishHoleCards(tableId, state);
+        }
     }
 
     private void recordHandHistoryIfFinished(String tableId, GameState state) {
