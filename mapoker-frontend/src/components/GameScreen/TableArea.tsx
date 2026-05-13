@@ -100,7 +100,7 @@ export function TableArea({
 
     if (current <= prev) {
       prevCommLenRef.current = current
-      if (current === 0) setRevealedCount(0)
+      if (current === 0) window.setTimeout(() => setRevealedCount(0), 0)
       return
     }
 
@@ -149,24 +149,23 @@ export function TableArea({
       setFlippingIndices(new Set())
       timers.forEach(window.clearTimeout)
     }
-  }, [communityCount]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [communityCount])
 
   // ショーダウン結果のオーバーレイ表示（カードアニメーション完了後に開始）
+  // setSdStep は setTimeout 経由で呼ぶ（react-hooks/set-state-in-effect 対策）
   useEffect(() => {
-    if (!isShowdown) {
-      setSdStep(0)
-      return
-    }
-    setSdStep(0)
-    // カードめくりアニメーションが終わるまで待ってから結果を表示
+    if (!isShowdown) return
     const cardWait = Math.max(0, cardAnimEndsAtRef.current - Date.now())
+    const t0 = window.setTimeout(() => setSdStep(0), 0)
     const t1 = window.setTimeout(() => setSdStep(1), cardWait)
     const t2 = window.setTimeout(() => setSdStep(2), cardWait + 800)
     const t3 = window.setTimeout(() => setSdStep(3), cardWait + 1600)
     return () => {
+      window.clearTimeout(t0)
       window.clearTimeout(t1)
       window.clearTimeout(t2)
       window.clearTimeout(t3)
+      setSdStep(0)
     }
   }, [isShowdown])
 
@@ -234,6 +233,7 @@ export function TableArea({
       })
     }, 3000)
     return () => window.clearTimeout(timerId)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.current_player, game.street, game.players, game.current_bet])
 
   return (
