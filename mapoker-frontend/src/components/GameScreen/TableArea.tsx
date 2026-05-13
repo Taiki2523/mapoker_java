@@ -303,9 +303,11 @@ export function TableArea({
           const anchorSeat = mySeat ?? 0
           const pos = seatPosition(idx, anchorSeat, n)
           const isActive = game.current_player === idx
-          const isWinnerSeat = showdown?.winners?.includes(idx) ?? false
-          const isLoserSeat = isShowdown && !isWinnerSeat
-          const showCards = mySeat === idx || isSpectator || (isShowdown && !player.folded)
+          // カード公開が完了するまでネタバレしない（sdStep >= 3 = result表示タイミング）
+          const showResult = sdStep >= 3
+          const isWinnerSeat = showResult && (showdown?.winners?.includes(idx) ?? false)
+          const isLoserSeat = showResult && !(showdown?.winners?.includes(idx) ?? false) && !player.folded
+          const showCards = mySeat === idx || isSpectator || (showResult && !player.folded)
           const cards = player.hole?.length ? player.hole : ['--', '--']
           const isMe = mySeat === idx
 
@@ -318,10 +320,10 @@ export function TableArea({
                   'player-seat',
                   isActive ? 'active' : '',
                   player.folded || isLoserSeat ? 'folded' : '',
-                  isWinnerSeat && isShowdown ? 'winner' : '',
+                  isWinnerSeat ? 'winner' : '',
                   isMe ? 'me' : '',
                   dealingSeats.has(idx) ? 'dealing' : '',
-                  isShowdown ? 'sd-active' : '',
+                  showResult ? 'sd-active' : '',
                 ].filter(Boolean).join(' ')}
                 style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
               >

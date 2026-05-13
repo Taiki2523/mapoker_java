@@ -18,6 +18,8 @@ import { RoomScreen } from './components/RoomScreen'
 import { GameScreen } from './components/GameScreen'
 
 const NEXT_HAND_DELAY_MS = 7000
+// TableArea.tsx の STREET_REVEAL_INTERVAL_MS と同じ値で管理すること
+const CARD_REVEAL_MS_PER_STREET = 3000
 
 function App() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
@@ -32,6 +34,9 @@ function App() {
   const showdownInFlight = useRef(false)
   const startHandInFlight = useRef(false)
   const prevIsMyTurn = useRef(false)
+  // コミュニティカード公開アニメーションの終了予定時刻（ネタバレ防止用）
+  const cardRevealEndsAtRef = useRef(0)
+  const prevCommLenRef = useRef(0)
   const [myName, setMyName] = useState('')
   const [mySeatIndex, setMySeatIndex] = useState<number | null>(null)
   const [leavePending, setLeavePending] = useState(false)
@@ -244,6 +249,25 @@ function App() {
     prevIsMyTurn.current = isMyTurn
   }, [isMyTurn, minRaise])
 
+  // コミュニティカード公開アニメーションの終了時刻を追跡（強制退席・勝者表示ネタバレ防止）
+  useEffect(() => {
+    const current = (game?.community ?? []).filter(c => c && c !== '--').length
+    const prev = prevCommLenRef.current
+    prevCommLenRef.current = current
+
+    if (current <= prev) {
+      if (current === 0) cardRevealEndsAtRef.current = 0
+      return
+    }
+
+    let ms = 0
+    if (prev < 3 && current >= 3) ms += CARD_REVEAL_MS_PER_STREET
+    if (prev < 4 && current >= 4) ms += CARD_REVEAL_MS_PER_STREET
+    if (prev < 5 && current >= 5) ms += CARD_REVEAL_MS_PER_STREET
+    // +1600 = TableArea の sdStep(3) 発火タイミングと揃える
+    if (ms > 0) cardRevealEndsAtRef.current = Date.now() + ms + 1600
+  }, [game?.community])
+
   // Bug3: 退席予約が解消されたらロビーに戻る
   useEffect(() => {
     if (!leavePending || !myName.trim()) return
@@ -302,6 +326,8 @@ function App() {
 
   const refreshMembers = async (id = gameId) => {
     if (!id) return
+    // カード公開アニメーション中はロスター更新をスキップ（強制退席のネタバレ防止）
+    if (Date.now() < cardRevealEndsAtRef.current) return
     try {
       const data = await fetchJSON<{ members: RoomMemberApi[] }>(`/v1/tables/${id}/members`)
       setRoster(mapMembers(data.members))
@@ -640,6 +666,11 @@ function App() {
     setError('')
     try {
       const data = await fetchJSON<Showdown>(`/v1/games/${gameId}/showdown`, { method: 'POST' })
+      // カード公開アニメーション完了まで待機してからUIを更新（ネタバレ防止）
+      const waitMs = Math.max(0, cardRevealEndsAtRef.current - Date.now())
+      if (waitMs > 0) {
+        await new Promise<void>(resolve => setTimeout(resolve, waitMs))
+      }
       setShowdown(data)
       await refreshGame(gameId)
     } catch (err) {
