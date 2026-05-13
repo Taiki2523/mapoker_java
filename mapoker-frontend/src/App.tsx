@@ -24,6 +24,7 @@ const CARD_REVEAL_MS_PER_STREET = 1500
 
 function App() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
+  const [appVersion, setAppVersion] = useState<string>('')
   const [gameId, setGameId] = useState('')
   const [game, setGame] = useState<GameState | null>(null)
   const [showdown, setShowdown] = useState<Showdown | null>(null)
@@ -184,6 +185,9 @@ function App() {
   useEffect(() => {
     fetchJSON<AuthUser>('/v1/auth/me')
       .then((user) => { setCurrentUser(user); setMyName(user.username) })
+      .catch(() => {})
+    fetchJSON<{ version: string }>('/v1/version')
+      .then((res) => setAppVersion(res.version))
       .catch(() => {})
   }, [])
 
@@ -787,6 +791,7 @@ function App() {
                 currentUser={currentUser}
                 onOpenMyPage={() => void openMyPage()}
                 onSelectRing={() => setRoomScreenMode('lobby')}
+                appVersion={appVersion}
               />
             )}
             {viewMode === 'room' && roomScreenMode === 'room' && (
@@ -797,6 +802,7 @@ function App() {
                 currentUser={currentUser}
                 onOpenMyPage={() => void openMyPage()}
                 onBack={() => setRoomScreenMode('lobby')}
+                appVersion={appVersion}
               />
             )}
             {viewMode === 'room' && roomScreenMode === 'lobby' && (
@@ -806,6 +812,7 @@ function App() {
                 onJoinRoom={lobbyJoinWithBuyIn}
                 onCreateTable={() => setRoomScreenMode('room')}
                 onBack={() => setRoomScreenMode('gameType')}
+                appVersion={appVersion}
               />
             )}
           </div>
