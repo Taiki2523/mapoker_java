@@ -21,7 +21,7 @@ CREATE TYPE odd_chip_rule     AS ENUM ('low_index', 'button_left');
 CREATE TYPE action_type       AS ENUM ('fold', 'check', 'call', 'bet', 'raise', 'all_in');
 CREATE TYPE wallet_ledger_reason AS ENUM (
   'REGISTER_BONUS', 'DAILY_BONUS', 'RECOVERY_BONUS',
-  'TABLE_BUY_IN', 'TABLE_CASH_OUT', 'ADMIN_GRANT'
+  'TABLE_BUY_IN', 'TABLE_CASH_OUT', 'ADMIN_GRANT', 'TABLE_REBUY'
 );
 ```
 
@@ -241,3 +241,4 @@ CREATE TABLE tables (
 | V5 | `V5__hand_history.sql` | hand_history テーブル作成 |
 | V6 | `V6__wallet_and_ledger.sql` | user_wallets / wallet_ledger テーブルと ENUM 作成 |
 | V7 | `V7__tables_and_sitting_out.sql` | tables テーブル作成、players に `sitting_out` カラム追加 |
+| V8 | `V8__add_rebuy_reason.sql` | `wallet_ledger_reason` ENUM に `TABLE_REBUY` を追加 |

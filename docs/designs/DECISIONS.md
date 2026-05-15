@@ -54,11 +54,27 @@
 - Go 版から維持するベッティング判断:
   - `bet` と `raise` の `amount` は raise-to の合計額とする
   - `call` の `amount = 0` は auto-call とみなしてよい
-  - 最小レイズ額は `max(big blind, last raise size)` とする
+  - 最小レイズ額は `max(big blind, current_bet)` とする（v1.0.1 で last raise size から変更）
   - 最小レイズ未満の all-in は許可するが、ベッティングは reopen しない
 - Go 版から維持する配当判断:
   - サイドポットは各プレイヤーの hand 全体の contribution を基準に計算する
   - 端数チップ配分は設定可能とし、デフォルトは `low_index` とする
+
+## 2026-05-14
+- WebSocket 移行（a740e04）:
+  - REST ポーリング（2秒間隔）を廃止し、STOMP over SockJS に移行する
+  - アクション送信は引き続き REST POST を使う。WebSocket はサーバー → クライアントの push 専用
+  - ブローカー設定: `enableSimpleBroker("/topic", "/queue")`（`/queue` は `/user/...` 解決に必須）
+  - `GameEventPublisher` コンポーネントが `SimpMessagingTemplate` で各 push を担当する
+  - ゲーム状態 broadcast はホールカードを全マスクして `/topic/tables/{tableId}/game` に送る
+  - ホールカードは `startHand` 時に着席プレイヤー全員へ `/user/queue/hole-cards` で個別 push する
+  - `streetRevealedAt`（`Instant`）をペイロードに含め、フロントエンドのアニメーション開始時刻を全クライアント間で同期する
+  - STOMP フレーム認可: `WebSocketSecurityConfigLocal`（全許可）と `WebSocketSecurityConfigProd`（認証必須）を `@Profile` で切り替える
+  - `GameService → GameEventPublisher` の循環依存は `ObjectProvider<TableService>` パターンで回避する
+- パッケージ追加: `com.mapoker.interfaces.ws` — WebSocket DTO を置く場所
+- リバイ理由の追加（v1.0.0）:
+  - `wallet_ledger_reason` ENUM に `TABLE_REBUY` を追加（V8 migration）
+  - スタック 0 で着席中のプレイヤーに `can_rebuy: true` を `GameResponse` で返す
 
 ## 2026-04-21
 - Git ブランチ戦略:
