@@ -197,6 +197,7 @@ const ja = {
   RECOVERY_BONUS: '回復チップ',
   ADMIN_GRANT: '管理者付与',
   TABLE_BUY_IN: 'バイイン',
+  TABLE_REBUY: 'リバイ',
   TABLE_CASH_OUT: 'キャッシュアウト',
   cooldownUntil: '次回: {time}',
   insufficientFunds: 'チップが不足しています',

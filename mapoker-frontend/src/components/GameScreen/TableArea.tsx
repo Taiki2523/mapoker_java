@@ -47,6 +47,8 @@ export function TableArea({
   const prevHoleRef = useRef<Record<number, number>>({})
   // StrictMode 対応: cleanup で元の値に戻すため prevCommLenRef をマウント時の枚数で初期化
   const prevCommLenRef = useRef(_initCommCount)
+  // ショーダウン開始時点（ペイアウト前）のスタックを凍結し、result 表示まで旧値を見せる
+  const frozenStacksRef = useRef<number[] | null>(null)
   const prevContribRef = useRef<Record<number, number>>({})
   const cardAnimEndsAtRef = useRef(0)
   const [dealingSeats, setDealingSeats] = useState<Set<number>>(new Set())
@@ -93,7 +95,9 @@ export function TableArea({
 
   // コミュニティカードの公開順序制御
   //
-  // StrictMode 対応: cleanup で prevCommLenRef を元の値（prev）に戻す。
+  // prevCommLenRef は effect 本体ではなく各タイマーコールバック内で更新する。
+  // こうすることで cleanup がタイマーをキャンセルしても ref が巻き戻らず、
+  // 次の effect が正しい prev を参照できる（StrictMode でも production でも動作する）。
   useEffect(() => {
     const current = communityCount
     const prev = prevCommLenRef.current
@@ -104,8 +108,6 @@ export function TableArea({
       return
     }
 
-    prevCommLenRef.current = current
-
     const timers: number[] = []
     let delay = 0
 
@@ -114,6 +116,7 @@ export function TableArea({
       const revealTo = Math.min(current, 3)
       const flopSet = new Set(Array.from({ length: revealTo - prev }, (_, i) => prev + i))
       timers.push(window.setTimeout(() => {
+        prevCommLenRef.current = Math.max(prevCommLenRef.current, revealTo)
         setRevealedCount(revealTo)
         setFlippingIndices(flopSet)
       }, delay))
@@ -124,6 +127,7 @@ export function TableArea({
     // ターン（インデックス 3）
     if (prev < 4 && current >= 4) {
       timers.push(window.setTimeout(() => {
+        prevCommLenRef.current = Math.max(prevCommLenRef.current, 4)
         setRevealedCount(4)
         setFlippingIndices(new Set([3]))
       }, delay))
@@ -134,6 +138,7 @@ export function TableArea({
     // リバー（インデックス 4）
     if (prev < 5 && current >= 5) {
       timers.push(window.setTimeout(() => {
+        prevCommLenRef.current = Math.max(prevCommLenRef.current, 5)
         setRevealedCount(5)
         setFlippingIndices(new Set([4]))
       }, delay))
@@ -144,12 +149,23 @@ export function TableArea({
     cardAnimEndsAtRef.current = Date.now() + delay
 
     return () => {
-      prevCommLenRef.current = prev  // StrictMode: 2回目の実行で再スケジュールできるよう戻す
       cardAnimEndsAtRef.current = 0
       setFlippingIndices(new Set())
       timers.forEach(window.clearTimeout)
     }
   }, [communityCount])
+
+  // ショーダウン開始時点のスタックを凍結（ペイアウト前の値を保持）
+  useEffect(() => {
+    if (isShowdown) {
+      if (frozenStacksRef.current === null) {
+        frozenStacksRef.current = game.players.map((p) => p.stack)
+      }
+    } else {
+      frozenStacksRef.current = null
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isShowdown])
 
   // ショーダウン結果のオーバーレイ表示（カードアニメーション完了後に開始）
   // setSdStep は setTimeout 経由で呼ぶ（react-hooks/set-state-in-effect 対策）
@@ -337,7 +353,11 @@ export function TableArea({
                         </div>
                       </div>
                       <div className="player-stack">
-                        Stack <strong>{formatStack(player.stack)}</strong>
+                        Stack <strong>{formatStack(
+                          showResult || frozenStacksRef.current === null
+                            ? player.stack
+                            : (frozenStacksRef.current[idx] ?? player.stack)
+                        )}</strong>
                       </div>
                     </div>
                   </div>
