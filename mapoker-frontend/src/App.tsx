@@ -120,7 +120,7 @@ function App() {
   const minRaise = useMemo(() => {
     if (!game) return 0
     if (game.current_bet === 0) return game.big_blind
-    return game.current_bet + Math.max(game.big_blind, game.last_raise_size || game.big_blind)
+    return game.current_bet * 2
   }, [game])
 
   const maxBet = useMemo(() => {

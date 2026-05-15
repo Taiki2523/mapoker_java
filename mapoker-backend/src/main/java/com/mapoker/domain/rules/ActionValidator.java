@@ -67,7 +67,7 @@ public final class ActionValidator {
     }
 
     private static int minRaiseSize(TableState table) {
-        return Math.max(table.lastRaiseSize(), table.bigBlind());
+        return Math.max(table.currentBet(), table.bigBlind());
     }
 
     private static int currentToCall(TableState table, PlayerState player) {

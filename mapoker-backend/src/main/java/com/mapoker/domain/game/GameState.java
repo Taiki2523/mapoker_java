@@ -247,9 +247,9 @@ public class GameState {
                 commitBet(playerIndex, target);
                 if (target > currentBet) {
                     int raiseSize = target - currentBet;
-                    int previousRaise = lastRaiseSize;
+                    int previousBet = currentBet;
                     currentBet = target;
-                    if (raiseSize >= minRaiseSize(bigBlindSize, previousRaise)) {
+                    if (raiseSize >= minRaiseSize(bigBlindSize, previousBet)) {
                         lastRaiseSize = raiseSize;
                         raiseOpen = true;
                         resetActedExcept(playerIndex);
