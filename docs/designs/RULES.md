@@ -67,7 +67,7 @@
 ## 9. No-Limit のベッティングルール
 - 最小レイズ額は次の大きい方
   - big blind
-  - 直前の raise サイズ
+  - 現在の current_bet（`max(bigBlind, currentBet)`）
 - 最小レイズ未満の all-in は許可する
 - 最小レイズ未満の all-in は、すでに行動済みプレイヤーに対して betting を reopen しない
 

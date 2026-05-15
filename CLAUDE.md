@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-This repository currently contains **design documents only**. The working reference implementation is in the Go project at `/home/taiki/projects/mapoker`. The Java implementation does not yet exist; these docs define what to build.
+Java 実装は完成・稼働中（v1.0.2）。Go プロジェクト（`/home/taiki/projects/mapoker`）は参照実装として残すが、主体は本リポジトリの Java 実装に移っている。
 
 ## Commands
 
@@ -60,6 +60,7 @@ com.mapoker.domain          # Pure poker logic: Card, Deck, Hand, evaluator, act
 com.mapoker.application     # Use-case orchestration, service layer
 com.mapoker.infrastructure  # Persistence (PostgreSQL + in-memory), auth (Spring Security), Flyway
 com.mapoker.interfaces.http # Controllers, DTOs, Jackson serialization, exception mapping
+com.mapoker.interfaces.ws   # WebSocket DTOs (GameBroadcastPayload, HoleCardsPayload, MembersBroadcastPayload)
 ```
 
 Source roots:

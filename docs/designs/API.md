@@ -370,7 +370,25 @@ Texas Hold'em ポーカー HTTP API の仕様。
 - `hole` はリクエストした閲覧者に見せてよい場合のみ含む
 - ショーダウン / フィニッシュ（フォールドウィン以外）では全プレイヤーのホールカードを公開
 - `can_start_hand`: 次のハンドを開始できる状態かどうか
-- `can_rebuy`: 閲覧者のスタックが 0 でリバイ可能かどうか
+- `can_rebuy`: 閲覧者のスタックが 0 でリバイ可能かどうか（スタック 0 かつ着席中の場合 `true`）
+- `viewer_membership_active`: 閲覧者がテーブルに着席中かどうか
+
+---
+
+## バージョン API
+
+### バージョン取得
+
+`GET /v1/version`
+
+認証不要。
+
+レスポンス `200 OK`:
+```json
+{ "version": "1.0.2" }
+```
+
+バージョンは `spring.application.version` プロパティから取得する（Docker ビルド時に git タグで注入）。
 
 ---
 
@@ -447,3 +465,76 @@ Texas Hold'em ポーカー HTTP API の仕様。
 - ショーダウン / フィニッシュ（フォールドウィン以外）: 折りたたんでいない全プレイヤーのカードを返す
 - 観戦モード（`spectator=1`）: 全カードを非表示
 - 認証済みユーザー: テーブルシートインデックスを自動解決して適切なカードを返す
+
+---
+
+## WebSocket API
+
+REST API とは別に、サーバー側からのリアルタイム push に WebSocket（STOMP over SockJS）を使用する。
+アクション送信は引き続き REST POST を使う。WebSocket はサーバー → クライアントの push 専用。
+
+### 接続エンドポイント
+
+```
+/ws  （SockJS エンドポイント）
+```
+
+フロントエンドは `@stomp/stompjs` の `Client` を使用し、`brokerURL` に `wss://{host}/ws/websocket` を指定する。
+
+### トピック
+
+| トピック | 対象 | 内容 |
+|---|---|---|
+| `/topic/tables/{tableId}/game` | 全員（broadcast） | ゲーム状態変化（ホールカードは全マスク） |
+| `/topic/tables/{tableId}/members` | 全員（broadcast） | ロスター変化 |
+| `/user/queue/hole-cards` | 本人のみ（個別 push） | 自分のホールカード |
+
+### ペイロード
+
+**GameBroadcastPayload** (`/topic/tables/{tableId}/game`):
+```json
+{
+  "game": { ...GameResponse... },
+  "streetRevealedAt": "2026-05-01T12:00:00.000Z"
+}
+```
+
+- `streetRevealedAt`: ストリート変化が発生したサーバー側の `Instant`。フロントエンドはこのタイムスタンプを基準にアニメーション開始時刻を計算することで全クライアントの演出を同期する。ストリート変化がない場合は `null`。
+
+**MembersBroadcastPayload** (`/topic/tables/{tableId}/members`):
+```json
+{
+  "tableId": "uuid",
+  "members": [
+    { "name": "alice", "seatIndex": 1, "joinedAt": "...", "pendingLeave": false }
+  ]
+}
+```
+
+**HoleCardsPayload** (`/user/queue/hole-cards`):
+```json
+{
+  "tableId": "uuid",
+  "seatIndex": 1,
+  "hole": ["AS", "KH"]
+}
+```
+
+### セキュリティ
+
+- `local` プロファイル: 全 STOMP メッセージを許可
+- `!local` プロファイル: CONNECT / SUBSCRIBE / MESSAGE すべてに認証必須（`WebSocketSecurityConfigProd` で設定）
+- HTTP ハンドシェイク時に Spring Security セッションの `Principal` が WebSocket セッションへ自動引き継ぎされる
+
+### フロントエンド実装
+
+`mapoker-frontend/src/ws.ts` に以下の関数を公開している。
+
+```typescript
+createStompClient(): Client
+subscribeGame(client, tableId, onMessage)
+subscribeMembers(client, tableId, onMessage)
+subscribeHoleCards(client, onMessage)
+```
+
+初回ロード・再接続時は REST GET で状態復元する（WebSocket はポーリングの代替であり REST エンドポイントは維持）。
