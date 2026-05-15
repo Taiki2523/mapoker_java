@@ -14,8 +14,10 @@ import com.mapoker.domain.rules.Street;
 import com.mapoker.domain.rules.TableState;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
@@ -300,6 +302,7 @@ public class GameState {
         if (community.size() < PokerConstants.COMMUNITY_CARDS)
             throw new IllegalStateException("community cards incomplete");
 
+        Map<Integer, HandValue> handValues = new HashMap<>();
         HandValue best = new HandValue(HandRank.HIGH_CARD, List.of(Rank.TWO));
         List<Integer> winners = new ArrayList<>();
 
@@ -309,6 +312,7 @@ public class GameState {
             if (p.isSittingOut()) continue;
             Card[] seven = buildSeven(p.getHole(), community);
             HandValue val = HandEvaluator.eval7(seven);
+            handValues.put(i, val);
             int cmp = val.compareTo(best);
             if (cmp > 0) {
                 best = val;
@@ -321,7 +325,7 @@ public class GameState {
         if (winners.isEmpty())
             throw new IllegalStateException("no active players at showdown");
 
-        List<Integer> payouts = splitPots(winners);
+        List<Integer> payouts = splitPots(handValues);
         ShowdownResult result = new ShowdownResult(List.copyOf(winners), best, payouts);
         lastShowdown = result;
         return result;
@@ -488,6 +492,7 @@ public class GameState {
         return out;
     }
 
+    // フォールドウィン用：勝者リストを直接渡す
     private List<Integer> splitPots(List<Integer> winners) {
         int[] payouts = new int[players.size()];
         List<SidePot> pots = buildSidePots();
@@ -502,6 +507,40 @@ public class GameState {
         List<Integer> result = new ArrayList<>(players.size());
         for (int v : payouts) result.add(v);
         return result;
+    }
+
+    // ショーダウン用：サイドポットごとに eligible 内の最強ハンドを再評価する
+    private List<Integer> splitPots(Map<Integer, HandValue> handValues) {
+        int[] payouts = new int[players.size()];
+        List<SidePot> pots = buildSidePots();
+        for (SidePot sp : pots) {
+            List<Integer> potWinners = findPotWinners(sp.eligible(), handValues);
+            if (potWinners.isEmpty()) continue;
+            int base = sp.amount() / potWinners.size();
+            int rem = sp.amount() % potWinners.size();
+            for (int idx : potWinners) payouts[idx] += base;
+            distributeRemainder(payouts, potWinners, rem);
+        }
+        List<Integer> result = new ArrayList<>(players.size());
+        for (int v : payouts) result.add(v);
+        return result;
+    }
+
+    private List<Integer> findPotWinners(List<Integer> eligible, Map<Integer, HandValue> handValues) {
+        HandValue best = null;
+        List<Integer> winners = new ArrayList<>();
+        for (int idx : eligible) {
+            HandValue val = handValues.get(idx);
+            if (val == null) continue;
+            if (best == null || val.compareTo(best) > 0) {
+                best = val;
+                winners.clear();
+                winners.add(idx);
+            } else if (val.compareTo(best) == 0) {
+                winners.add(idx);
+            }
+        }
+        return winners;
     }
 
     private record SidePot(int amount, List<Integer> eligible) {}
