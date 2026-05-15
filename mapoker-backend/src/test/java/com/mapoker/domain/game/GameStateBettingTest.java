@@ -89,28 +89,26 @@ class GameStateBettingTest {
 
     @Test
     void subMinAllInDoesNotReopenBetting() {
-        // p0=100, p1=100, p2=15（サブミン スタック）
-        // p2 のオールインがサブミンの場合、p0 は re-raise できない（ベッティング未再オープン）
+        // button=2 → startHand 後: button=p0, SB=p1, BB=p2(25chips → 残り15), UTG=p0
+        // p0 が raise20、p1 が fold、p2 が all-in 25（currentBet=20 に対し raise+5 < minRaise10）
+        // → raiseOpen=false → p0 は再レイズ不可
         GameState g = GameState.newGame(
-                List.of(new Player("p0", 100), new Player("p1", 100), new Player("p2", 15)),
-                0, 10, new Random(1), OddChipRule.LOW_INDEX);
+                List.of(new Player("p0", 100), new Player("p1", 100), new Player("p2", 25)),
+                2, 10, new Random(1), OddChipRule.LOW_INDEX);
         g.startHand(10);
 
-        // p2 が BBを払った段階（スタック=5残り）、UTGのp0がbet20
-        // その後 p2がall-in (< min raise) → raiseOpen=false → p0はcallのみ
-
-        // プリフロップ: UTG(p0) bet 20
+        // プリフロップ: UTG(p0) raise to 20
         int cur = g.getCurrentPlayer(); // p0
-        g.applyAction(cur, Action.of(ActionType.BET, 20));
+        g.applyAction(cur, Action.of(ActionType.RAISE, 20));
 
-        // p1 fold
+        // p1(SB) fold
         g.applyAction(g.getCurrentPlayer(), Action.of(ActionType.FOLD, 0));
 
-        // p2(BB, 残り5) all-in → サブミン
+        // p2(BB, 残り15) all-in → total 25、currentBet=20 に対しサブミン raise (+5 < minRaise 10)
         int p2 = g.getCurrentPlayer();
         g.applyAction(p2, Action.of(ActionType.ALL_IN, 0));
 
-        // p0 はレイズ不可（raiseOpen=false）→ call のみ可能
+        // p0 はレイズ不可（raiseOpen=false）→ raise が弾かれることを確認
         int p0Again = g.getCurrentPlayer();
         assertThatThrownBy(() ->
                 g.applyAction(p0Again, Action.of(ActionType.RAISE, 60)))

@@ -17,11 +17,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class GameStateSidePotTest {
 
-    /** スタックを指定して3人ゲームを作成する。button=0 固定。 */
+    /**
+     * スタックを指定して3人ゲームを作成する。
+     * buttonIndex=2 を渡すことで startHand 後に button=0(p0)・SB=1(p1)・BB=2(p2)・UTG=0(p0) となる。
+     */
     private static GameState game3P(int s0, int s1, int s2) {
         return GameState.newGame(
                 List.of(new Player("p0", s0), new Player("p1", s1), new Player("p2", s2)),
-                0, 10, new Random(1), OddChipRule.LOW_INDEX);
+                2, 10, new Random(1), OddChipRule.LOW_INDEX);
     }
 
     // -----------------------------------------------------------------------
@@ -44,7 +47,7 @@ class GameStateSidePotTest {
         cur = g.getCurrentPlayer();
         g.applyAction(cur, Action.of(ActionType.CALL, 0));     // p1 call
         cur = g.getCurrentPlayer();
-        g.applyAction(cur, Action.of(ActionType.CHECK, 0));    // p2 check (already matched)
+        g.applyAction(cur, Action.of(ActionType.CALL, 0));     // p2(BB) call (p0 raised above BB)
 
         // ボードをランアウトして showdown へ
         advanceToShowdown(g);

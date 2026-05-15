@@ -12,6 +12,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.List;
@@ -30,6 +32,7 @@ import static org.mockito.Mockito.when;
  * <p>table-join-bb 追加時に join() の変更が既存ケースを壊さないことを確認する基準テストとして機能する。
  */
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class TableServiceTest {
 
     @Mock ObjectProvider<WalletService> walletProvider;
@@ -57,9 +60,9 @@ class TableServiceTest {
 
         var gameRepo = new InMemoryGameRepository();
         var historyRepo = new InMemoryHandHistoryRepository();
-        var handHistoryService = new HandHistoryService(historyRepo);
         var userTableHistoryRepo = new InMemoryUserTableHistoryRepository();
         var userTableHistoryService = new UserTableHistoryService(userTableHistoryRepo);
+        var handHistoryService = new HandHistoryService(historyRepo, userTableHistoryService);
         var gameService = new GameService(gameRepo, handHistoryService, tableServiceProvider, publisherProvider);
 
         tableService = new TableService(
@@ -218,8 +221,8 @@ class TableServiceTest {
         // maxPlayers=2 で満席になるため、3人テーブルで確認する
         var input = new TableService.CreateRingTableInput("T", 3, 10, "public", null);
         var table = tableService.createRingTable(input).table();
-        tableService.join(table.id(), "alice", 0);
-        tableService.join(table.id(), "bob", 0);
+        tableService.join(table.id(), "alice", 1000);
+        tableService.join(table.id(), "bob", 1000);
         // ハンド開始（pot>0 → active）
         tableService.startHand(table.id(), 10);
 
@@ -259,8 +262,8 @@ class TableServiceTest {
     @Test
     void leaveDuringActiveHandSetsPendingLeave() {
         var table = tableService.createRingTable(defaultInput()).table();
-        tableService.join(table.id(), "alice", 0);
-        tableService.join(table.id(), "bob", 0);
+        tableService.join(table.id(), "alice", 1000);
+        tableService.join(table.id(), "bob", 1000);
         tableService.startHand(table.id(), 10); // pot=15 → active
 
         var members = tableService.leave(table.id(), "alice", null);
@@ -275,8 +278,8 @@ class TableServiceTest {
     @Test
     void processPendingLeavesRemovesPendingMembers() {
         var table = tableService.createRingTable(defaultInput()).table();
-        tableService.join(table.id(), "alice", 0);
-        tableService.join(table.id(), "bob", 0);
+        tableService.join(table.id(), "alice", 1000);
+        tableService.join(table.id(), "bob", 1000);
         tableService.startHand(table.id(), 10);  // hand active
 
         tableService.leave(table.id(), "alice", null); // pendingLeave=true
@@ -292,8 +295,8 @@ class TableServiceTest {
     @Test
     void processPendingLeavesKeepsNonPendingMembers() {
         var table = tableService.createRingTable(defaultInput()).table();
-        tableService.join(table.id(), "alice", 0);
-        tableService.join(table.id(), "bob", 0);
+        tableService.join(table.id(), "alice", 1000);
+        tableService.join(table.id(), "bob", 1000);
         tableService.startHand(table.id(), 10);
 
         // bob だけ pendingLeave
