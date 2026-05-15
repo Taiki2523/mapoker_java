@@ -215,24 +215,33 @@ export function TableArea({
     prevCurrentBetRef.current = game.current_bet
     prevStreetRef.current = game.street
 
-    if (prevPlayer < 0 || prevStreet !== game.street || prevPlayer === game.current_player) return
+    if (prevPlayer < 0) return
+    if (prevPlayer === game.current_player && prevStreet === game.street) return
 
     const actingNow = game.players[prevPlayer]
     const actingBefore = prevPlayers[prevPlayer]
     if (!actingNow || !actingBefore) return
 
+    const streetChanged = prevStreet !== game.street
     let label = ''
+
     if (actingNow.folded && !actingBefore.folded) {
       label = t('fold')
-    } else if (actingNow.all_in && actingNow.contributed > actingBefore.contributed) {
-      label = `${t('allIn')} ${formatStack(actingNow.contributed)}`
+    } else if (actingNow.all_in && !actingBefore.all_in) {
+      // 同一ストリート: contributed 増加あり → 金額付き、ストリートまたぎ: リセット済みなので金額なし
+      label = actingNow.contributed > actingBefore.contributed
+        ? `${t('allIn')} ${formatStack(actingNow.contributed)}`
+        : t('allIn')
     } else if (actingNow.contributed > actingBefore.contributed) {
+      // ストリートまたぎ時は contributed=0 にリセットされるため、このブランチは同一ストリートのみ到達
       const delta = actingNow.contributed - actingBefore.contributed
-      if (game.current_bet > prevBet) {
-        label = prevBet === 0 ? `${t('betLabel')} ${formatStack(actingNow.contributed)}` : `${t('raiseLabel')} ${formatStack(actingNow.contributed)}`
-      } else {
-        label = `${t('call')} ${formatStack(delta)}`
-      }
+      label = game.current_bet > prevBet
+        ? (prevBet === 0 ? `${t('betLabel')} ${formatStack(actingNow.contributed)}` : `${t('raiseLabel')} ${formatStack(actingNow.contributed)}`)
+        : `${t('call')} ${formatStack(delta)}`
+    } else if (streetChanged && prevBet > 0) {
+      // ストリートまたぎのコール（contributed リセット済み → prevBet で推定）
+      // ※ streetChanged なしだと BB オプションチェック（contributed 変化なし、prevBet>0）と区別できない
+      label = `${t('call')} ${formatStack(prevBet)}`
     } else {
       label = t('check')
     }
@@ -240,15 +249,20 @@ export function TableArea({
     if (!label) return
 
     const seatIdx = prevPlayer
-    setActionBubbles((prev) => new Map(prev).set(seatIdx, label))
-    const timerId = window.setTimeout(() => {
+    const showId = window.setTimeout(() => {
+      setActionBubbles((prev) => new Map(prev).set(seatIdx, label))
+    }, 1000)
+    const clearId = window.setTimeout(() => {
       setActionBubbles((prev) => {
         const next = new Map(prev)
         next.delete(seatIdx)
         return next
       })
-    }, 3000)
-    return () => window.clearTimeout(timerId)
+    }, 4000)
+    return () => {
+      window.clearTimeout(showId)
+      window.clearTimeout(clearId)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.current_player, game.street, game.players, game.current_bet])
 
@@ -316,6 +330,7 @@ export function TableArea({
           const isWinnerSeat = showResult && (showdown?.winners?.includes(idx) ?? false)
           const isLoserSeat = showResult && !(showdown?.winners?.includes(idx) ?? false) && !player.folded
           const showCards = mySeat === idx || isSpectator || (showResult && !player.folded)
+            || (game.status === 'in_progress' && !player.folded && player.all_in)
           const cards = player.hole?.length ? player.hole : ['--', '--']
           const isMe = mySeat === idx
 

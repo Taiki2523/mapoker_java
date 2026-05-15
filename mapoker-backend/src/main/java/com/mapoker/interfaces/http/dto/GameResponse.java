@@ -110,12 +110,11 @@ public record GameResponse(
         boolean showAll = g.getStatus() == GameStatus.SHOWDOWN
                 || (g.getStatus() == GameStatus.FINISHED && !g.isFoldWin());
 
-        boolean isFinished = g.getStatus() == GameStatus.FINISHED;
         for (int i = 0; i < g.getPlayers().size(); i++) {
             Player p = g.getPlayers().get(i);
             List<Card> hole = null;
             boolean showThisPlayer = showAll
-                    || (isFinished && p.isAllIn() && !p.isFolded());
+                    || (p.isAllIn() && !p.isFolded());
             if (showThisPlayer && p.getHole() != null && p.getHole()[0] != null) {
                 hole = Arrays.asList(p.getHole());
             } else if (!spectator && viewerIndex != null && viewerIndex == i) {
