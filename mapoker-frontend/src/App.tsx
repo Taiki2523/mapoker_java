@@ -283,7 +283,8 @@ function App() {
   }, [game, showdown])
 
   useEffect(() => {
-    if (!game || game.status !== 'finished' || !game.can_start_hand) return
+    const isAutoStartable = game?.status === 'finished' || !game?.status
+    if (!game || !isAutoStartable || !game.can_start_hand) return
     const timer = window.setTimeout(() => {
       void startHand(undefined, undefined, { suppressError: true })
     }, NEXT_HAND_DELAY_MS)

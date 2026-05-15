@@ -1,0 +1,1 @@
+ALTER TYPE wallet_ledger_reason ADD VALUE IF NOT EXISTS 'TABLE_REBUY';

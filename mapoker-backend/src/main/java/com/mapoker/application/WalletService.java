@@ -19,6 +19,7 @@ public class WalletService {
     private static final String DAILY_BONUS = "DAILY_BONUS";
     private static final String RECOVERY_BONUS = "RECOVERY_BONUS";
     private static final String TABLE_BUY_IN = "TABLE_BUY_IN";
+    private static final String TABLE_REBUY = "TABLE_REBUY";
     private static final String TABLE_CASH_OUT = "TABLE_CASH_OUT";
     private static final String ADMIN_GRANT = "ADMIN_GRANT";
 
@@ -107,6 +108,32 @@ public class WalletService {
                 "TABLE",
                 normalizedTableId,
                 "BUY_IN:" + normalizedTableId + ":" + normalizedUsername)) {
+            throw new IllegalStateException("insufficient funds");
+        }
+    }
+
+    /**
+     * リバイのためにウォレットからチップを引き落とします。
+     * 初回バイインとは別の idempotency キーを使い、複数回のリバイを正しく処理します。
+     *
+     * @param username ユーザー名
+     * @param tableId テーブル ID
+     * @param amount 引き落とし額
+     * @throws IllegalArgumentException 入力値が不正な場合
+     * @throws IllegalStateException 残高不足の場合
+     */
+    public void rebuy(String username, String tableId, int amount) {
+        String normalizedUsername = requireUsername(username);
+        String normalizedTableId = normalizeReference(tableId);
+        validateAmount(amount);
+        String idempotencyKey = "REBUY:" + normalizedTableId + ":" + normalizedUsername + ":" + Instant.now().toEpochMilli();
+        if (!walletRepository.debit(
+                normalizedUsername,
+                amount,
+                TABLE_REBUY,
+                "TABLE",
+                normalizedTableId,
+                idempotencyKey)) {
             throw new IllegalStateException("insufficient funds");
         }
     }

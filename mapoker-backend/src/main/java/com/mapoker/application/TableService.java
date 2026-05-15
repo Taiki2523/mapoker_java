@@ -230,7 +230,7 @@ public class TableService {
                         if (buyIn < table.minBuyIn() || buyIn > table.maxBuyIn()) {
                             throw new IllegalArgumentException("buy-in out of range");
                         }
-                        walletService.buyIn(name, table.id(), buyIn);
+                        walletService.rebuy(name, table.id(), buyIn);
                     }
                     gameService.setSeatStack(table.gameId(), existing.seatIndex(), buyIn);
                     gameService.setSittingOut(table.gameId(), existing.seatIndex(), false);
@@ -238,6 +238,7 @@ public class TableService {
                 userTableHistoryService.recordJoin(name, table, existing.seatIndex());
                 result = new JoinResult(existing.seatIndex(), List.copyOf(members));
                 publishMembers(table.id(), result.members());
+                publishGameState(table.id(), table.gameId());
                 return result;
             }
 
@@ -284,6 +285,7 @@ public class TableService {
             userTableHistoryService.recordJoin(name, table, seatIndex);
             result = new JoinResult(seatIndex, List.copyOf(members));
             publishMembers(table.id(), result.members());
+            publishGameState(table.id(), table.gameId());
             return result;
         }
     }
@@ -378,6 +380,13 @@ public class TableService {
         GameEventPublisher pub = eventPublisherProvider.getIfAvailable();
         if (pub != null) {
             pub.publishMembers(tableId, members);
+        }
+    }
+
+    private void publishGameState(String tableId, String gameId) {
+        GameEventPublisher pub = eventPublisherProvider.getIfAvailable();
+        if (pub != null) {
+            pub.publishGameState(tableId, gameService.getGame(gameId));
         }
     }
 
