@@ -105,13 +105,14 @@ public class WalletController {
         return ResponseEntity.ok(loadWalletResponse(username));
     }
 
+    /** principal.getUsername() は publicId（UUID）を返す。そのまま wallet に渡す。 */
     private String resolveUsername(UserDetails principal) {
-        return userService.getByPublicId(principal.getUsername()).username();
+        return principal.getUsername();
     }
 
-    private WalletResponse loadWalletResponse(String username) {
-        WalletEntry walletEntry = walletService.getBalance(username);
-        return WalletResponse.from(walletEntry, walletService.getNextClaimTimes(username));
+    private WalletResponse loadWalletResponse(String publicId) {
+        WalletEntry walletEntry = walletService.getBalance(publicId);
+        return WalletResponse.from(walletEntry, walletService.getNextClaimTimes(publicId));
     }
 }
 
@@ -127,16 +128,20 @@ class AdminWalletController {
 
     private final UserService userService;
 
-    AdminWalletController(WalletService walletService, UserService userService) {
+    private final com.mapoker.application.UserRepository userRepository;
+
+    AdminWalletController(WalletService walletService, UserService userService,
+                          com.mapoker.application.UserRepository userRepository) {
         this.walletService = walletService;
         this.userService = userService;
+        this.userRepository = userRepository;
     }
 
     /**
      * 管理者権限でウォレット残高を付与します。
      *
      * @param principal 認証済みユーザー
-     * @param request 付与リクエスト
+     * @param request   付与リクエスト
      * @return 更新後のウォレット応答
      */
     @PostMapping("/wallet/grants")
@@ -148,8 +153,17 @@ class AdminWalletController {
         }
         String adminUsername = userService.getByPublicId(principal.getUsername()).username();
         walletService.adminGrant(adminUsername, request.targetUsername(), request.amount());
+        // 対象ユーザーの publicId で残高を取得
+        String targetPublicId = userRepository.findByUsername(request.targetUsername())
+                .map(com.mapoker.application.User::publicId)
+                .orElse(null);
+        if (targetPublicId == null) {
+            return ResponseEntity.ok(WalletResponse.from(
+                    new com.mapoker.application.WalletEntry(request.targetUsername(), 0L, null),
+                    new WalletService.NextClaimTimes(null, null)));
+        }
         return ResponseEntity.ok(WalletResponse.from(
-                walletService.getBalance(request.targetUsername()),
-                walletService.getNextClaimTimes(request.targetUsername())));
+                walletService.getBalance(targetPublicId),
+                walletService.getNextClaimTimes(targetPublicId)));
     }
 }

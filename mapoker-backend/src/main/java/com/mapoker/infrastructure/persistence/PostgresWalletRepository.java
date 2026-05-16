@@ -19,6 +19,9 @@ import java.util.Optional;
 
 /**
  * Spring の {@code @Repository} として PostgreSQL へウォレット残高と台帳を保存する実装です。
+ *
+ * <p>ユーザー識別には {@code public_id}（UUID）を使用します。
+ * {@code username} は一意でないため使用しません。
  */
 @Repository
 @Profile("postgresql")
@@ -32,21 +35,16 @@ public class PostgresWalletRepository implements WalletRepository {
         this.walletProperties = walletProperties;
     }
 
-    /**
-     * ユーザーウォレットを初期化します。
-     *
-     * @param username ユーザー名
-     */
     @Override
     @Transactional
-    public void initializeWallet(String username) {
-        String idempotencyKey = "REGISTER_BONUS:" + username;
+    public void initializeWallet(String publicId) {
+        String idempotencyKey = "REGISTER_BONUS:" + publicId;
         jdbc.update("""
                 WITH inserted_wallet AS (
                   INSERT INTO user_wallets (user_id, chip_balance)
                   SELECT id, ?
                   FROM users
-                  WHERE username = ?
+                  WHERE public_id = ?::uuid
                   ON CONFLICT (user_id) DO NOTHING
                   RETURNING user_id, chip_balance
                 )
@@ -65,47 +63,30 @@ public class PostgresWalletRepository implements WalletRepository {
                 ON CONFLICT (idempotency_key) DO NOTHING
                 """,
                 walletProperties.initialGrant(),
-                username,
+                publicId,
                 walletProperties.initialGrant(),
                 "REGISTER_BONUS",
                 "USER",
-                username,
+                publicId,
                 idempotencyKey);
     }
 
-    /**
-     * ユーザー名からウォレット残高を取得します。
-     *
-     * @param username ユーザー名
-     * @return ウォレット情報
-     */
     @Override
-    public Optional<WalletEntry> findByUsername(String username) {
+    public Optional<WalletEntry> findByPublicId(String publicId) {
         List<WalletEntry> results = jdbc.query("""
                 SELECT u.username, uw.chip_balance, uw.updated_at
                 FROM user_wallets uw
                 JOIN users u ON u.id = uw.user_id
-                WHERE u.username = ?
+                WHERE u.public_id = ?::uuid
                 """,
                 (rs, rowNum) -> mapWalletEntry(rs),
-                username);
+                publicId);
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
 
-    /**
-     * 指定額を出金します。
-     *
-     * @param username ユーザー名
-     * @param amount 出金額
-     * @param reason 取引理由
-     * @param refType 参照種別
-     * @param refId 参照 ID
-     * @param idempotencyKey 冪等性キー
-     * @return 出金できた場合は {@code true}
-     */
     @Override
     @Transactional
-    public boolean debit(String username, long amount, String reason, String refType, String refId, String idempotencyKey) {
+    public boolean debit(String publicId, long amount, String reason, String refType, String refId, String idempotencyKey) {
         try {
             int inserted = jdbc.update("""
                     WITH existing AS (
@@ -116,7 +97,7 @@ public class PostgresWalletRepository implements WalletRepository {
                     updated AS (
                       UPDATE user_wallets
                       SET chip_balance = chip_balance - ?, updated_at = CURRENT_TIMESTAMP
-                      WHERE user_id = (SELECT id FROM users WHERE username = ?)
+                      WHERE user_id = (SELECT id FROM users WHERE public_id = ?::uuid)
                         AND chip_balance >= ?
                         AND NOT EXISTS (SELECT 1 FROM existing)
                       RETURNING user_id, chip_balance
@@ -136,39 +117,24 @@ public class PostgresWalletRepository implements WalletRepository {
                     """,
                     idempotencyKey,
                     amount,
-                    username,
+                    publicId,
                     amount,
                     -amount,
                     reason,
                     refType,
                     refId,
                     idempotencyKey);
-            if (inserted > 0) {
-                return true;
-            }
+            if (inserted > 0) return true;
             return hasLedgerEntry(idempotencyKey);
         } catch (DataIntegrityViolationException e) {
-            if (hasLedgerEntry(idempotencyKey)) {
-                return true;
-            }
+            if (hasLedgerEntry(idempotencyKey)) return true;
             throw e;
         }
     }
 
-    /**
-     * 指定額を入金します。
-     *
-     * @param username ユーザー名
-     * @param amount 入金額
-     * @param reason 取引理由
-     * @param refType 参照種別
-     * @param refId 参照 ID
-     * @param idempotencyKey 冪等性キー
-     * @throws IllegalStateException ウォレットが存在しない場合
-     */
     @Override
     @Transactional
-    public void credit(String username, long amount, String reason, String refType, String refId, String idempotencyKey) {
+    public void credit(String publicId, long amount, String reason, String refType, String refId, String idempotencyKey) {
         try {
             int inserted = jdbc.update("""
                     WITH existing AS (
@@ -179,7 +145,7 @@ public class PostgresWalletRepository implements WalletRepository {
                     updated AS (
                       UPDATE user_wallets
                       SET chip_balance = chip_balance + ?, updated_at = CURRENT_TIMESTAMP
-                      WHERE user_id = (SELECT id FROM users WHERE username = ?)
+                      WHERE user_id = (SELECT id FROM users WHERE public_id = ?::uuid)
                         AND NOT EXISTS (SELECT 1 FROM existing)
                       RETURNING user_id, chip_balance
                     )
@@ -198,79 +164,58 @@ public class PostgresWalletRepository implements WalletRepository {
                     """,
                     idempotencyKey,
                     amount,
-                    username,
+                    publicId,
                     amount,
                     reason,
                     refType,
                     refId,
                     idempotencyKey);
             if (inserted == 0 && !hasLedgerEntry(idempotencyKey)) {
-                throw new IllegalStateException("wallet not found: " + username);
+                throw new IllegalStateException("wallet not found: " + publicId);
             }
         } catch (DataIntegrityViolationException e) {
-            if (!hasLedgerEntry(idempotencyKey)) {
-                throw e;
-            }
+            if (!hasLedgerEntry(idempotencyKey)) throw e;
         }
     }
 
-    /**
-     * 直近の台帳履歴を取得します。
-     *
-     * @param username ユーザー名
-     * @param limit 取得件数の上限
-     * @return 台帳履歴一覧
-     */
     @Override
-    public List<WalletLedgerEntry> findLedger(String username, int limit) {
+    public List<WalletLedgerEntry> findLedger(String publicId, int limit) {
         return jdbc.query("""
-                SELECT wl.id, u.username, wl.delta, wl.balance_after, wl.reason, wl.reference_type, wl.reference_id, wl.created_at
+                SELECT wl.id, u.username, wl.delta, wl.balance_after, wl.reason,
+                       wl.reference_type, wl.reference_id, wl.created_at
                 FROM wallet_ledger wl
                 JOIN users u ON u.id = wl.user_id
-                WHERE u.username = ?
+                WHERE u.public_id = ?::uuid
                 ORDER BY wl.created_at DESC
                 LIMIT ?
                 """,
                 (rs, rowNum) -> mapLedgerEntry(rs),
-                username,
+                publicId,
                 Math.max(1, limit));
     }
 
-    /**
-     * 指定理由の最終台帳時刻を取得します。
-     *
-     * @param username ユーザー名
-     * @param reason 取引理由
-     * @return 最終台帳時刻
-     */
     @Override
-    public Optional<Instant> findLastLedgerTime(String username, String reason) {
+    public Optional<Instant> findLastLedgerTime(String publicId, String reason) {
         List<Instant> results = jdbc.query("""
                 SELECT MAX(wl.created_at) AS last_created_at
                 FROM wallet_ledger wl
                 JOIN users u ON u.id = wl.user_id
-                WHERE u.username = ? AND wl.reason = CAST(? AS wallet_ledger_reason)
+                WHERE u.public_id = ?::uuid AND wl.reason = CAST(? AS wallet_ledger_reason)
                 """,
                 (rs, rowNum) -> {
                     Timestamp timestamp = rs.getTimestamp("last_created_at");
                     return timestamp != null ? timestamp.toInstant() : null;
                 },
-                username,
+                publicId,
                 reason);
-        if (results.isEmpty() || results.get(0) == null) {
-            return Optional.empty();
-        }
+        if (results.isEmpty() || results.get(0) == null) return Optional.empty();
         return Optional.of(results.get(0));
     }
 
     private boolean hasLedgerEntry(String idempotencyKey) {
-        Integer count = jdbc.queryForObject("""
-                SELECT COUNT(*)
-                FROM wallet_ledger
-                WHERE idempotency_key = ?
-                """,
-                Integer.class,
-                idempotencyKey);
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM wallet_ledger WHERE idempotency_key = ?",
+                Integer.class, idempotencyKey);
         return count != null && count > 0;
     }
 
@@ -278,8 +223,7 @@ public class PostgresWalletRepository implements WalletRepository {
         return new WalletEntry(
                 rs.getString("username"),
                 rs.getLong("chip_balance"),
-                rs.getTimestamp("updated_at").toInstant()
-        );
+                rs.getTimestamp("updated_at").toInstant());
     }
 
     private WalletLedgerEntry mapLedgerEntry(ResultSet rs) throws SQLException {
@@ -291,7 +235,6 @@ public class PostgresWalletRepository implements WalletRepository {
                 rs.getString("reason"),
                 rs.getString("reference_type"),
                 rs.getString("reference_id"),
-                rs.getTimestamp("created_at").toInstant()
-        );
+                rs.getTimestamp("created_at").toInstant());
     }
 }

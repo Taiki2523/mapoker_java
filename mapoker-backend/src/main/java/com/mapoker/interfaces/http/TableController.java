@@ -105,7 +105,7 @@ public class TableController {
         String name = resolveName(principal, body);
         int buyIn = body != null && body.buyIn() != null ? body.buyIn() : 0;
         String[] userInfo = resolveUserInfo(principal, name);
-        TableService.JoinResult result = tableService.join(id, name, buyIn, userInfo[0], userInfo[1]);
+        TableService.JoinResult result = tableService.join(id, name, buyIn, userInfo[0], userInfo[1], userInfo[2]);
         return new JoinResponse(result.assignedSeatIndex(), toMembers(result.members()));
     }
 
@@ -130,10 +130,10 @@ public class TableController {
         if (principal != null) {
             try {
                 var user = userService.getByPublicId(principal.getUsername());
-                return new String[]{ user.displayName(), user.avatarUrl() };
+                return new String[]{ user.displayName(), user.avatarUrl(), user.publicId() };
             } catch (Exception ignored) {}
         }
-        return new String[]{ name, null };
+        return new String[]{ name, null, null };
     }
 
     private String resolveName(UserDetails principal, TableMembershipRequest body) {

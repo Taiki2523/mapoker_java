@@ -6,64 +6,67 @@ import java.util.Optional;
 
 /**
  * ウォレット残高と台帳を永続化するリポジトリです。
+ *
+ * <p>ユーザーの識別には {@code publicId}（UUID）を使用します。
+ * {@code username} は一意でないため使用しません。
  */
 public interface WalletRepository {
 
     /**
      * ユーザー用ウォレットを初期化します。
      *
-     * @param username ユーザー名
+     * @param publicId ユーザーの公開 ID（UUID）
      */
-    void initializeWallet(String username);
+    void initializeWallet(String publicId);
 
     /**
-     * ユーザー名からウォレット情報を取得します。
+     * 公開 ID からウォレット情報を取得します。
      *
-     * @param username ユーザー名
+     * @param publicId ユーザーの公開 ID（UUID）
      * @return ウォレット情報
      */
-    Optional<WalletEntry> findByUsername(String username);
+    Optional<WalletEntry> findByPublicId(String publicId);
 
     /**
      * 指定額を出金します。
      *
-     * @param username ユーザー名
-     * @param amount 出金額
-     * @param reason 取引理由
-     * @param refType 参照種別
-     * @param refId 参照 ID
+     * @param publicId     ユーザーの公開 ID（UUID）
+     * @param amount       出金額
+     * @param reason       取引理由
+     * @param refType      参照種別
+     * @param refId        参照 ID
      * @param idempotencyKey 冪等性キー
      * @return 出金に成功した場合は {@code true}
      */
-    boolean debit(String username, long amount, String reason, String refType, String refId, String idempotencyKey);
+    boolean debit(String publicId, long amount, String reason, String refType, String refId, String idempotencyKey);
 
     /**
      * 指定額を入金します。
      *
-     * @param username ユーザー名
-     * @param amount 入金額
-     * @param reason 取引理由
-     * @param refType 参照種別
-     * @param refId 参照 ID
+     * @param publicId     ユーザーの公開 ID（UUID）
+     * @param amount       入金額
+     * @param reason       取引理由
+     * @param refType      参照種別
+     * @param refId        参照 ID
      * @param idempotencyKey 冪等性キー
      */
-    void credit(String username, long amount, String reason, String refType, String refId, String idempotencyKey);
+    void credit(String publicId, long amount, String reason, String refType, String refId, String idempotencyKey);
 
     /**
      * 直近の台帳履歴を取得します。
      *
-     * @param username ユーザー名
-     * @param limit 取得件数の上限
+     * @param publicId ユーザーの公開 ID（UUID）
+     * @param limit    取得件数の上限
      * @return 台帳履歴一覧
      */
-    List<WalletLedgerEntry> findLedger(String username, int limit);
+    List<WalletLedgerEntry> findLedger(String publicId, int limit);
 
     /**
      * 指定理由の最終台帳時刻を取得します。
      *
-     * @param username ユーザー名
-     * @param reason 取引理由
+     * @param publicId ユーザーの公開 ID（UUID）
+     * @param reason   取引理由
      * @return 最終台帳時刻
      */
-    Optional<Instant> findLastLedgerTime(String username, String reason);
+    Optional<Instant> findLastLedgerTime(String publicId, String reason);
 }

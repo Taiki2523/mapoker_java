@@ -77,7 +77,7 @@ public class GoogleAuthService {
                 authIdentityRepository.create(user.id(), AuthProvider.GOOGLE, googleSub);
                 WalletService walletService = walletServiceProvider.getIfAvailable();
                 if (walletService != null) {
-                    walletService.initializeWallet(user.username());
+                    walletService.initializeWallet(user.publicId());
                 }
                 return user;
             } catch (DataIntegrityViolationException e) {
