@@ -3,6 +3,7 @@ import type { BetPreset, GameState, PayoutLine, Player, RoomMember, Showdown } f
 import { TopBar } from './TopBar'
 import { TableArea } from './TableArea'
 import { ActionPanel } from './ActionPanel'
+import { ActionLog } from './ActionLog'
 import { t } from '../../i18n'
 
 const STACK_MODE_KEY = 'mapoker_stack_mode'
@@ -107,6 +108,8 @@ export function GameScreen({
         displayName={displayName}
         onSendAction={onSendAction}
       />
+
+      <ActionLog game={game} displayName={displayName} />
 
       {/* 退席ボタン・退席予約メッセージ — 右下固定 */}
       <div className="leave-area">

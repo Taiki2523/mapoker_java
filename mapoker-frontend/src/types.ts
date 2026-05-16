@@ -28,6 +28,13 @@ export type GameState = {
   last_showdown?: Showdown
 }
 
+export type ActionLogEntry = {
+  seq: number
+  player_index: number
+  type: string
+  amount: number
+}
+
 export type Showdown = {
   winners?: number[]
   best_hand?: { rank: string; kickers: string[] } | null

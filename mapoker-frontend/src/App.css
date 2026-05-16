@@ -580,6 +580,25 @@
   min-width: 140px;
 }
 
+.bet-step-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: var(--surface-3);
+  color: var(--text-base);
+  font-size: 1rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.bet-step-btn:hover:not(:disabled) { background: var(--surface-2); }
+.bet-step-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
 .bet-slider {
   flex: 1;
   height: 4px;
@@ -763,6 +782,37 @@ button.icon-btn[data-label]:hover::after {
 }
 
 /* ---- 退席エリア (右下固定) ---- */
+.action-log {
+  position: fixed;
+  bottom: 5rem;
+  left: 0.75rem;
+  width: 220px;
+  max-height: 160px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.action-log-entry {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+  backdrop-filter: blur(4px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.action-log-fold    { color: #e57373; }
+.action-log-all_in  { color: var(--poker-gold); }
+.action-log-bet,
+.action-log-raise   { color: var(--accent); }
+
 .leave-area {
   position: fixed;
   bottom: 1.25rem;
