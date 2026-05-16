@@ -276,6 +276,14 @@ function App() {
   useEffect(() => {
     if (!game) return
     if (game.status === 'showdown' && !showdown) {
+      // オールインのランアウト時はコミュニティカードアニメーション完了を待ってから解決する
+      const delay = Math.max(0, cardRevealEndsAtRef.current - Date.now())
+      if (delay > 0) {
+        const timer = window.setTimeout(() => {
+          void runShowdown({ suppressError: true })
+        }, delay)
+        return () => window.clearTimeout(timer)
+      }
       void runShowdown({ suppressError: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
