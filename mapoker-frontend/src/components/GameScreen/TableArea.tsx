@@ -171,11 +171,13 @@ export function TableArea({
   // setSdStep は setTimeout 経由で呼ぶ（react-hooks/set-state-in-effect 対策）
   useEffect(() => {
     if (!isShowdown) return
+    const RESULT_DELAY = 1500 // カードアニメーション完了後にresultを表示するまでの待機時間(ms)
     const cardWait = Math.max(0, cardAnimEndsAtRef.current - Date.now())
+    const resultAt = cardWait + RESULT_DELAY
     const t0 = window.setTimeout(() => setSdStep(0), 0)
     const t1 = window.setTimeout(() => setSdStep(1), cardWait)
-    const t2 = window.setTimeout(() => setSdStep(2), cardWait + 800)
-    const t3 = window.setTimeout(() => setSdStep(3), cardWait + 1600)
+    const t2 = window.setTimeout(() => setSdStep(2), resultAt - 300)
+    const t3 = window.setTimeout(() => setSdStep(3), resultAt)
     return () => {
       window.clearTimeout(t0)
       window.clearTimeout(t1)

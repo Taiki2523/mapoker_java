@@ -18,7 +18,11 @@ public enum ActionType {
     /** レイズです。 */
     RAISE("raise"),
     /** オールインです。 */
-    ALL_IN("all_in");
+    ALL_IN("all_in"),
+    /** ショーダウン結果です。label に役名を格納します。 */
+    SHOWDOWN("showdown"),
+    /** ポット獲得です。amount に獲得チップ数を格納します。 */
+    PAYOUT("payout");
 
     private final String label;
 

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
-import type { BetPreset, GameState, PayoutLine, Player, RoomMember, Showdown } from '../../types'
+import type { BetPreset, GameState, Player, RoomMember, Showdown, PayoutLine } from '../../types'
 import { TopBar } from './TopBar'
 import { TableArea } from './TableArea'
 import { ActionPanel } from './ActionPanel'
+import { ActionLogDialog } from './ActionLog'
+
 import { t } from '../../i18n'
 
 const STACK_MODE_KEY = 'mapoker_stack_mode'
@@ -54,6 +56,7 @@ export function GameScreen({
   const [stackMode, setStackMode] = useState<'chips' | 'bb'>(() => {
     return (localStorage.getItem(STACK_MODE_KEY) as 'chips' | 'bb') ?? 'chips'
   })
+  const [logOpen, setLogOpen] = useState(false)
 
   useEffect(() => {
     localStorage.setItem(STACK_MODE_KEY, stackMode)
@@ -76,6 +79,7 @@ export function GameScreen({
         onToggleStackMode={toggleStackMode}
         onCopyInvite={onCopyInvite}
         onOpenMyPage={onOpenMyPage}
+        onOpenActionLog={() => setLogOpen(true)}
       />
       <TableArea
         game={game}
@@ -117,6 +121,13 @@ export function GameScreen({
           {t('leave')}
         </button>
       </div>
+
+      <ActionLogDialog
+        game={game}
+        displayName={displayName}
+        open={logOpen}
+        onClose={() => setLogOpen(false)}
+      />
     </div>
   )
 }

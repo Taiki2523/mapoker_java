@@ -258,6 +258,28 @@ public class GameService {
         ShowdownResult result = state.resolveShowdown();
         state.applyPayouts(result.payouts());
         gameRepository.update(id, state);
+
+        // ショーダウン結果をアクションログに永続化（二重呼び出し対策: 既存ならスキップ）
+        List<ActionRecord> existing = gameRepository.findActionsByGameId(id);
+        boolean alreadyRecorded = existing.stream()
+                .anyMatch(a -> a.actionType() == ActionType.SHOWDOWN || a.actionType() == ActionType.PAYOUT);
+        if (!alreadyRecorded) {
+            int nextSeq = existing.size() + 1;
+            boolean isFoldWin = result.bestHand() == null || result.bestHand().rank() == null;
+            String handLabel = isFoldWin ? "fold_win" : result.bestHand().rank().getLabel();
+            for (int winnerIdx : result.winnerIndexes()) {
+                gameRepository.appendAction(id, new ActionRecord(nextSeq++, winnerIdx,
+                        ActionType.SHOWDOWN, 0, handLabel));
+            }
+            List<Integer> payouts = result.payouts();
+            for (int i = 0; i < payouts.size(); i++) {
+                if (payouts.get(i) > 0) {
+                    gameRepository.appendAction(id, new ActionRecord(nextSeq++, i,
+                            ActionType.PAYOUT, payouts.get(i), null));
+                }
+            }
+        }
+
         recordHandHistoryIfFinished(id, state);
         TableService tableService = tableServiceProvider.getIfAvailable();
         if (tableService != null) {
