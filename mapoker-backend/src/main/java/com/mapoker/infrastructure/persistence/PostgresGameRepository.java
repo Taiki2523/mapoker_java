@@ -143,7 +143,8 @@ public class PostgresGameRepository implements GameRepository {
                         rs.getInt("seq"),
                         rs.getInt("player_index"),
                         ActionType.fromLabel(rs.getString("action_type")),
-                        rs.getInt("amount")),
+                        rs.getInt("amount"),
+                        rs.getString("label")),
                 gameId);
     }
 
@@ -263,13 +264,18 @@ public class PostgresGameRepository implements GameRepository {
         }
     }
 
+    @Override
+    public void appendAction(String id, ActionRecord action) {
+        insertAction(id, action);
+    }
+
     private void insertAction(String id, ActionRecord action) {
         jdbc.update("""
-                INSERT INTO actions (game_id, seq, player_index, action_type, amount)
-                VALUES (?, ?, ?, CAST(? AS action_type), ?)
+                INSERT INTO actions (game_id, seq, player_index, action_type, amount, label)
+                VALUES (?, ?, ?, CAST(? AS action_type), ?, ?)
                 """,
                 id, action.seq(), action.playerIndex(),
-                action.actionType().getLabel(), action.amount());
+                action.actionType().getLabel(), action.amount(), action.label());
     }
 
     // ---- deserialize ----

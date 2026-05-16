@@ -62,6 +62,16 @@ public interface GameRepository {
     List<GameState> findAll();
 
     /**
+     * ゲーム状態を更新せずにアクションのみを追記する。
+     *
+     * <p>ショーダウン結果・ペイアウトなど、ゲーム状態変更を伴わないログ追記に使用する。
+     *
+     * @param id     ゲーム ID
+     * @param action 追記するアクション
+     */
+    void appendAction(String id, ActionRecord action);
+
+    /**
      * 指定ゲームに記録された全アクション履歴を取得する。
      *
      * @param gameId ゲーム ID

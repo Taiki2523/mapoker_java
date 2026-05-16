@@ -89,6 +89,11 @@ public class InMemoryGameRepository implements GameRepository {
      * @return アクション履歴一覧
      */
     @Override
+    public void appendAction(String id, ActionRecord action) {
+        actions.computeIfAbsent(id, k -> new ArrayList<>()).add(action);
+    }
+
+    @Override
     public List<ActionRecord> findActionsByGameId(String gameId) {
         return actions.getOrDefault(gameId, List.of());
     }

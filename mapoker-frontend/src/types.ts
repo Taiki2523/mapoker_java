@@ -33,6 +33,7 @@ export type ActionLogEntry = {
   player_index: number
   type: string
   amount: number
+  label?: string | null
 }
 
 export type Showdown = {

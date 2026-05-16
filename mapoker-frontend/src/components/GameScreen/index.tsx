@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import type { BetPreset, GameState, PayoutLine, Player, RoomMember, Showdown } from '../../types'
+import type { BetPreset, GameState, Player, RoomMember, Showdown, PayoutLine } from '../../types'
 import { TopBar } from './TopBar'
 import { TableArea } from './TableArea'
 import { ActionPanel } from './ActionPanel'
 import { ActionLogDialog } from './ActionLog'
+
 import { t } from '../../i18n'
 
 const STACK_MODE_KEY = 'mapoker_stack_mode'
@@ -123,8 +124,6 @@ export function GameScreen({
 
       <ActionLogDialog
         game={game}
-        showdown={showdown}
-        payoutLines={payoutLines}
         displayName={displayName}
         open={logOpen}
         onClose={() => setLogOpen(false)}
