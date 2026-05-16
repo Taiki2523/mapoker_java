@@ -356,7 +356,8 @@ public class TableService {
                                 current.joinedAt(),
                                 true,
                                 current.displayName(),
-                                current.avatarUrl()
+                                current.avatarUrl(),
+                                current.publicId()
                         ));
                     } else {
                         updatedMembers.add(current);
