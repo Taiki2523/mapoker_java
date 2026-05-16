@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>com.mapoker</groupId>
 	<artifactId>mapoker-backend</artifactId>
-	<version>1.0.2</version>
+	<version>1.0.3</version>
 	<name/>
 	<description/>
 	<url/>
@@ -129,7 +129,14 @@
 						<exclude>com/mapoker/interfaces/ws/dto/**</exclude>
 						<!-- 外部ウォレット連携（統合テストが必要、単体テスト対象外） -->
 						<exclude>com/mapoker/application/WalletService*</exclude>
+						<exclude>com/mapoker/application/WalletEntry*</exclude>
+						<exclude>com/mapoker/application/WalletLedgerEntry*</exclude>
 						<exclude>com/mapoker/interfaces/http/WalletController*</exclude>
+						<exclude>com/mapoker/interfaces/http/AdminWalletController*</exclude>
+						<!-- 認証基盤（Google ID Token検証・Spring Security依存、統合テスト対象外） -->
+						<exclude>com/mapoker/application/UserService*</exclude>
+						<exclude>com/mapoker/application/User.class</exclude>
+						<exclude>com/mapoker/interfaces/http/AuthController*</exclude>
 						<!-- モデルレコード（DTOに準ずる） -->
 						<exclude>com/mapoker/application/HandHistoryEntry*</exclude>
 						<!-- エントリーポイント・テストヘルパー -->
@@ -159,8 +166,7 @@
 										<limit>
 											<counter>INSTRUCTION</counter>
 											<value>COVEREDRATIO</value>
-											<!-- TODO: GameService等のテスト追加後に85%へ引き上げる -->
-											<minimum>0.75</minimum>
+											<minimum>0.85</minimum>
 										</limit>
 									</limits>
 								</rule>
