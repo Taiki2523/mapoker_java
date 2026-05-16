@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { fetchJSON } from '../../api'
 import type { ActionLogEntry, GameState, PayoutLine, Showdown } from '../../types'
+import { hasTranslation, t } from '../../i18n'
 
 const ACTION_LABELS: Record<string, string> = {
   FOLD: 'フォールド',
@@ -58,7 +59,15 @@ export function ActionLogDialog({ game, showdown, payoutLines, displayName, open
 
   const isFinished = game.status === 'finished' || game.status === 'showdown'
   if (isFinished && payoutLines.length > 0) {
-    const label = game.status === 'finished' && showdown == null ? 'フォールド勝ち' : 'ショーダウン'
+    const isFoldWin = game.status === 'finished' && showdown == null
+    // ショーダウン divider: 勝者名 + 役を表示
+    let label = 'フォールド勝ち'
+    if (!isFoldWin && showdown) {
+      const winnerNames = (showdown.winners ?? []).map((i) => displayName(i)).join(', ')
+      const rank = showdown.best_hand?.rank
+      const rankLabel = rank && hasTranslation(rank) ? t(rank as Parameters<typeof t>[0]) : rank ?? ''
+      label = rankLabel ? `${winnerNames} — ${rankLabel}` : `${winnerNames} 勝利`
+    }
     items.push({ kind: 'divider', label })
     for (const p of payoutLines) {
       items.push({ kind: 'payout', name: p.name, amount: p.amount })
