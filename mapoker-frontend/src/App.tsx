@@ -276,6 +276,14 @@ function App() {
   useEffect(() => {
     if (!game) return
     if (game.status === 'showdown' && !showdown) {
+      // オールインのランアウト時はコミュニティカードアニメーション完了を待ってから解決する
+      const delay = Math.max(0, cardRevealEndsAtRef.current - Date.now())
+      if (delay > 0) {
+        const timer = window.setTimeout(() => {
+          void runShowdown({ suppressError: true })
+        }, delay)
+        return () => window.clearTimeout(timer)
+      }
       void runShowdown({ suppressError: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -283,13 +291,14 @@ function App() {
 
   useEffect(() => {
     const isAutoStartable = game?.status === 'finished' || !game?.status
-    if (!game || !isAutoStartable || !game.can_start_hand) return
+    const activeRosterCount = roster.filter((m) => !m.pendingLeave).length
+    if (!game || !isAutoStartable || !game.can_start_hand || activeRosterCount < 2) return
     const timer = window.setTimeout(() => {
       void startHand(undefined, undefined, { suppressError: true })
     }, NEXT_HAND_DELAY_MS)
     return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game?.status, game?.can_start_hand, gameId])
+  }, [game?.status, game?.can_start_hand, gameId, roster])
 
   useEffect(() => {
     if (isMyTurn && !prevIsMyTurn.current) {

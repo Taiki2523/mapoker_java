@@ -182,6 +182,12 @@ public class TableService {
             if (current.getStatus() == GameStatus.IN_PROGRESS) {
                 return current;
             }
+            long activeRosterCount = getMembers(tableId).stream()
+                    .filter(m -> !m.pendingLeave())
+                    .count();
+            if (activeRosterCount < com.mapoker.domain.PokerConstants.MIN_PLAYERS) {
+                throw new IllegalStateException("not enough players at the table");
+            }
             return gameService.startHand(tableId, bigBlind);
         }
     }

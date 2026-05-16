@@ -109,7 +109,9 @@ export function TableArea({
     }
 
     const timers: number[] = []
-    let delay = 0
+    // オールインランアウト時はホールカード公開後 1000ms 待ってからコミュニティカードを開始する
+    const anyAllIn = game.players.some(p => p.all_in && !p.folded)
+    let delay = (anyAllIn && isShowdown) ? STREET_REVEAL_INTERVAL_MS : 0
 
     // フロップ（インデックス 0-2）
     if (prev < 3 && current >= 3) {
@@ -331,8 +333,11 @@ export function TableArea({
           const showResult = sdStep >= 3
           const isWinnerSeat = showResult && (showdown?.winners?.includes(idx) ?? false)
           const isLoserSeat = showResult && !(showdown?.winners?.includes(idx) ?? false) && !player.folded
+          // ショーダウン時に誰かがオールインなら全員のカードをアニメーション前から公開する
+          // （ランアウト = 全員オールイン で board が配られる場面）
+          const anyAllInAtShowdown = isShowdown && game.players.some(p => p.all_in && !p.folded)
           const showCards = mySeat === idx || isSpectator || (showResult && !player.folded)
-            || (game.status === 'in_progress' && !player.folded && player.all_in)
+            || (anyAllInAtShowdown && !player.folded)
           const cards = player.hole?.length ? player.hole : ['--', '--']
           const isMe = mySeat === idx
 
