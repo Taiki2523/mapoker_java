@@ -329,12 +329,11 @@ export function TableArea({
           const showResult = sdStep >= 3
           const isWinnerSeat = showResult && (showdown?.winners?.includes(idx) ?? false)
           const isLoserSeat = showResult && !(showdown?.winners?.includes(idx) ?? false) && !player.folded
-          // 全員オールイン（アクション不要）の場合のみランアウト中にカードを公開する
-          const allRemainingAreAllIn = game.players
-            .filter(p => !p.folded)
-            .every(p => p.all_in)
+          // ショーダウン時に誰かがオールインなら全員のカードをアニメーション前から公開する
+          // （ランアウト = 全員オールイン で board が配られる場面）
+          const anyAllInAtShowdown = isShowdown && game.players.some(p => p.all_in && !p.folded)
           const showCards = mySeat === idx || isSpectator || (showResult && !player.folded)
-            || (game.status === 'in_progress' && !player.folded && player.all_in && allRemainingAreAllIn)
+            || (anyAllInAtShowdown && !player.folded)
           const cards = player.hole?.length ? player.hole : ['--', '--']
           const isMe = mySeat === idx
 
