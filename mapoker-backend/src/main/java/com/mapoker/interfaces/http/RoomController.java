@@ -37,7 +37,7 @@ public class RoomController {
             @JsonProperty("joined_at") String joinedAt
     ) {}
 
-    private record MembersResponse(List<MemberRecord> members) {}
+    record MembersResponse(List<MemberRecord> members) {}
 
     /**
      * ルーム参加者一覧を取得します。

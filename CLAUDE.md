@@ -120,9 +120,24 @@ POST   /v1/auth/logout
 
 `games`, `players`, `actions`, `users` — see `docs/designs/db_schema.md` for DDL. Key: `deck`, `community`, `hole`, `acted` are JSON columns.
 
-### Testing priorities (80% coverage target)
+### Testing priorities (85% coverage target)
 
-Emphasize: hand evaluator, action validation, street progression, showdown/side-pot distribution, repository transaction behavior.
+カバレッジは JaCoCo で計測（`./mvnw verify` で `target/site/jacoco/index.html` が生成される）。
+設定クラス・DTO・PostgresRepository は除外済み。`./mvnw verify` が 85% 未達の場合はビルドが失敗する。
+
+**優先順位の方針**: 変更頻度 × 複雑度で優先する。バグが出たら即テスト追加（リグレッション防止）。
+
+**テストファイルの分割規則**（`GameState` を例に）:
+- `GameStateTest.java` — 基本フロー（ハンド開始・ブラインド・ボタン移動）
+- `GameStateSidePotTest.java` — サイドポット計算・showdown 解決・odd chip
+- `GameStateBettingTest.java` — raiseOpen・ストリート進行・ベット額境界
+
+**モックを使う場合**: `UserService` 等アプリ層は `InMemoryUserRepository` をそのまま使うと Spring 不要で速い。
+`ObjectProvider` 依存がある場合は Mockito で stub する。
+
+**ドメイン層のテストは Spring 不要**: `GameState`, `ActionValidator`, `HandEvaluator` は `@SpringBootTest` なしで書く（起動が速い）。
+
+Emphasize: action validation, street progression, showdown/side-pot distribution, repository transaction behavior.
 
 ### Reference implementation
 
