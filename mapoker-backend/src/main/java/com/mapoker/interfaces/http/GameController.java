@@ -98,7 +98,7 @@ public class GameController {
             @AuthenticationPrincipal UserDetails principal) {
         boolean isSpectator = "1".equals(spectator) || "true".equalsIgnoreCase(spectator);
         Integer effectiveViewerIndex = resolveViewerIndex(id, viewerIndex, principal);
-        return GameResponse.from(gameService.getGame(id), effectiveViewerIndex, isSpectator);
+        return GameResponse.from(gameService.getGame(id), effectiveViewerIndex, isSpectator, seatedCount(id));
     }
 
     /**
@@ -112,7 +112,7 @@ public class GameController {
      */
     @PostMapping("/{id}/start")
     public GameResponse startHand(@PathVariable String id, @Valid @RequestBody StartHandRequest req) {
-        return GameResponse.from(tableService.startHand(id, req.bigBlind()), null, false);
+        return GameResponse.from(tableService.startHand(id, req.bigBlind()), null, false, seatedCount(id));
     }
 
     /**
@@ -137,7 +137,7 @@ public class GameController {
         GameState state = gameService.applyAction(id, req.playerIndex(),
                 req.action().type(), req.action().amount());
         Integer effectiveViewerIndex = resolveViewerIndex(id, viewerIndex, principal);
-        return GameResponse.from(state, effectiveViewerIndex, false);
+        return GameResponse.from(state, effectiveViewerIndex, false, seatedCount(id));
     }
 
     /**
@@ -165,7 +165,7 @@ public class GameController {
         gameService.resolveShowdown(id);
         // showdown後のGameResponseにlast_showdownと全参加者のホールカードを含める
         GameState state = gameService.getGame(id);
-        return GameResponse.from(state, null, false);
+        return GameResponse.from(state, null, false, seatedCount(id));
     }
 
     /**
@@ -179,6 +179,17 @@ public class GameController {
      * @param principal             認証済みユーザー詳細。未認証時は {@code null}
      * @return 有効な {@code viewerIndex}、または {@code null}（観戦モード相当）
      */
+    /** テーブルの着席中プレイヤー数（pendingLeave 除く）を返す。テーブルが存在しない場合は -1。 */
+    private int seatedCount(String id) {
+        try {
+            return (int) tableService.getMembers(id).stream()
+                    .filter(m -> !m.pendingLeave())
+                    .count();
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
     private Integer resolveViewerIndex(String id, Integer requestedViewerIndex, UserDetails principal) {
         if (principal == null) {
             return requestedViewerIndex;
