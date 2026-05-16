@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { fetchJSON } from '../../api'
 import type { ActionLogEntry, GameState } from '../../types'
 
-const MAX_LOG = 10
+const MAX_LOG = 4
 
 const ACTION_LABELS: Record<string, string> = {
   FOLD: 'フォールド',

@@ -784,12 +784,11 @@ button.icon-btn[data-label]:hover::after {
 /* ---- 退席エリア (右下固定) ---- */
 .action-log {
   flex-shrink: 0;
-  max-height: 80px;
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-  padding: 0.3rem 1.25rem;
+  padding: 0.25rem 1.25rem;
   background: rgba(8, 12, 20, 0.75);
   border-top: 1px solid rgba(255,255,255,0.04);
 }
