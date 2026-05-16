@@ -10,6 +10,8 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import org.springframework.scheduling.annotation.Scheduled;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -29,6 +31,8 @@ public class TableService {
     private final Map<String, TableRecord> tables = new ConcurrentHashMap<>();
     private final Map<String, List<TableMemberRecord>> tableMembers = new ConcurrentHashMap<>();
     private final Map<String, Object> tableLocks = new ConcurrentHashMap<>();
+    /** テーブルが最後に空になった日時（メンバーが0人になった瞬間を記録）。 */
+    private final Map<String, java.time.Instant> lastEmptiedAt = new ConcurrentHashMap<>();
 
     private final GameService gameService;
     private final GameProperties gameProperties;
@@ -346,6 +350,7 @@ public class TableService {
             cashOutSeatStackIfPossible(member.name(), table.gameId(), member.seatIndex());
             userTableHistoryService.recordLeave(member.name(), table.id(), member.seatIndex());
             List<TableMemberRecord> result = List.copyOf(members);
+            trackEmptyTable(table.id(), result);
             publishMembers(table.id(), result);
             return result;
         }
@@ -379,8 +384,36 @@ public class TableService {
             }
             remainingMembers.sort(Comparator.comparingInt(TableMemberRecord::seatIndex));
             tableMembers.put(table.id(), remainingMembers);
-            publishMembers(tableId, List.copyOf(remainingMembers));
+            List<TableMemberRecord> remaining = List.copyOf(remainingMembers);
+            trackEmptyTable(tableId, remaining);
+            publishMembers(tableId, remaining);
         }
+    }
+
+    /** メンバーが空になったときに lastEmptiedAt を記録する。 */
+    private void trackEmptyTable(String tableId, List<TableMemberRecord> members) {
+        if (members.isEmpty()) {
+            lastEmptiedAt.putIfAbsent(tableId, Instant.now());
+        } else {
+            lastEmptiedAt.remove(tableId);
+        }
+    }
+
+    /**
+     * 24 時間以上無人のテーブルを削除します。Spring Scheduler により 1 時間ごとに実行されます。
+     */
+    @Scheduled(fixedDelay = 3_600_000)
+    public void removeStaleEmptyTables() {
+        Instant threshold = Instant.now().minus(24, ChronoUnit.HOURS);
+        lastEmptiedAt.entrySet().removeIf(entry -> {
+            if (entry.getValue().isBefore(threshold)) {
+                String tableId = entry.getKey();
+                tables.remove(tableId);
+                tableMembers.remove(tableId);
+                return true;
+            }
+            return false;
+        });
     }
 
     private void publishMembers(String tableId, List<TableMemberRecord> members) {
