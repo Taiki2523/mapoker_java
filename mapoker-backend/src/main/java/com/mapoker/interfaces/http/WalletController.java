@@ -1,5 +1,6 @@
 package com.mapoker.interfaces.http;
 
+import com.mapoker.application.UserService;
 import com.mapoker.application.WalletEntry;
 import com.mapoker.application.WalletService;
 import com.mapoker.interfaces.http.dto.AdminGrantRequest;
@@ -31,9 +32,11 @@ public class WalletController {
     private static final int MAX_LEDGER_LIMIT = 100;
 
     private final WalletService walletService;
+    private final UserService userService;
 
-    public WalletController(WalletService walletService) {
+    public WalletController(WalletService walletService, UserService userService) {
         this.walletService = walletService;
+        this.userService = userService;
     }
 
     /**
@@ -47,14 +50,14 @@ public class WalletController {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        return ResponseEntity.ok(loadWalletResponse(principal.getUsername()));
+        return ResponseEntity.ok(loadWalletResponse(resolveUsername(principal)));
     }
 
     /**
      * 認証ユーザーの台帳履歴を取得します。
      *
      * @param principal 認証済みユーザー
-     * @param limit 取得件数
+     * @param limit     取得件数（最大 100）
      * @return 台帳履歴応答
      */
     @GetMapping("/ledger")
@@ -65,7 +68,7 @@ public class WalletController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         int normalizedLimit = Math.max(1, Math.min(limit, MAX_LEDGER_LIMIT));
-        return ResponseEntity.ok(walletService.getLedger(principal.getUsername(), normalizedLimit).stream()
+        return ResponseEntity.ok(walletService.getLedger(resolveUsername(principal), normalizedLimit).stream()
                 .map(WalletLedgerResponse::from)
                 .toList());
     }
@@ -81,7 +84,7 @@ public class WalletController {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        String username = principal.getUsername();
+        String username = resolveUsername(principal);
         walletService.claimDailyBonus(username);
         return ResponseEntity.ok(loadWalletResponse(username));
     }
@@ -97,9 +100,13 @@ public class WalletController {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        String username = principal.getUsername();
+        String username = resolveUsername(principal);
         walletService.claimRecovery(username);
         return ResponseEntity.ok(loadWalletResponse(username));
+    }
+
+    private String resolveUsername(UserDetails principal) {
+        return userService.getByPublicId(principal.getUsername()).username();
     }
 
     private WalletResponse loadWalletResponse(String username) {
@@ -118,8 +125,11 @@ class AdminWalletController {
 
     private final WalletService walletService;
 
-    AdminWalletController(WalletService walletService) {
+    private final UserService userService;
+
+    AdminWalletController(WalletService walletService, UserService userService) {
         this.walletService = walletService;
+        this.userService = userService;
     }
 
     /**
@@ -136,7 +146,8 @@ class AdminWalletController {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        walletService.adminGrant(principal.getUsername(), request.targetUsername(), request.amount());
+        String adminUsername = userService.getByPublicId(principal.getUsername()).username();
+        walletService.adminGrant(adminUsername, request.targetUsername(), request.amount());
         return ResponseEntity.ok(WalletResponse.from(
                 walletService.getBalance(request.targetUsername()),
                 walletService.getNextClaimTimes(request.targetUsername())));

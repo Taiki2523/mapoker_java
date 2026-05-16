@@ -2,7 +2,7 @@ package com.mapoker;
 
 import com.mapoker.application.GameService;
 import com.mapoker.application.TableService;
-import com.mapoker.application.UserService;
+import com.mapoker.application.UserRepository;
 import com.mapoker.application.UserTableHistoryService;
 import com.mapoker.domain.game.GameStatus;
 import com.mapoker.domain.game.OddChipRule;
@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PostgresPersistenceIntegrationTest {
 
     @Autowired
-    private UserService userService;
+    private UserRepository userRepository;
 
     @Autowired
     private GameService gameService;
@@ -38,9 +38,10 @@ class PostgresPersistenceIntegrationTest {
 
     @Test
     void persistsUsersAndGameLifecycleInPostgres() {
-        var user = userService.register("alice", "password123");
+        var user = userRepository.createWithGoogle("alice", "0000", null);
         assertThat(user.id()).isPositive();
-        assertThat(userService.getByUsername("alice").username()).isEqualTo("alice");
+        assertThat(user.username()).isEqualTo("alice");
+        assertThat(user.publicId()).isNotBlank();
 
         var game = gameService.createGame(
                 List.of(
@@ -66,7 +67,7 @@ class PostgresPersistenceIntegrationTest {
 
     @Test
     void persistsUserTableHistoryInPostgres() {
-        userService.register("history_alice", "password123");
+        userRepository.createWithGoogle("history_alice", "0001", null);
 
         var created = tableService.createRingTable(new TableService.CreateRingTableInput(
                 "History Table",

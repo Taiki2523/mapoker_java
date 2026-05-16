@@ -211,6 +211,10 @@ public class TableService {
      * @throws IllegalStateException ウォレット残高が不足している場合
      */
     public JoinResult join(String id, String requestedName, int buyIn) {
+        return join(id, requestedName, buyIn, requestedName, null);
+    }
+
+    public JoinResult join(String id, String requestedName, int buyIn, String displayName, String avatarUrl) {
         synchronized (tableLock(id)) {
             TableRecord table = getTable(id);
             String name = normalizeMemberName(requestedName);
@@ -279,7 +283,8 @@ public class TableService {
                     true
             ));
 
-            members.add(new TableMemberRecord(name, seatIndex, Instant.now().toString()));
+            members.add(new TableMemberRecord(name, seatIndex, Instant.now().toString(),
+                    displayName != null ? displayName : name, avatarUrl));
             members.sort(Comparator.comparingInt(TableMemberRecord::seatIndex));
             tableMembers.put(table.id(), members);
             userTableHistoryService.recordJoin(name, table, seatIndex);
@@ -320,7 +325,9 @@ public class TableService {
                                 current.name(),
                                 current.seatIndex(),
                                 current.joinedAt(),
-                                true
+                                true,
+                                current.displayName(),
+                                current.avatarUrl()
                         ));
                     } else {
                         updatedMembers.add(current);

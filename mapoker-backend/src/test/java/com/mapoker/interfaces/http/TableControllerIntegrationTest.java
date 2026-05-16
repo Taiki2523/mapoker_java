@@ -177,13 +177,12 @@ class TableControllerIntegrationTest {
     }
 
     @Test
-    void validatesLoginRequest() throws Exception {
-        mockMvc.perform(post("/v1/auth/login")
+    void validatesGoogleAuthRequest() throws Exception {
+        mockMvc.perform(post("/v1/auth/google")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "username": "ab",
-                                  "password": "123"
+                                  "idToken": ""
                                 }
                                 """))
                 .andExpect(status().isBadRequest())

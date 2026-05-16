@@ -88,7 +88,7 @@ function App() {
   const displayName = useMemo(() => {
     return (seatIndex: number) => {
       const member = roster.find((m) => m.seatIndex === seatIndex)
-      return member?.name || game?.players?.[seatIndex]?.id || t('seatN', { n: seatIndex + 1 })
+      return member?.displayName || member?.name || game?.players?.[seatIndex]?.id || t('seatN', { n: seatIndex + 1 })
     }
   }, [game?.players, roster])
 
@@ -872,7 +872,6 @@ function App() {
           loading={profileLoading}
           error={profileError}
           onClose={() => setShowMyPage(false)}
-          onRefresh={() => void refreshProfileTables()}
           onLogout={() => void handleLogout()}
           onUpdateUser={(user) => { setCurrentUser(user); setMyName(user.username) }}
           onClaimDailyBonus={() => void handleClaimDailyBonus()}

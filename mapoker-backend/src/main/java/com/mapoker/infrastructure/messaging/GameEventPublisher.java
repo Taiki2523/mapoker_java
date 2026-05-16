@@ -72,7 +72,9 @@ public class GameEventPublisher {
                         member.name(),
                         member.seatIndex(),
                         member.joinedAt(),
-                        member.pendingLeave()
+                        member.pendingLeave(),
+                        member.displayName(),
+                        member.avatarUrl()
                 ))
                 .toList();
         messaging.convertAndSend(

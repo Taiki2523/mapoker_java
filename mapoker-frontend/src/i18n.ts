@@ -131,6 +131,8 @@ const ja = {
 
   // --- 認証 ---
   signIn: 'サインイン',
+  signInWithGoogle: 'Google でサインイン',
+  signInFailed: 'サインインに失敗しました',
   signUp: 'サインアップ',
   usernameLabel: 'ユーザー名',
   passwordLabel: 'パスワード',

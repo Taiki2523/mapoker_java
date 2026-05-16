@@ -36,7 +36,7 @@ public record CorsProperties(
         if (allowedOriginPatterns == null || allowedOriginPatterns.isEmpty())
             allowedOriginPatterns = List.of("*");
         if (allowedMethods == null || allowedMethods.isEmpty())
-            allowedMethods = List.of("GET", "POST", "PUT", "DELETE", "OPTIONS");
+            allowedMethods = List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
         if (allowedHeaders == null || allowedHeaders.isEmpty())
             allowedHeaders = List.of("*");
     }

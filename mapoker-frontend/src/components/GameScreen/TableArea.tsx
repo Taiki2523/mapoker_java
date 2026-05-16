@@ -353,9 +353,29 @@ export function TableArea({
                 {bubble && <div className="action-bubble">{bubble}</div>}
                 <div className="player-box">
                   <div className="seat-header">
-                    <div className="seat-avatar">
-                      {displayName(idx).slice(0, 1).toUpperCase()}
-                    </div>
+                    {(() => {
+                      const member = roster.find((m) => m.seatIndex === idx)
+                      const avatarUrl = member?.avatarUrl
+                      const fullName = member?.displayName || displayName(idx)
+                      const shortName = member?.name || displayName(idx)
+                      return (
+                        <div className="seat-avatar-wrap" title={fullName}>
+                          <div className="seat-avatar">
+                            {avatarUrl
+                              ? <img src={avatarUrl} alt={shortName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                              : shortName.slice(0, 1).toUpperCase()
+                            }
+                          </div>
+                          <div className="player-tooltip">
+                            {avatarUrl && <img src={avatarUrl} alt={shortName} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />}
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{fullName}</div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Stack {formatStack(player.stack)}</div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })()}
                     <div className="seat-info">
                       <div className="player-name-row">
                         <span className="player-name">{displayName(idx)}</span>
