@@ -23,7 +23,7 @@ type Props = {
 
 type LogItem =
   | { kind: 'action'; entry: ActionLogEntry }
-  | { kind: 'divider'; label: string }
+  | { kind: 'showdown'; label: string }
   | { kind: 'payout'; name: string; amount: number }
 
 export function ActionLogDialog({ game, showdown, payoutLines, displayName, open, onClose }: Props) {
@@ -35,7 +35,7 @@ export function ActionLogDialog({ game, showdown, payoutLines, displayName, open
     fetchJSON<{ actions: ActionLogEntry[] }>(`/v1/games/${game.id}/actions`)
       .then(({ actions }) => setEntries(actions))
       .catch(() => {})
-  }, [game.id, game.current_player, game.street, game.status])
+  }, [game.id, game.current_player, game.street, game.status, showdown])
 
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ behavior: 'instant' })
@@ -47,31 +47,30 @@ export function ActionLogDialog({ game, showdown, payoutLines, displayName, open
   const fmt = (chips: number) =>
     `¥${chips}${bb > 0 ? ` (${Math.round((chips / bb) * 10) / 10}BB)` : ''}`
 
+  const items: LogItem[] = entries.map((e) => ({ kind: 'action', entry: e }))
+
+  // showdown 結果はハンド終了後かつ解決済みのときのみ追加（ネタバレ防止）
+  const resolved = game.status === 'finished' && showdown !== null
+  if (resolved && payoutLines.length > 0) {
+    const isFoldWin = showdown.best_hand == null
+    if (isFoldWin) {
+      items.push({ kind: 'showdown', label: 'フォールド勝ち' })
+    } else {
+      const winnerNames = (showdown.winners ?? []).map((i) => displayName(i)).join(', ')
+      const rank = showdown.best_hand?.rank
+      const rankLabel = rank && hasTranslation(rank) ? t(rank as Parameters<typeof t>[0]) : (rank ?? '')
+      items.push({ kind: 'showdown', label: `${winnerNames} — ${rankLabel}` })
+    }
+    for (const p of payoutLines) {
+      items.push({ kind: 'payout', name: p.name, amount: p.amount })
+    }
+  }
+
   const fmtAction = (entry: ActionLogEntry) => {
     const name = displayName(entry.player_index)
     const label = ACTION_LABELS[entry.type] ?? entry.type.toLowerCase()
     const amtStr = entry.amount > 0 ? ` ${fmt(entry.amount)}` : ''
     return `${name} が${label}${amtStr}`
-  }
-
-  // ログアイテムを構築: アクション履歴 + ショーダウン結果
-  const items: LogItem[] = entries.map((e) => ({ kind: 'action', entry: e }))
-
-  const isFinished = game.status === 'finished' || game.status === 'showdown'
-  if (isFinished && payoutLines.length > 0) {
-    const isFoldWin = game.status === 'finished' && showdown == null
-    // ショーダウン divider: 勝者名 + 役を表示
-    let label = 'フォールド勝ち'
-    if (!isFoldWin && showdown) {
-      const winnerNames = (showdown.winners ?? []).map((i) => displayName(i)).join(', ')
-      const rank = showdown.best_hand?.rank
-      const rankLabel = rank && hasTranslation(rank) ? t(rank as Parameters<typeof t>[0]) : rank ?? ''
-      label = rankLabel ? `${winnerNames} — ${rankLabel}` : `${winnerNames} 勝利`
-    }
-    items.push({ kind: 'divider', label })
-    for (const p of payoutLines) {
-      items.push({ kind: 'payout', name: p.name, amount: p.amount })
-    }
   }
 
   return (
@@ -85,16 +84,17 @@ export function ActionLogDialog({ game, showdown, payoutLines, displayName, open
           {items.length === 0
             ? <div className="muted" style={{ padding: '1rem', textAlign: 'center' }}>まだアクションはありません</div>
             : items.map((item, i) => {
-                if (item.kind === 'divider') {
+                if (item.kind === 'showdown') {
                   return (
-                    <div key={`divider-${i}`} className="action-log-divider">
+                    <div key={`sd-${i}`} className="action-log-entry action-log-showdown">
+                      <span className="action-log-seq">🃏</span>
                       {item.label}
                     </div>
                   )
                 }
                 if (item.kind === 'payout') {
                   return (
-                    <div key={`payout-${i}`} className="action-log-entry action-log-payout">
+                    <div key={`pay-${i}`} className="action-log-entry action-log-payout">
                       <span className="action-log-seq">💰</span>
                       {`${item.name} が ${fmt(item.amount)} を獲得`}
                     </div>
