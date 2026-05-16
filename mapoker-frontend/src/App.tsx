@@ -469,6 +469,17 @@ function App() {
   }
 
   const handleLogout = async () => {
+    // テーブルに着席中ならログアウト前にキャッシュアウト退席する
+    if (gameId && myName.trim()) {
+      try {
+        await fetchJSON(`/v1/tables/${gameId}/leave`, {
+          method: 'POST',
+          body: JSON.stringify({ name: myName.trim(), seat_index: mySeatIndex }),
+        })
+      } catch {
+        // ignore — サーバー側で未処理のまま logout を続行
+      }
+    }
     try {
       await fetchJSON('/v1/auth/logout', { method: 'POST' })
     } catch {

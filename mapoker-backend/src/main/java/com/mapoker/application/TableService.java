@@ -230,8 +230,18 @@ public class TableService {
                     .findFirst()
                     .orElse(null);
             if (existing != null) {
-                // スタックが 0 かつ buyIn > 0 の場合はリバイとして処理
                 int currentStack = gameService.getSeatStack(table.gameId(), existing.seatIndex());
+                GameState state = gameService.getGame(table.gameId());
+                boolean handActive = (state.getStatus() == GameStatus.IN_PROGRESS && state.getPot() > 0)
+                        || state.getStatus() == GameStatus.SHOWDOWN;
+
+                // ハンド非進行中にスタックが残っている（切断・未退席）場合はキャッシュアウトしてから再バイイン
+                if (currentStack > 0 && !handActive) {
+                    cashOutSeatStackIfPossible(name, table.gameId(), existing.seatIndex());
+                    currentStack = 0;
+                }
+
+                // スタックが 0 かつ buyIn > 0 の場合はリバイとして処理
                 if (currentStack == 0 && buyIn > 0) {
                     WalletService walletService = walletServiceProvider.getIfAvailable();
                     if (walletService != null) {
