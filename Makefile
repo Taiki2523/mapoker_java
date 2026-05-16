@@ -1,4 +1,4 @@
-.PHONY: up down build rebuild logs ps setup
+.PHONY: up down build rebuild deploy pull logs ps setup
 
 ENV      ?= local
 ENV_FILE := --env-file .env.$(ENV)
@@ -22,6 +22,16 @@ build:
 rebuild:
 	docker compose down
 	docker compose build --no-cache
+	$(MAKE) setup ENV=$(ENV)
+	docker compose $(ENV_FILE) up -d
+
+# レジストリから最新イメージを pull して再起動（ローカルビルドなし）
+pull:
+	docker compose $(ENV_FILE) pull
+
+deploy:
+	docker compose $(ENV_FILE) pull
+	docker compose down
 	$(MAKE) setup ENV=$(ENV)
 	docker compose $(ENV_FILE) up -d
 
