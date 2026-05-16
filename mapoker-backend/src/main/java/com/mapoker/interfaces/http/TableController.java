@@ -125,18 +125,24 @@ public class TableController {
         return new MembersResponse(toMembers(tableService.leave(id, name, null)));
     }
 
-    /** [displayName, avatarUrl] を返す。未認証時は [name, null]。 */
+    /** [displayName, avatarUrl] を返す。未認証時または解決失敗時は [name, null]。 */
     private String[] resolveUserInfo(UserDetails principal, String name) {
         if (principal != null) {
-            var user = userService.getByPublicId(principal.getUsername());
-            return new String[]{ user.displayName(), user.avatarUrl() };
+            try {
+                var user = userService.getByPublicId(principal.getUsername());
+                return new String[]{ user.displayName(), user.avatarUrl() };
+            } catch (Exception ignored) {}
         }
         return new String[]{ name, null };
     }
 
     private String resolveName(UserDetails principal, TableMembershipRequest body) {
         if (body != null && body.name() != null && !body.name().isBlank()) return body.name();
-        if (principal != null) return userService.getByPublicId(principal.getUsername()).username();
+        if (principal != null) {
+            try {
+                return userService.getByPublicId(principal.getUsername()).username();
+            } catch (Exception ignored) {}
+        }
         return null;
     }
 

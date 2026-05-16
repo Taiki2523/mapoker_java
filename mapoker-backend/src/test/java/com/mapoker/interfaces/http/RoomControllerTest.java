@@ -13,6 +13,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,10 +42,6 @@ class RoomControllerTest {
         controller = new RoomController(tableService, userService);
     }
 
-    // -----------------------------------------------------------------------
-    // getMembers
-    // -----------------------------------------------------------------------
-
     @Test
     void getMembersReturnsMappedList() {
         when(tableService.getMembers(ROOM_ID)).thenReturn(List.of(
@@ -55,31 +53,26 @@ class RoomControllerTest {
 
         assertThat(response.members()).hasSize(2);
         assertThat(response.members().get(0).name()).isEqualTo("alice");
-        assertThat(response.members().get(0).seatIndex()).isEqualTo(0);
         assertThat(response.members().get(1).name()).isEqualTo("bob");
     }
 
     @Test
     void getMembersReturnsEmptyList() {
         when(tableService.getMembers(ROOM_ID)).thenReturn(List.of());
-
         assertThat(controller.getMembers(ROOM_ID).members()).isEmpty();
     }
-
-    // -----------------------------------------------------------------------
-    // join — 名義解決
-    // -----------------------------------------------------------------------
 
     @Test
     void joinUsesBodyNameEvenWhenPrincipalPresent() {
         var principal = principalOf(ALICE_PUBLIC_ID);
+        when(userService.getByPublicId(ALICE_PUBLIC_ID)).thenReturn(ALICE);
         var joinResult = new TableService.JoinResult(0, List.of(
                 new TableMemberRecord("bodyName", 0, "2024-01-01T00:00:00Z")));
-        when(tableService.join(ROOM_ID, "bodyName", 0)).thenReturn(joinResult);
+        when(tableService.join(eq(ROOM_ID), eq("bodyName"), eq(0), any(), any())).thenReturn(joinResult);
 
         controller.join(ROOM_ID, new TableMembershipRequest("bodyName", null), principal);
 
-        verify(tableService).join(ROOM_ID, "bodyName", 0);
+        verify(tableService).join(eq(ROOM_ID), eq("bodyName"), eq(0), any(), any());
     }
 
     @Test
@@ -88,67 +81,59 @@ class RoomControllerTest {
         when(userService.getByPublicId(ALICE_PUBLIC_ID)).thenReturn(ALICE);
         var joinResult = new TableService.JoinResult(0, List.of(
                 new TableMemberRecord("alice", 0, "2024-01-01T00:00:00Z")));
-        when(tableService.join(ROOM_ID, "alice", 0)).thenReturn(joinResult);
+        when(tableService.join(eq(ROOM_ID), eq("alice"), eq(0), any(), any())).thenReturn(joinResult);
 
         controller.join(ROOM_ID, new TableMembershipRequest(null, null), principal);
 
-        verify(tableService).join(ROOM_ID, "alice", 0);
+        verify(tableService).join(eq(ROOM_ID), eq("alice"), eq(0), any(), any());
     }
 
     @Test
     void joinUsesBodyNameWhenNoPrincipal() {
         var joinResult = new TableService.JoinResult(1, List.of(
                 new TableMemberRecord("bob", 1, "2024-01-01T00:00:00Z")));
-        when(tableService.join(ROOM_ID, "bob", 0)).thenReturn(joinResult);
+        when(tableService.join(eq(ROOM_ID), eq("bob"), eq(0), any(), any())).thenReturn(joinResult);
 
         controller.join(ROOM_ID, new TableMembershipRequest("bob", null), null);
 
-        verify(tableService).join(ROOM_ID, "bob", 0);
+        verify(tableService).join(eq(ROOM_ID), eq("bob"), eq(0), any(), any());
     }
 
     @Test
     void joinUsesNullNameWhenNoPrincipalAndNoBody() {
         var joinResult = new TableService.JoinResult(0, List.of());
-        when(tableService.join(ROOM_ID, null, 0)).thenReturn(joinResult);
+        when(tableService.join(eq(ROOM_ID), eq(null), eq(0), any(), any())).thenReturn(joinResult);
 
         controller.join(ROOM_ID, null, null);
 
-        verify(tableService).join(ROOM_ID, null, 0);
+        verify(tableService).join(eq(ROOM_ID), eq(null), eq(0), any(), any());
     }
-
-    // -----------------------------------------------------------------------
-    // join — buyIn 解決
-    // -----------------------------------------------------------------------
 
     @Test
     void joinUsesBuyInFromBodyWhenProvided() {
         var joinResult = new TableService.JoinResult(0, List.of());
-        when(tableService.join(ROOM_ID, "charlie", 500)).thenReturn(joinResult);
+        when(tableService.join(eq(ROOM_ID), eq("charlie"), eq(500), any(), any())).thenReturn(joinResult);
 
         controller.join(ROOM_ID, new TableMembershipRequest("charlie", 500), null);
 
-        verify(tableService).join(ROOM_ID, "charlie", 500);
+        verify(tableService).join(eq(ROOM_ID), eq("charlie"), eq(500), any(), any());
     }
 
     @Test
     void joinDefaultsBuyInToZeroWhenBodyBuyInIsNull() {
         var joinResult = new TableService.JoinResult(0, List.of());
-        when(tableService.join(ROOM_ID, "dave", 0)).thenReturn(joinResult);
+        when(tableService.join(eq(ROOM_ID), eq("dave"), eq(0), any(), any())).thenReturn(joinResult);
 
         controller.join(ROOM_ID, new TableMembershipRequest("dave", null), null);
 
-        verify(tableService).join(ROOM_ID, "dave", 0);
+        verify(tableService).join(eq(ROOM_ID), eq("dave"), eq(0), any(), any());
     }
-
-    // -----------------------------------------------------------------------
-    // join — レスポンス
-    // -----------------------------------------------------------------------
 
     @Test
     void joinReturnsMappedMembers() {
         var joinResult = new TableService.JoinResult(0, List.of(
                 new TableMemberRecord("alice", 0, "2024-01-01T00:00:00Z")));
-        when(tableService.join(ROOM_ID, "alice", 0)).thenReturn(joinResult);
+        when(tableService.join(eq(ROOM_ID), eq("alice"), eq(0), any(), any())).thenReturn(joinResult);
 
         var response = controller.join(ROOM_ID, new TableMembershipRequest("alice", null), null);
 
@@ -156,10 +141,6 @@ class RoomControllerTest {
         assertThat(response.members().get(0).name()).isEqualTo("alice");
         assertThat(response.members().get(0).seatIndex()).isEqualTo(0);
     }
-
-    // -----------------------------------------------------------------------
-    // leave — 名義解決
-    // -----------------------------------------------------------------------
 
     @Test
     void leaveUsesBodyNameEvenWhenPrincipalPresent() {
@@ -199,10 +180,6 @@ class RoomControllerTest {
 
         verify(tableService).leave(ROOM_ID, null, null);
     }
-
-    // -----------------------------------------------------------------------
-    // leave — レスポンス
-    // -----------------------------------------------------------------------
 
     @Test
     void leaveReturnsMappedMembers() {

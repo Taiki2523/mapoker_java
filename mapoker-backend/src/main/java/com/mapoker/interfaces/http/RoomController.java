@@ -104,18 +104,22 @@ public class RoomController {
             return body.name();
         }
         if (principal != null) {
-            return userService.getByPublicId(principal.getUsername()).username();
+            try {
+                return userService.getByPublicId(principal.getUsername()).username();
+            } catch (Exception ignored) {}
         }
         return null;
     }
 
     /**
-     * 認証ユーザーの {@code [displayName, avatarUrl]} を返します。未認証時は {@code [name, null]}。
+     * 認証ユーザーの {@code [displayName, avatarUrl]} を返します。未認証時または解決失敗時は {@code [name, null]}。
      */
     private String[] resolveUserInfo(UserDetails principal, String name) {
         if (principal != null) {
-            User user = userService.getByPublicId(principal.getUsername());
-            return new String[]{ user.displayName(), user.avatarUrl() };
+            try {
+                User user = userService.getByPublicId(principal.getUsername());
+                return new String[]{ user.displayName(), user.avatarUrl() };
+            } catch (Exception ignored) {}
         }
         return new String[]{ name, null };
     }

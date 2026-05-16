@@ -194,7 +194,11 @@ public class GameController {
         if (principal == null) {
             return requestedViewerIndex;
         }
-        String username = userService.getByPublicId(principal.getUsername()).username();
-        return tableService.findSeatIndex(id, username);
+        try {
+            String username = userService.getByPublicId(principal.getUsername()).username();
+            return tableService.findSeatIndex(id, username);
+        } catch (Exception ignored) {
+            return requestedViewerIndex;
+        }
     }
 }

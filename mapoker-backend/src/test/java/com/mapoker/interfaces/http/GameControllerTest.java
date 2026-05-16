@@ -39,6 +39,7 @@ class GameControllerTest {
 
     private GameService gameService;
     private TableService tableService;
+    private UserService userService;
     private GameController controller;
 
     private static final GameProperties GAME_PROPS =
@@ -48,7 +49,8 @@ class GameControllerTest {
     void setUp() {
         gameService = mock(GameService.class);
         tableService = mock(TableService.class);
-        controller = new GameController(gameService, GAME_PROPS, tableService, mock(UserService.class));
+        userService = mock(UserService.class);
+        controller = new GameController(gameService, GAME_PROPS, tableService, userService);
     }
 
     // -----------------------------------------------------------------------
@@ -208,11 +210,14 @@ class GameControllerTest {
     void applyActionResolvesViewerIndexForAuthenticatedUser() {
         GameState state = startedGame();
         when(gameService.applyAction(anyString(), anyInt(), any(), anyInt())).thenReturn(state);
+        var appAlice = new com.mapoker.application.User(
+                1L, "pub-alice", "alice", "0000", null, java.time.LocalDateTime.now());
+        when(userService.getByPublicId("pub-alice")).thenReturn(appAlice);
         when(tableService.findSeatIndex("g1", "alice")).thenReturn(1);
 
         var req = new ApplyActionRequest(1, new ApplyActionRequest.ActionDto(ActionType.CALL, 0));
         var response = controller.applyAction("g1", req, null,
-                new User("alice", "secret", List.of()));
+                new User("pub-alice", "secret", List.of()));
 
         assertThat(response.players().get(1).hole()).hasSize(2);
         assertThat(response.players().get(0).hole()).isNull();
