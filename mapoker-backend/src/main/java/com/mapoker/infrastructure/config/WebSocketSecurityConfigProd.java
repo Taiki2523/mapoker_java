@@ -12,7 +12,7 @@ public class WebSocketSecurityConfigProd extends AbstractSecurityWebSocketMessag
     @Override
     protected void configureInbound(MessageSecurityMetadataSourceRegistry messages) {
         messages
-                .nullDestMatcher().authenticated()
+                .nullDestMatcher().permitAll()   // CONNECT / DISCONNECT / HEARTBEAT は認証不要
                 .simpSubscribeDestMatchers("/topic/**", "/user/queue/**").authenticated()
                 .anyMessage().authenticated();
     }
