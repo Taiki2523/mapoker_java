@@ -400,11 +400,11 @@ public class TableService {
     }
 
     /**
-     * 24 時間以上無人のテーブルを削除します。Spring Scheduler により 1 時間ごとに実行されます。
+     * 1 時間以上無人のテーブルを削除します。Spring Scheduler により 10 分ごとに実行されます。
      */
-    @Scheduled(fixedDelay = 3_600_000)
+    @Scheduled(fixedDelay = 600_000)
     public void removeStaleEmptyTables() {
-        Instant threshold = Instant.now().minus(24, ChronoUnit.HOURS);
+        Instant threshold = Instant.now().minus(1, ChronoUnit.HOURS);
         lastEmptiedAt.entrySet().removeIf(entry -> {
             if (entry.getValue().isBefore(threshold)) {
                 String tableId = entry.getKey();
