@@ -68,11 +68,11 @@ class RoomControllerTest {
         when(userService.getByPublicId(ALICE_PUBLIC_ID)).thenReturn(ALICE);
         var joinResult = new TableService.JoinResult(0, List.of(
                 new TableMemberRecord("bodyName", 0, "2024-01-01T00:00:00Z")));
-        when(tableService.join(eq(ROOM_ID), eq("bodyName"), eq(0), any(), any())).thenReturn(joinResult);
+        when(tableService.join(eq(ROOM_ID), eq("bodyName"), eq(0), any(), any(), any())).thenReturn(joinResult);
 
         controller.join(ROOM_ID, new TableMembershipRequest("bodyName", null), principal);
 
-        verify(tableService).join(eq(ROOM_ID), eq("bodyName"), eq(0), any(), any());
+        verify(tableService).join(eq(ROOM_ID), eq("bodyName"), eq(0), any(), any(), any());
     }
 
     @Test
@@ -81,59 +81,59 @@ class RoomControllerTest {
         when(userService.getByPublicId(ALICE_PUBLIC_ID)).thenReturn(ALICE);
         var joinResult = new TableService.JoinResult(0, List.of(
                 new TableMemberRecord("alice", 0, "2024-01-01T00:00:00Z")));
-        when(tableService.join(eq(ROOM_ID), eq("alice"), eq(0), any(), any())).thenReturn(joinResult);
+        when(tableService.join(eq(ROOM_ID), eq("alice"), eq(0), any(), any(), any())).thenReturn(joinResult);
 
         controller.join(ROOM_ID, new TableMembershipRequest(null, null), principal);
 
-        verify(tableService).join(eq(ROOM_ID), eq("alice"), eq(0), any(), any());
+        verify(tableService).join(eq(ROOM_ID), eq("alice"), eq(0), any(), any(), any());
     }
 
     @Test
     void joinUsesBodyNameWhenNoPrincipal() {
         var joinResult = new TableService.JoinResult(1, List.of(
                 new TableMemberRecord("bob", 1, "2024-01-01T00:00:00Z")));
-        when(tableService.join(eq(ROOM_ID), eq("bob"), eq(0), any(), any())).thenReturn(joinResult);
+        when(tableService.join(eq(ROOM_ID), eq("bob"), eq(0), any(), any(), any())).thenReturn(joinResult);
 
         controller.join(ROOM_ID, new TableMembershipRequest("bob", null), null);
 
-        verify(tableService).join(eq(ROOM_ID), eq("bob"), eq(0), any(), any());
+        verify(tableService).join(eq(ROOM_ID), eq("bob"), eq(0), any(), any(), any());
     }
 
     @Test
     void joinUsesNullNameWhenNoPrincipalAndNoBody() {
         var joinResult = new TableService.JoinResult(0, List.of());
-        when(tableService.join(eq(ROOM_ID), eq(null), eq(0), any(), any())).thenReturn(joinResult);
+        when(tableService.join(eq(ROOM_ID), eq(null), eq(0), any(), any(), any())).thenReturn(joinResult);
 
         controller.join(ROOM_ID, null, null);
 
-        verify(tableService).join(eq(ROOM_ID), eq(null), eq(0), any(), any());
+        verify(tableService).join(eq(ROOM_ID), eq(null), eq(0), any(), any(), any());
     }
 
     @Test
     void joinUsesBuyInFromBodyWhenProvided() {
         var joinResult = new TableService.JoinResult(0, List.of());
-        when(tableService.join(eq(ROOM_ID), eq("charlie"), eq(500), any(), any())).thenReturn(joinResult);
+        when(tableService.join(eq(ROOM_ID), eq("charlie"), eq(500), any(), any(), any())).thenReturn(joinResult);
 
         controller.join(ROOM_ID, new TableMembershipRequest("charlie", 500), null);
 
-        verify(tableService).join(eq(ROOM_ID), eq("charlie"), eq(500), any(), any());
+        verify(tableService).join(eq(ROOM_ID), eq("charlie"), eq(500), any(), any(), any());
     }
 
     @Test
     void joinDefaultsBuyInToZeroWhenBodyBuyInIsNull() {
         var joinResult = new TableService.JoinResult(0, List.of());
-        when(tableService.join(eq(ROOM_ID), eq("dave"), eq(0), any(), any())).thenReturn(joinResult);
+        when(tableService.join(eq(ROOM_ID), eq("dave"), eq(0), any(), any(), any())).thenReturn(joinResult);
 
         controller.join(ROOM_ID, new TableMembershipRequest("dave", null), null);
 
-        verify(tableService).join(eq(ROOM_ID), eq("dave"), eq(0), any(), any());
+        verify(tableService).join(eq(ROOM_ID), eq("dave"), eq(0), any(), any(), any());
     }
 
     @Test
     void joinReturnsMappedMembers() {
         var joinResult = new TableService.JoinResult(0, List.of(
                 new TableMemberRecord("alice", 0, "2024-01-01T00:00:00Z")));
-        when(tableService.join(eq(ROOM_ID), eq("alice"), eq(0), any(), any())).thenReturn(joinResult);
+        when(tableService.join(eq(ROOM_ID), eq("alice"), eq(0), any(), any(), any())).thenReturn(joinResult);
 
         var response = controller.join(ROOM_ID, new TableMembershipRequest("alice", null), null);
 
