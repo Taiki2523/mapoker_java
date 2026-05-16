@@ -783,26 +783,20 @@ button.icon-btn[data-label]:hover::after {
 
 /* ---- 退席エリア (右下固定) ---- */
 .action-log {
-  position: fixed;
-  bottom: 5rem;
-  left: 0.75rem;
-  width: 220px;
-  max-height: 160px;
+  flex-shrink: 0;
+  max-height: 80px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  pointer-events: none;
-  z-index: 20;
+  gap: 0.15rem;
+  padding: 0.3rem 1.25rem;
+  background: rgba(8, 12, 20, 0.75);
+  border-top: 1px solid rgba(255,255,255,0.04);
 }
 
 .action-log-entry {
   font-size: 0.72rem;
   color: var(--text-muted);
-  background: rgba(0, 0, 0, 0.55);
-  border-radius: 4px;
-  padding: 0.15rem 0.4rem;
-  backdrop-filter: blur(4px);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
