@@ -111,7 +111,7 @@ export function TableArea({
     const timers: number[] = []
     // オールインランアウト時はホールカード公開後 1000ms 待ってからコミュニティカードを開始する
     const anyAllIn = game.players.some(p => p.all_in && !p.folded)
-    let delay = (anyAllIn && isShowdown) ? 1000 : 0
+    let delay = (anyAllIn && isShowdown) ? STREET_REVEAL_INTERVAL_MS : 0
 
     // フロップ（インデックス 0-2）
     if (prev < 3 && current >= 3) {
