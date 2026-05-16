@@ -838,10 +838,24 @@ button.icon-btn[data-label]:hover::after {
   min-width: 2rem;
 }
 
+.action-log-divider {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 0.4rem 1rem;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
 .action-log-fold    { color: #e57373; }
 .action-log-all_in  { color: var(--poker-gold); }
 .action-log-bet,
 .action-log-raise   { color: var(--accent); }
+.action-log-payout  { color: var(--poker-gold); font-weight: 600; }
 
 .leave-area {
   position: fixed;

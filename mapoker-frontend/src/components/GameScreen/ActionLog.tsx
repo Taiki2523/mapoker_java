@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { fetchJSON } from '../../api'
-import type { ActionLogEntry, GameState } from '../../types'
+import type { ActionLogEntry, GameState, PayoutLine, Showdown } from '../../types'
 
 const ACTION_LABELS: Record<string, string> = {
   FOLD: 'フォールド',
@@ -13,12 +13,19 @@ const ACTION_LABELS: Record<string, string> = {
 
 type Props = {
   game: GameState
+  showdown: Showdown | null
+  payoutLines: PayoutLine[]
   displayName: (idx: number) => string
   open: boolean
   onClose: () => void
 }
 
-export function ActionLogDialog({ game, displayName, open, onClose }: Props) {
+type LogItem =
+  | { kind: 'action'; entry: ActionLogEntry }
+  | { kind: 'divider'; label: string }
+  | { kind: 'payout'; name: string; amount: number }
+
+export function ActionLogDialog({ game, showdown, payoutLines, displayName, open, onClose }: Props) {
   const [entries, setEntries] = useState<ActionLogEntry[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -31,18 +38,31 @@ export function ActionLogDialog({ game, displayName, open, onClose }: Props) {
 
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ behavior: 'instant' })
-  }, [open, entries])
+  }, [open, entries, showdown])
 
   if (!open) return null
 
-  const fmt = (entry: ActionLogEntry) => {
+  const bb = game.big_blind
+  const fmt = (chips: number) =>
+    `¥${chips}${bb > 0 ? ` (${Math.round((chips / bb) * 10) / 10}BB)` : ''}`
+
+  const fmtAction = (entry: ActionLogEntry) => {
     const name = displayName(entry.player_index)
     const label = ACTION_LABELS[entry.type] ?? entry.type.toLowerCase()
-    const bb = game.big_blind
-    const amtStr = entry.amount > 0
-      ? ` ¥${entry.amount}${bb > 0 ? ` (${Math.round((entry.amount / bb) * 10) / 10}BB)` : ''}`
-      : ''
+    const amtStr = entry.amount > 0 ? ` ${fmt(entry.amount)}` : ''
     return `${name} が${label}${amtStr}`
+  }
+
+  // ログアイテムを構築: アクション履歴 + ショーダウン結果
+  const items: LogItem[] = entries.map((e) => ({ kind: 'action', entry: e }))
+
+  const isFinished = game.status === 'finished' || game.status === 'showdown'
+  if (isFinished && payoutLines.length > 0) {
+    const label = game.status === 'finished' && showdown == null ? 'フォールド勝ち' : 'ショーダウン'
+    items.push({ kind: 'divider', label })
+    for (const p of payoutLines) {
+      items.push({ kind: 'payout', name: p.name, amount: p.amount })
+    }
   }
 
   return (
@@ -53,14 +73,31 @@ export function ActionLogDialog({ game, displayName, open, onClose }: Props) {
           <button className="ghost" onClick={onClose}>✕</button>
         </div>
         <div className="action-log-dialog-body">
-          {entries.length === 0
+          {items.length === 0
             ? <div className="muted" style={{ padding: '1rem', textAlign: 'center' }}>まだアクションはありません</div>
-            : entries.map((e) => (
-              <div key={e.seq} className={`action-log-entry action-log-${e.type.toLowerCase()}`}>
-                <span className="action-log-seq">#{e.seq}</span>
-                {fmt(e)}
-              </div>
-            ))
+            : items.map((item, i) => {
+                if (item.kind === 'divider') {
+                  return (
+                    <div key={`divider-${i}`} className="action-log-divider">
+                      {item.label}
+                    </div>
+                  )
+                }
+                if (item.kind === 'payout') {
+                  return (
+                    <div key={`payout-${i}`} className="action-log-entry action-log-payout">
+                      <span className="action-log-seq">💰</span>
+                      {`${item.name} が ${fmt(item.amount)} を獲得`}
+                    </div>
+                  )
+                }
+                return (
+                  <div key={item.entry.seq} className={`action-log-entry action-log-${item.entry.type.toLowerCase()}`}>
+                    <span className="action-log-seq">#{item.entry.seq}</span>
+                    {fmtAction(item.entry)}
+                  </div>
+                )
+              })
           }
           <div ref={bottomRef} />
         </div>

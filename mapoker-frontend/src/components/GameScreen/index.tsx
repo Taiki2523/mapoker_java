@@ -123,6 +123,8 @@ export function GameScreen({
 
       <ActionLogDialog
         game={game}
+        showdown={showdown}
+        payoutLines={payoutLines}
         displayName={displayName}
         open={logOpen}
         onClose={() => setLogOpen(false)}
