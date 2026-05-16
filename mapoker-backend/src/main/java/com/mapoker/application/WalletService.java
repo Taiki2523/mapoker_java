@@ -11,6 +11,9 @@ import java.util.List;
 
 /**
  * Spring の {@code @Service} としてウォレット残高、入出金、ボーナス付与を管理するサービスです。
+ *
+ * <p>ユーザー識別には {@code publicId}（UUID）を使用します。
+ * {@code username} は一意でないため、ウォレット操作には使用しません。
  */
 @Service
 @Profile("postgresql")
@@ -25,115 +28,95 @@ public class WalletService {
 
     private final WalletRepository walletRepository;
     private final WalletProperties walletProperties;
+    private final UserRepository userRepository;
 
-    public WalletService(WalletRepository walletRepository, WalletProperties walletProperties) {
+    public WalletService(WalletRepository walletRepository,
+                         WalletProperties walletProperties,
+                         UserRepository userRepository) {
         this.walletRepository = walletRepository;
         this.walletProperties = walletProperties;
+        this.userRepository = userRepository;
     }
 
     /**
      * ユーザーのウォレットを初期化します。
      *
-     * @param username ユーザー名
-     * @throws IllegalArgumentException ユーザー名が不正な場合
+     * @param publicId ユーザーの公開 ID（UUID）
      */
-    public void initializeWallet(String username) {
-        walletRepository.initializeWallet(requireUsername(username));
+    public void initializeWallet(String publicId) {
+        walletRepository.initializeWallet(requirePublicId(publicId));
     }
 
     /**
      * 現在の残高を取得します。
      *
-     * @param username ユーザー名
+     * @param publicId ユーザーの公開 ID（UUID）
      * @return ウォレット残高情報
      */
-    public WalletEntry getBalance(String username) {
-        String normalizedUsername = normalizeUsername(username);
-        if (normalizedUsername == null) {
+    public WalletEntry getBalance(String publicId) {
+        if (publicId == null || publicId.isBlank()) {
             return new WalletEntry(null, 0L, null);
         }
-        return walletRepository.findByUsername(normalizedUsername)
-                .orElseGet(() -> new WalletEntry(normalizedUsername, 0L, null));
+        return walletRepository.findByPublicId(publicId.trim())
+                .orElseGet(() -> new WalletEntry(publicId, 0L, null));
     }
 
     /**
      * 台帳履歴を取得します。
      *
-     * @param username ユーザー名
-     * @param limit 取得件数の上限
+     * @param publicId ユーザーの公開 ID（UUID）
+     * @param limit    取得件数の上限
      * @return 台帳履歴一覧
      */
-    public List<WalletLedgerEntry> getLedger(String username, int limit) {
-        String normalizedUsername = normalizeUsername(username);
-        if (normalizedUsername == null) {
-            return List.of();
-        }
-        return walletRepository.findLedger(normalizedUsername, Math.max(1, limit));
+    public List<WalletLedgerEntry> getLedger(String publicId, int limit) {
+        if (publicId == null || publicId.isBlank()) return List.of();
+        return walletRepository.findLedger(publicId.trim(), Math.max(1, limit));
     }
 
     /**
      * 次回請求可能時刻を取得します。
      *
-     * @param username ユーザー名
+     * @param publicId ユーザーの公開 ID（UUID）
      * @return 日次ボーナスと救済ボーナスの次回可能時刻
      */
-    public NextClaimTimes getNextClaimTimes(String username) {
-        String normalizedUsername = normalizeUsername(username);
-        if (normalizedUsername == null) {
-            return new NextClaimTimes(null, null);
-        }
-        WalletEntry wallet = getBalance(normalizedUsername);
+    public NextClaimTimes getNextClaimTimes(String publicId) {
+        if (publicId == null || publicId.isBlank()) return new NextClaimTimes(null, null);
+        WalletEntry wallet = getBalance(publicId);
         return new NextClaimTimes(
-                nextClaimAt(normalizedUsername, DAILY_BONUS, walletProperties.dailyBonusCooldownHours()),
-                nextRecoveryAt(normalizedUsername, wallet));
+                nextClaimAt(publicId, DAILY_BONUS, walletProperties.dailyBonusCooldownHours()),
+                nextRecoveryAt(publicId, wallet));
     }
 
     /**
      * テーブル参加のためにウォレットからチップを引き落とします。
      *
-     * @param username ユーザー名
-     * @param tableId テーブル ID
-     * @param amount 引き落とし額
-     * @throws IllegalArgumentException 入力値が不正な場合
-     * @throws IllegalStateException 残高不足の場合
+     * @param publicId ユーザーの公開 ID（UUID）
+     * @param tableId  テーブル ID
+     * @param amount   引き落とし額
      */
-    public void buyIn(String username, String tableId, int amount) {
-        String normalizedUsername = requireUsername(username);
-        String normalizedTableId = normalizeReference(tableId);
+    public void buyIn(String publicId, String tableId, int amount) {
+        String pid = requirePublicId(publicId);
+        String tid = requireRef(tableId);
         validateAmount(amount);
-        if (!walletRepository.debit(
-                normalizedUsername,
-                amount,
-                TABLE_BUY_IN,
-                "TABLE",
-                normalizedTableId,
-                "BUY_IN:" + normalizedTableId + ":" + normalizedUsername)) {
+        if (!walletRepository.debit(pid, amount, TABLE_BUY_IN, "TABLE", tid,
+                "BUY_IN:" + tid + ":" + pid)) {
             throw new IllegalStateException("insufficient funds");
         }
     }
 
     /**
      * リバイのためにウォレットからチップを引き落とします。
-     * 初回バイインとは別の idempotency キーを使い、複数回のリバイを正しく処理します。
      *
-     * @param username ユーザー名
-     * @param tableId テーブル ID
-     * @param amount 引き落とし額
-     * @throws IllegalArgumentException 入力値が不正な場合
-     * @throws IllegalStateException 残高不足の場合
+     * @param publicId ユーザーの公開 ID（UUID）
+     * @param tableId  テーブル ID
+     * @param amount   引き落とし額
      */
-    public void rebuy(String username, String tableId, int amount) {
-        String normalizedUsername = requireUsername(username);
-        String normalizedTableId = normalizeReference(tableId);
+    public void rebuy(String publicId, String tableId, int amount) {
+        String pid = requirePublicId(publicId);
+        String tid = requireRef(tableId);
         validateAmount(amount);
-        String idempotencyKey = "REBUY:" + normalizedTableId + ":" + normalizedUsername + ":" + Instant.now().toEpochMilli();
-        if (!walletRepository.debit(
-                normalizedUsername,
-                amount,
-                TABLE_REBUY,
-                "TABLE",
-                normalizedTableId,
-                idempotencyKey)) {
+        String key = "REBUY:" + tid + ":" + pid + ":" + Instant.now().toEpochMilli();
+        if (!walletRepository.debit(pid, amount, TABLE_REBUY, "TABLE", tid, key)) {
             throw new IllegalStateException("insufficient funds");
         }
     }
@@ -141,119 +124,91 @@ public class WalletService {
     /**
      * テーブルからの持ち帰りチップをウォレットへ戻します。
      *
-     * @param username ユーザー名
-     * @param tableId テーブル ID
-     * @param amount 入金額
-     * @throws IllegalArgumentException 入力値が不正な場合
+     * @param publicId ユーザーの公開 ID（UUID）
+     * @param tableId  テーブル ID
+     * @param amount   入金額
      */
-    public void cashOut(String username, String tableId, int amount) {
-        String normalizedUsername = requireUsername(username);
-        String normalizedTableId = normalizeReference(tableId);
+    public void cashOut(String publicId, String tableId, int amount) {
+        String pid = requirePublicId(publicId);
+        String tid = requireRef(tableId);
         validateAmount(amount);
-        walletRepository.credit(
-                normalizedUsername,
-                amount,
-                TABLE_CASH_OUT,
-                "TABLE",
-                normalizedTableId,
-                "CASH_OUT:" + normalizedTableId + ":" + normalizedUsername + ":" + amount);
+        walletRepository.credit(pid, amount, TABLE_CASH_OUT, "TABLE", tid,
+                "CASH_OUT:" + tid + ":" + pid + ":" + amount);
     }
 
     /**
      * 日次ボーナスを付与します。
      *
-     * @param username ユーザー名
-     * @throws IllegalArgumentException ユーザー名が不正な場合
-     * @throws IllegalStateException クールダウン中の場合
+     * @param publicId ユーザーの公開 ID（UUID）
      */
-    public void claimDailyBonus(String username) {
-        String normalizedUsername = requireUsername(username);
-        requireCooldownElapsed(
-                normalizedUsername,
-                DAILY_BONUS,
-                walletProperties.dailyBonusCooldownHours());
-        walletRepository.credit(
-                normalizedUsername,
-                walletProperties.dailyBonusAmount(),
-                DAILY_BONUS,
-                "SYSTEM",
-                normalizedUsername,
-                "DAILY_BONUS:" + normalizedUsername + ":" + currentWindow(walletProperties.dailyBonusCooldownHours()));
+    public void claimDailyBonus(String publicId) {
+        String pid = requirePublicId(publicId);
+        requireCooldownElapsed(pid, DAILY_BONUS, walletProperties.dailyBonusCooldownHours());
+        walletRepository.credit(pid, walletProperties.dailyBonusAmount(), DAILY_BONUS, "SYSTEM", pid,
+                "DAILY_BONUS:" + pid + ":" + currentWindow(walletProperties.dailyBonusCooldownHours()));
     }
 
     /**
      * 救済ボーナスを付与します。
      *
-     * @param username ユーザー名
-     * @throws IllegalArgumentException ユーザー名が不正な場合
-     * @throws IllegalStateException 条件未達またはクールダウン中の場合
+     * @param publicId ユーザーの公開 ID（UUID）
      */
-    public void claimRecovery(String username) {
-        String normalizedUsername = requireUsername(username);
-        WalletEntry wallet = getBalance(normalizedUsername);
+    public void claimRecovery(String publicId) {
+        String pid = requirePublicId(publicId);
+        WalletEntry wallet = getBalance(pid);
         if (wallet.chipBalance() > walletProperties.recoveryThreshold()) {
             throw new IllegalStateException("recovery not available");
         }
-        requireCooldownElapsed(
-                normalizedUsername,
-                RECOVERY_BONUS,
-                walletProperties.recoveryCooldownHours());
-        walletRepository.credit(
-                normalizedUsername,
-                walletProperties.recoveryAmount(),
-                RECOVERY_BONUS,
-                "SYSTEM",
-                normalizedUsername,
-                "RECOVERY_BONUS:" + normalizedUsername + ":" + currentWindow(walletProperties.recoveryCooldownHours()));
+        requireCooldownElapsed(pid, RECOVERY_BONUS, walletProperties.recoveryCooldownHours());
+        walletRepository.credit(pid, walletProperties.recoveryAmount(), RECOVERY_BONUS, "SYSTEM", pid,
+                "RECOVERY_BONUS:" + pid + ":" + currentWindow(walletProperties.recoveryCooldownHours()));
     }
 
     /**
      * 管理者権限で残高を付与します。
      *
-     * @param adminUsername 管理者ユーザー名
-     * @param targetUsername 付与対象ユーザー名
-     * @param amount 付与額
-     * @throws IllegalArgumentException 入力値が不正な場合
-     * @throws AccessDeniedException 管理者権限がない場合
+     * <p>管理者の認可は {@code adminUsername} で行います（設定リストとの照合）。
+     * 対象ユーザーは {@code targetUsername} で検索し、{@code publicId} に変換して入金します。
+     *
+     * @param adminUsername   管理者ユーザー名（認可チェック用）
+     * @param targetUsername  付与対象ユーザー名
+     * @param amount          付与額
      */
     public void adminGrant(String adminUsername, String targetUsername, long amount) {
-        String normalizedAdminUsername = requireUsername(adminUsername);
-        String normalizedTargetUsername = requireUsername(targetUsername);
-        if (!walletProperties.adminUsernames().contains(normalizedAdminUsername)) {
+        if (adminUsername == null || adminUsername.isBlank()) {
+            throw new IllegalArgumentException("adminUsername is required");
+        }
+        String normalizedAdmin = adminUsername.trim();
+        if (!walletProperties.adminUsernames().contains(normalizedAdmin)) {
             throw new AccessDeniedException("admin access required");
         }
         validateAmount(amount);
-        walletRepository.credit(
-                normalizedTargetUsername,
-                amount,
-                ADMIN_GRANT,
-                "ADMIN",
-                normalizedAdminUsername,
-                "ADMIN_GRANT:" + normalizedAdminUsername + ":" + normalizedTargetUsername + ":" + Instant.now().toEpochMilli());
+        // 対象ユーザーを username → publicId に変換
+        String targetPublicId = userRepository.findByUsername(targetUsername)
+                .map(User::publicId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + targetUsername));
+        walletRepository.credit(targetPublicId, amount, ADMIN_GRANT, "ADMIN", normalizedAdmin,
+                "ADMIN_GRANT:" + normalizedAdmin + ":" + targetPublicId + ":" + Instant.now().toEpochMilli());
     }
 
-    private Instant nextRecoveryAt(String username, WalletEntry wallet) {
-        if (wallet.chipBalance() > walletProperties.recoveryThreshold()) {
-            return null;
-        }
-        return nextClaimAt(username, RECOVERY_BONUS, walletProperties.recoveryCooldownHours());
+    private Instant nextRecoveryAt(String publicId, WalletEntry wallet) {
+        if (wallet.chipBalance() > walletProperties.recoveryThreshold()) return null;
+        return nextClaimAt(publicId, RECOVERY_BONUS, walletProperties.recoveryCooldownHours());
     }
 
-    private Instant nextClaimAt(String username, String reason, int cooldownHours) {
+    private Instant nextClaimAt(String publicId, String reason, int cooldownHours) {
         Instant now = Instant.now();
-        return walletRepository.findLastLedgerTime(username, reason)
-                .map(lastClaimAt -> lastClaimAt.plus(cooldownHours, ChronoUnit.HOURS))
-                .filter(nextClaimAt -> nextClaimAt.isAfter(now))
+        return walletRepository.findLastLedgerTime(publicId, reason)
+                .map(last -> last.plus(cooldownHours, ChronoUnit.HOURS))
+                .filter(next -> next.isAfter(now))
                 .orElse(null);
     }
 
-    private void requireCooldownElapsed(String username, String reason, int cooldownHours) {
+    private void requireCooldownElapsed(String publicId, String reason, int cooldownHours) {
         Instant cutoff = Instant.now().minus(cooldownHours, ChronoUnit.HOURS);
-        walletRepository.findLastLedgerTime(username, reason)
-                .filter(lastClaimAt -> lastClaimAt.isAfter(cutoff))
-                .ifPresent(ignored -> {
-                    throw new IllegalStateException(reason + " cooldown active");
-                });
+        walletRepository.findLastLedgerTime(publicId, reason)
+                .filter(last -> last.isAfter(cutoff))
+                .ifPresent(ignored -> { throw new IllegalStateException(reason + " cooldown active"); });
     }
 
     private long currentWindow(int cooldownHours) {
@@ -261,22 +216,14 @@ public class WalletService {
         return Instant.now().toEpochMilli() / windowMillis;
     }
 
-    private String normalizeUsername(String username) {
-        if (username == null || username.isBlank()) {
-            return null;
+    private String requirePublicId(String publicId) {
+        if (publicId == null || publicId.isBlank()) {
+            throw new IllegalArgumentException("publicId is required");
         }
-        return username.trim();
+        return publicId.trim();
     }
 
-    private String requireUsername(String username) {
-        String normalizedUsername = normalizeUsername(username);
-        if (normalizedUsername == null) {
-            throw new IllegalArgumentException("username is required");
-        }
-        return normalizedUsername;
-    }
-
-    private String normalizeReference(String value) {
+    private String requireRef(String value) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException("reference is required");
         }
@@ -284,20 +231,14 @@ public class WalletService {
     }
 
     private void validateAmount(long amount) {
-        if (amount <= 0) {
-            throw new IllegalArgumentException("amount must be positive");
-        }
+        if (amount <= 0) throw new IllegalArgumentException("amount must be positive");
     }
 
     /**
      * 次回請求可能時刻をまとめて返すレコードです。
      *
      * @param nextDailyBonusAt 日次ボーナスの次回請求可能時刻
-     * @param nextRecoveryAt 救済ボーナスの次回請求可能時刻
+     * @param nextRecoveryAt   救済ボーナスの次回請求可能時刻
      */
-    public record NextClaimTimes(
-            Instant nextDailyBonusAt,
-            Instant nextRecoveryAt
-    ) {
-    }
+    public record NextClaimTimes(Instant nextDailyBonusAt, Instant nextRecoveryAt) {}
 }

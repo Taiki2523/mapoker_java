@@ -77,7 +77,7 @@ public class RoomController {
         String name = resolveName(principal, body);
         int buyIn = body != null && body.buyIn() != null ? body.buyIn() : 0;
         String[] userInfo = resolveUserInfo(principal, name);
-        return new MembersResponse(mapMembers(tableService.join(id, name, buyIn, userInfo[0], userInfo[1]).members()));
+        return new MembersResponse(mapMembers(tableService.join(id, name, buyIn, userInfo[0], userInfo[1], userInfo[2]).members()));
     }
 
     /**
@@ -112,16 +112,16 @@ public class RoomController {
     }
 
     /**
-     * 認証ユーザーの {@code [displayName, avatarUrl]} を返します。未認証時または解決失敗時は {@code [name, null]}。
+     * 認証ユーザーの {@code [displayName, avatarUrl, publicId]} を返します。未認証時は {@code [name, null, null]}。
      */
     private String[] resolveUserInfo(UserDetails principal, String name) {
         if (principal != null) {
             try {
                 User user = userService.getByPublicId(principal.getUsername());
-                return new String[]{ user.displayName(), user.avatarUrl() };
+                return new String[]{ user.displayName(), user.avatarUrl(), user.publicId() };
             } catch (Exception ignored) {}
         }
-        return new String[]{ name, null };
+        return new String[]{ name, null, null };
     }
 
     private List<MemberRecord> mapMembers(List<TableMemberRecord> members) {

@@ -221,10 +221,14 @@ public class TableService {
      * @throws IllegalStateException ウォレット残高が不足している場合
      */
     public JoinResult join(String id, String requestedName, int buyIn) {
-        return join(id, requestedName, buyIn, requestedName, null);
+        return join(id, requestedName, buyIn, requestedName, null, null);
     }
 
     public JoinResult join(String id, String requestedName, int buyIn, String displayName, String avatarUrl) {
+        return join(id, requestedName, buyIn, displayName, avatarUrl, null);
+    }
+
+    public JoinResult join(String id, String requestedName, int buyIn, String displayName, String avatarUrl, String publicId) {
         synchronized (tableLock(id)) {
             TableRecord table = getTable(id);
             String name = normalizeMemberName(requestedName);
@@ -243,18 +247,23 @@ public class TableService {
 
                 // ハンド非進行中にスタックが残っている（切断・未退席）場合はキャッシュアウトしてから再バイイン
                 if (currentStack > 0 && !handActive) {
-                    cashOutSeatStackIfPossible(name, table.gameId(), existing.seatIndex());
+                    cashOutSeatStackIfPossible(existing.publicId() != null ? existing.publicId() : name,
+                            table.gameId(), existing.seatIndex());
                     currentStack = 0;
                 }
 
                 // スタックが 0 かつ buyIn > 0 の場合はリバイとして処理
                 if (currentStack == 0 && buyIn > 0) {
                     WalletService walletService = walletServiceProvider.getIfAvailable();
-                    if (walletService != null) {
+                    if (walletService != null && publicId != null) {
                         if (buyIn < table.minBuyIn() || buyIn > table.maxBuyIn()) {
                             throw new IllegalArgumentException("buy-in out of range");
                         }
-                        walletService.rebuy(name, table.id(), buyIn);
+                        walletService.rebuy(publicId, table.id(), buyIn);
+                    } else if (walletService != null) {
+                        if (buyIn < table.minBuyIn() || buyIn > table.maxBuyIn()) {
+                            throw new IllegalArgumentException("buy-in out of range");
+                        }
                     }
                     gameService.setSeatStack(table.gameId(), existing.seatIndex(), buyIn);
                     gameService.setSittingOut(table.gameId(), existing.seatIndex(), false);
@@ -270,11 +279,11 @@ public class TableService {
 
             // ウォレット処理を先に行う。ここで例外が発生してもゲーム状態は未変更
             WalletService walletService = walletServiceProvider.getIfAvailable();
-            if (walletService != null && buyIn > 0) {
+            if (walletService != null && buyIn > 0 && publicId != null) {
                 if (buyIn < table.minBuyIn() || buyIn > table.maxBuyIn()) {
                     throw new IllegalArgumentException("buy-in out of range");
                 }
-                walletService.buyIn(name, table.id(), buyIn);
+                walletService.buyIn(publicId, table.id(), buyIn);
             }
 
             // ウォレット確定後にゲーム状態を変更する
@@ -304,7 +313,7 @@ public class TableService {
             ));
 
             members.add(new TableMemberRecord(name, seatIndex, Instant.now().toString(),
-                    displayName != null ? displayName : name, avatarUrl));
+                    displayName != null ? displayName : name, avatarUrl, publicId));
             members.sort(Comparator.comparingInt(TableMemberRecord::seatIndex));
             tableMembers.put(table.id(), members);
             userTableHistoryService.recordJoin(name, table, seatIndex);
@@ -347,7 +356,8 @@ public class TableService {
                                 current.joinedAt(),
                                 true,
                                 current.displayName(),
-                                current.avatarUrl()
+                                current.avatarUrl(),
+                                current.publicId()
                         ));
                     } else {
                         updatedMembers.add(current);
@@ -363,7 +373,8 @@ public class TableService {
             members.removeIf(current -> current.name().equals(member.name()) && current.seatIndex() == member.seatIndex());
             members.sort(Comparator.comparingInt(TableMemberRecord::seatIndex));
             tableMembers.put(table.id(), members);
-            cashOutSeatStackIfPossible(member.name(), table.gameId(), member.seatIndex());
+            cashOutSeatStackIfPossible(member.publicId() != null ? member.publicId() : member.name(),
+                        table.gameId(), member.seatIndex());
             userTableHistoryService.recordLeave(member.name(), table.id(), member.seatIndex());
             List<TableMemberRecord> result = List.copyOf(members);
             trackEmptyTable(table.id(), result);
@@ -395,7 +406,8 @@ public class TableService {
                     remainingMembers.add(member);
                     continue;
                 }
-                cashOutSeatStackIfPossible(member.name(), table.gameId(), member.seatIndex());
+                cashOutSeatStackIfPossible(member.publicId() != null ? member.publicId() : member.name(),
+                        table.gameId(), member.seatIndex());
                 userTableHistoryService.recordLeave(member.name(), table.id(), member.seatIndex());
             }
             remainingMembers.sort(Comparator.comparingInt(TableMemberRecord::seatIndex));
@@ -559,15 +571,19 @@ public class TableService {
         return null;
     }
 
-    private void cashOutSeatStackIfPossible(String name, String tableId, int seatIndex) {
+    /**
+     * シートのスタックをキャッシュアウトします。
+     *
+     * @param publicIdOrName publicId が利用可能な場合は publicId、なければ name（ゲスト用フォールバック）
+     * @param tableId        テーブル ID
+     * @param seatIndex      シートインデックス
+     */
+    private void cashOutSeatStackIfPossible(String publicIdOrName, String tableId, int seatIndex) {
         int stack = gameService.getSeatStack(tableId, seatIndex);
-        if (stack <= 0) {
-            return;
-        }
-
+        if (stack <= 0) return;
         WalletService walletService = walletServiceProvider.getIfAvailable();
-        if (walletService != null) {
-            walletService.cashOut(name, tableId, stack);
+        if (walletService != null && publicIdOrName != null) {
+            walletService.cashOut(publicIdOrName, tableId, stack);
         }
         gameService.setSeatStack(tableId, seatIndex, 0);
     }
