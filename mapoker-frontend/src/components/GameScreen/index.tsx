@@ -91,6 +91,8 @@ export function GameScreen({
         displayName={displayName}
         onCloseSession={() => {}}
       />
+      <ActionLog game={game} displayName={displayName} />
+
       <ActionPanel
         game={game}
         mySeatIndex={mySeatIndex}
@@ -108,8 +110,6 @@ export function GameScreen({
         displayName={displayName}
         onSendAction={onSendAction}
       />
-
-      <ActionLog game={game} displayName={displayName} />
 
       {/* 退席ボタン・退席予約メッセージ — 右下固定 */}
       <div className="leave-area">
