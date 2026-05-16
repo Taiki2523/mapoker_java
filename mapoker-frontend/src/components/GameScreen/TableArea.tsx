@@ -109,7 +109,9 @@ export function TableArea({
     }
 
     const timers: number[] = []
-    let delay = 0
+    // オールインランアウト時はホールカード公開後 1000ms 待ってからコミュニティカードを開始する
+    const anyAllIn = game.players.some(p => p.all_in && !p.folded)
+    let delay = (anyAllIn && isShowdown) ? STREET_REVEAL_INTERVAL_MS : 0
 
     // フロップ（インデックス 0-2）
     if (prev < 3 && current >= 3) {
@@ -171,11 +173,13 @@ export function TableArea({
   // setSdStep は setTimeout 経由で呼ぶ（react-hooks/set-state-in-effect 対策）
   useEffect(() => {
     if (!isShowdown) return
+    const RESULT_DELAY = 1500 // カードアニメーション完了後にresultを表示するまでの待機時間(ms)
     const cardWait = Math.max(0, cardAnimEndsAtRef.current - Date.now())
+    const resultAt = cardWait + RESULT_DELAY
     const t0 = window.setTimeout(() => setSdStep(0), 0)
     const t1 = window.setTimeout(() => setSdStep(1), cardWait)
-    const t2 = window.setTimeout(() => setSdStep(2), cardWait + 800)
-    const t3 = window.setTimeout(() => setSdStep(3), cardWait + 1600)
+    const t2 = window.setTimeout(() => setSdStep(2), resultAt - 300)
+    const t3 = window.setTimeout(() => setSdStep(3), resultAt)
     return () => {
       window.clearTimeout(t0)
       window.clearTimeout(t1)
@@ -329,8 +333,11 @@ export function TableArea({
           const showResult = sdStep >= 3
           const isWinnerSeat = showResult && (showdown?.winners?.includes(idx) ?? false)
           const isLoserSeat = showResult && !(showdown?.winners?.includes(idx) ?? false) && !player.folded
+          // ショーダウン時に誰かがオールインなら全員のカードをアニメーション前から公開する
+          // （ランアウト = 全員オールイン で board が配られる場面）
+          const anyAllInAtShowdown = isShowdown && game.players.some(p => p.all_in && !p.folded)
           const showCards = mySeat === idx || isSpectator || (showResult && !player.folded)
-            || (game.status === 'in_progress' && !player.folded && player.all_in)
+            || (anyAllInAtShowdown && !player.folded)
           const cards = player.hole?.length ? player.hole : ['--', '--']
           const isMe = mySeat === idx
 
@@ -353,9 +360,29 @@ export function TableArea({
                 {bubble && <div className="action-bubble">{bubble}</div>}
                 <div className="player-box">
                   <div className="seat-header">
-                    <div className="seat-avatar">
-                      {displayName(idx).slice(0, 1).toUpperCase()}
-                    </div>
+                    {(() => {
+                      const member = roster.find((m) => m.seatIndex === idx)
+                      const avatarUrl = member?.avatarUrl
+                      const fullName = member?.displayName || displayName(idx)
+                      const shortName = member?.name || displayName(idx)
+                      return (
+                        <div className="seat-avatar-wrap" title={fullName}>
+                          <div className="seat-avatar">
+                            {avatarUrl
+                              ? <img src={avatarUrl} alt={shortName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                              : shortName.slice(0, 1).toUpperCase()
+                            }
+                          </div>
+                          <div className="player-tooltip">
+                            {avatarUrl && <img src={avatarUrl} alt={shortName} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />}
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{fullName}</div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Stack {formatStack(player.stack)}</div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })()}
                     <div className="seat-info">
                       <div className="player-name-row">
                         <span className="player-name">{displayName(idx)}</span>

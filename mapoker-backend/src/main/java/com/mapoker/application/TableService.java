@@ -10,6 +10,8 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import org.springframework.scheduling.annotation.Scheduled;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -29,6 +31,8 @@ public class TableService {
     private final Map<String, TableRecord> tables = new ConcurrentHashMap<>();
     private final Map<String, List<TableMemberRecord>> tableMembers = new ConcurrentHashMap<>();
     private final Map<String, Object> tableLocks = new ConcurrentHashMap<>();
+    /** テーブルが最後に空になった日時（メンバーが0人になった瞬間を記録）。 */
+    private final Map<String, java.time.Instant> lastEmptiedAt = new ConcurrentHashMap<>();
 
     private final GameService gameService;
     private final GameProperties gameProperties;
@@ -178,6 +182,12 @@ public class TableService {
             if (current.getStatus() == GameStatus.IN_PROGRESS) {
                 return current;
             }
+            long activeRosterCount = getMembers(tableId).stream()
+                    .filter(m -> !m.pendingLeave())
+                    .count();
+            if (activeRosterCount < com.mapoker.domain.PokerConstants.MIN_PLAYERS) {
+                throw new IllegalStateException("not enough players at the table");
+            }
             return gameService.startHand(tableId, bigBlind);
         }
     }
@@ -211,6 +221,10 @@ public class TableService {
      * @throws IllegalStateException ウォレット残高が不足している場合
      */
     public JoinResult join(String id, String requestedName, int buyIn) {
+        return join(id, requestedName, buyIn, requestedName, null);
+    }
+
+    public JoinResult join(String id, String requestedName, int buyIn, String displayName, String avatarUrl) {
         synchronized (tableLock(id)) {
             TableRecord table = getTable(id);
             String name = normalizeMemberName(requestedName);
@@ -222,8 +236,18 @@ public class TableService {
                     .findFirst()
                     .orElse(null);
             if (existing != null) {
-                // スタックが 0 かつ buyIn > 0 の場合はリバイとして処理
                 int currentStack = gameService.getSeatStack(table.gameId(), existing.seatIndex());
+                GameState state = gameService.getGame(table.gameId());
+                boolean handActive = (state.getStatus() == GameStatus.IN_PROGRESS && state.getPot() > 0)
+                        || state.getStatus() == GameStatus.SHOWDOWN;
+
+                // ハンド非進行中にスタックが残っている（切断・未退席）場合はキャッシュアウトしてから再バイイン
+                if (currentStack > 0 && !handActive) {
+                    cashOutSeatStackIfPossible(name, table.gameId(), existing.seatIndex());
+                    currentStack = 0;
+                }
+
+                // スタックが 0 かつ buyIn > 0 の場合はリバイとして処理
                 if (currentStack == 0 && buyIn > 0) {
                     WalletService walletService = walletServiceProvider.getIfAvailable();
                     if (walletService != null) {
@@ -279,7 +303,8 @@ public class TableService {
                     true
             ));
 
-            members.add(new TableMemberRecord(name, seatIndex, Instant.now().toString()));
+            members.add(new TableMemberRecord(name, seatIndex, Instant.now().toString(),
+                    displayName != null ? displayName : name, avatarUrl));
             members.sort(Comparator.comparingInt(TableMemberRecord::seatIndex));
             tableMembers.put(table.id(), members);
             userTableHistoryService.recordJoin(name, table, seatIndex);
@@ -320,7 +345,9 @@ public class TableService {
                                 current.name(),
                                 current.seatIndex(),
                                 current.joinedAt(),
-                                true
+                                true,
+                                current.displayName(),
+                                current.avatarUrl()
                         ));
                     } else {
                         updatedMembers.add(current);
@@ -339,6 +366,7 @@ public class TableService {
             cashOutSeatStackIfPossible(member.name(), table.gameId(), member.seatIndex());
             userTableHistoryService.recordLeave(member.name(), table.id(), member.seatIndex());
             List<TableMemberRecord> result = List.copyOf(members);
+            trackEmptyTable(table.id(), result);
             publishMembers(table.id(), result);
             return result;
         }
@@ -372,8 +400,36 @@ public class TableService {
             }
             remainingMembers.sort(Comparator.comparingInt(TableMemberRecord::seatIndex));
             tableMembers.put(table.id(), remainingMembers);
-            publishMembers(tableId, List.copyOf(remainingMembers));
+            List<TableMemberRecord> remaining = List.copyOf(remainingMembers);
+            trackEmptyTable(tableId, remaining);
+            publishMembers(tableId, remaining);
         }
+    }
+
+    /** メンバーが空になったときに lastEmptiedAt を記録する。 */
+    private void trackEmptyTable(String tableId, List<TableMemberRecord> members) {
+        if (members.isEmpty()) {
+            lastEmptiedAt.putIfAbsent(tableId, Instant.now());
+        } else {
+            lastEmptiedAt.remove(tableId);
+        }
+    }
+
+    /**
+     * 1 時間以上無人のテーブルを削除します。Spring Scheduler により 10 分ごとに実行されます。
+     */
+    @Scheduled(fixedDelay = 600_000)
+    public void removeStaleEmptyTables() {
+        Instant threshold = Instant.now().minus(1, ChronoUnit.HOURS);
+        lastEmptiedAt.entrySet().removeIf(entry -> {
+            if (entry.getValue().isBefore(threshold)) {
+                String tableId = entry.getKey();
+                tables.remove(tableId);
+                tableMembers.remove(tableId);
+                return true;
+            }
+            return false;
+        });
     }
 
     private void publishMembers(String tableId, List<TableMemberRecord> members) {

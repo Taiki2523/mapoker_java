@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>com.mapoker</groupId>
 	<artifactId>mapoker-backend</artifactId>
-	<version>1.0.3</version>
+	<version>1.1.0</version>
 	<name/>
 	<description/>
 	<url/>
@@ -78,6 +78,11 @@
 			<version>8.10.1</version>
 		</dependency>
 		<dependency>
+			<groupId>com.google.api-client</groupId>
+			<artifactId>google-api-client</artifactId>
+			<version>2.7.2</version>
+		</dependency>
+		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
 			<optional>true</optional>
@@ -133,6 +138,7 @@
 						<exclude>com/mapoker/application/WalletLedgerEntry*</exclude>
 						<exclude>com/mapoker/interfaces/http/WalletController*</exclude>
 						<exclude>com/mapoker/interfaces/http/AdminWalletController*</exclude>
+						<exclude>com/mapoker/interfaces/http/AvatarController*</exclude>
 						<!-- 認証基盤（Google ID Token検証・Spring Security依存、統合テスト対象外） -->
 						<exclude>com/mapoker/application/UserService*</exclude>
 						<exclude>com/mapoker/application/User.class</exclude>

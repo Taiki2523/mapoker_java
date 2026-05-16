@@ -1,12 +1,13 @@
 package com.mapoker.interfaces.http;
 
+import com.mapoker.application.GoogleAuthService;
 import com.mapoker.application.HandHistoryService;
+import com.mapoker.application.User;
 import com.mapoker.application.UserService;
 import com.mapoker.application.UserTableHistoryService;
+import com.mapoker.interfaces.http.dto.GoogleAuthRequest;
 import com.mapoker.interfaces.http.dto.HandHistoryResponse;
-import com.mapoker.interfaces.http.dto.LoginRequest;
-import com.mapoker.interfaces.http.dto.RegisterRequest;
-import com.mapoker.interfaces.http.dto.UpdateProfileRequest;
+import com.mapoker.interfaces.http.dto.UpdateUsernameRequest;
 import com.mapoker.interfaces.http.dto.UserResponse;
 import com.mapoker.interfaces.http.dto.UserTableHistoryResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,213 +15,155 @@ import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 /**
- * 認証関連エンドポイントを提供するコントローラー。
+ * 認証関連エンドポイントを提供するコントローラーです。
  *
- * <p>ユーザー登録・ログイン・ログアウトおよび認証済みユーザー情報の取得を担当する。
- * セッションは {@link HttpSession} で管理され、Spring Security の
- * {@link org.springframework.security.web.context.HttpSessionSecurityContextRepository}
- * を経由して永続化される。
- *
- * <p>ローカル開発プロファイル ({@code SPRING_PROFILES_ACTIVE=local}) では認証が無効化されるため、
- * {@code principal} が {@code null} になる場合がある。各エンドポイントで {@code null} チェックを
- * 行っているのはそのためである。
+ * <p>Google ID Token を受け取り、ユーザーを識別してセッションを確立します。
+ * セッション principal には {@code public_id}（UUID）を使用します。
  */
 @RestController
 @RequestMapping("/v1/auth")
 public class AuthController {
 
     private final UserService userService;
+    private final GoogleAuthService googleAuthService;
     private final UserTableHistoryService userTableHistoryService;
     private final HandHistoryService handHistoryService;
-    private final AuthenticationManager authenticationManager;
 
     public AuthController(UserService userService,
+                          GoogleAuthService googleAuthService,
                           UserTableHistoryService userTableHistoryService,
-                          HandHistoryService handHistoryService,
-                          AuthenticationManager authenticationManager) {
+                          HandHistoryService handHistoryService) {
         this.userService = userService;
+        this.googleAuthService = googleAuthService;
         this.userTableHistoryService = userTableHistoryService;
         this.handHistoryService = handHistoryService;
-        this.authenticationManager = authenticationManager;
     }
 
     /**
-     * 新規ユーザーを登録し、そのままセッションを確立して返す。
+     * Google ID Token を検証してログインまたは新規登録します。
      *
-     * <p>登録と同時にログイン状態になるため、クライアントは別途ログインリクエストを送る必要がない。
-     *
-     * @param req     ユーザー名とパスワードを含む登録リクエスト
-     * @param request セッション生成に使用するHTTPリクエスト
-     * @return 登録されたユーザーの {@link UserResponse}（HTTP 201）
+     * @param req     ID Token を含むリクエスト
+     * @param request セッション生成に使用する HTTP リクエスト
+     * @return ユーザー情報
      */
-    @PostMapping("/register")
-    @ResponseStatus(HttpStatus.CREATED)
-    public UserResponse register(@Valid @RequestBody RegisterRequest req, HttpServletRequest request) {
-        userService.register(req.username(), req.password());
-        return createSessionAndReturn(req.username(), req.password(), request);
+    @PostMapping("/google")
+    public UserResponse loginWithGoogle(@Valid @RequestBody GoogleAuthRequest req,
+                                        HttpServletRequest request) {
+        GoogleAuthService.LoginResult result = googleAuthService.loginWithGoogle(req.idToken());
+        UserResponse response = result.isNewUser()
+                ? UserResponse.fromNew(result.user())
+                : UserResponse.from(result.user());
+        return establishSessionWithResponse(result.user(), response, request);
     }
 
     /**
-     * 既存ユーザーを認証してセッションを確立する。
+     * 現在ログイン中のユーザー情報を返します。
      *
-     * @param req     ユーザー名とパスワードを含むログインリクエスト
-     * @param request セッション生成に使用するHTTPリクエスト
-     * @return 認証されたユーザーの {@link UserResponse}（HTTP 200）
-     */
-    @PostMapping("/login")
-    public UserResponse login(@Valid @RequestBody LoginRequest req, HttpServletRequest request) {
-        return createSessionAndReturn(req.username(), req.password(), request);
-    }
-
-    /**
-     * 認証を実行してセッションを確立し、ユーザー情報を返す内部ヘルパー。
-     *
-     * <p>{@link SecurityContextHolder} に認証情報をセットした後、
-     * セッションに {@code SPRING_SECURITY_CONTEXT_KEY} として格納することで
-     * 後続リクエストでも認証状態が維持される。
-     *
-     * @param username   ユーザー名
-     * @param rawPassword 平文パスワード
-     * @param request    セッション生成に使用するHTTPリクエスト
-     * @return ユーザーの {@link UserResponse}
-     */
-    private UserResponse createSessionAndReturn(String username, String rawPassword, HttpServletRequest request) {
-        Authentication auth = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(username, rawPassword));
-        SecurityContextHolder.getContext().setAuthentication(auth);
-        HttpSession session = request.getSession(true);
-        session.setAttribute(
-                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-                SecurityContextHolder.getContext());
-        var user = userService.getByUsername(username);
-        return new UserResponse(user.id(), user.username());
-    }
-
-    /**
-     * 現在ログイン中のユーザー情報を返す。
-     *
-     * <p>未認証の場合は HTTP 401 を返す。ローカルプロファイルでは {@code principal} が
-     * {@code null} になり得るため、その場合も 401 を返す。
-     *
-     * @param principal Spring Security が注入する認証済みユーザー詳細。未認証時は {@code null}
-     * @return 認証済みユーザーの {@link UserResponse}、または HTTP 401
+     * @param principal 認証済みユーザー（principal = public_id）
+     * @return ユーザー情報、または HTTP 401
      */
     @GetMapping("/me")
     public ResponseEntity<UserResponse> me(@AuthenticationPrincipal UserDetails principal) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        var user = userService.getByUsername(principal.getUsername());
-        return ResponseEntity.ok(new UserResponse(user.id(), user.username()));
+        User user = userService.getByPublicId(principal.getUsername());
+        return ResponseEntity.ok(UserResponse.from(user));
     }
 
     /**
-     * 認証済みユーザーのプロフィール（ユーザー名・パスワード）を更新する。
+     * 認証済みユーザーの表示名を変更します。
      *
-     * <p>ユーザー名を変更した場合、セッションを再発行して新しい認証情報で継続できるようにする。
-     *
-     * @param req       更新内容（新ユーザー名・現パスワード・新パスワード）
+     * @param req       新しいユーザー名
      * @param principal 現在の認証済みユーザー
-     * @param request   セッション再発行に使用
-     * @return 更新後のユーザー情報、または HTTP 401
+     * @return 更新後のユーザー情報、または HTTP 401 / 409
      */
-    @PutMapping("/me")
-    public ResponseEntity<UserResponse> updateMe(
-            @Valid @RequestBody UpdateProfileRequest req,
-            @AuthenticationPrincipal UserDetails principal,
-            HttpServletRequest request) {
+    @PatchMapping("/me/username")
+    public ResponseEntity<UserResponse> updateUsername(
+            @Valid @RequestBody UpdateUsernameRequest req,
+            @AuthenticationPrincipal UserDetails principal) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         try {
-            var updated = userService.updateProfile(
-                    principal.getUsername(),
-                    req.newUsername(),
-                    req.currentPassword(),
-                    req.newPassword());
-            if (req.newUsername() != null && !req.newUsername().isBlank()
-                    && !req.newUsername().trim().equals(principal.getUsername())) {
-                String rawPassword = req.newPassword() != null ? req.newPassword() : req.currentPassword();
-                if (rawPassword != null && !rawPassword.isBlank()) {
-                    HttpSession old = request.getSession(false);
-                    if (old != null) old.invalidate();
-                    createSessionAndReturn(updated.username(), rawPassword, request);
-                }
-            }
-            return ResponseEntity.ok(new UserResponse(updated.id(), updated.username()));
+            User updated = userService.updateUsername(principal.getUsername(), req.newUsername());
+            return ResponseEntity.ok(UserResponse.from(updated));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
         }
     }
 
     /**
-     * 認証済みユーザーの直近テーブル参加履歴を返す。
-     *
-     * @param principal Spring Security が注入する認証済みユーザー詳細。未認証時は {@code null}
-     * @return {@link UserTableHistoryResponse} のリスト、または HTTP 401
+     * 認証済みユーザーの直近テーブル参加履歴を返します。
      */
     @GetMapping("/history")
-    public ResponseEntity<java.util.List<UserTableHistoryResponse>> history(@AuthenticationPrincipal UserDetails principal) {
+    public ResponseEntity<List<UserTableHistoryResponse>> history(
+            @AuthenticationPrincipal UserDetails principal) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        return ResponseEntity.ok(userTableHistoryService.listRecent(principal.getUsername()).stream()
+        User user = userService.getByPublicId(principal.getUsername());
+        return ResponseEntity.ok(userTableHistoryService.listRecent(user.username()).stream()
                 .map(UserTableHistoryResponse::from)
                 .toList());
     }
 
     /**
-     * 認証済みユーザーの直近ハンド履歴を返す。
-     *
-     * @param principal Spring Security が注入する認証済みユーザー詳細。未認証時は {@code null}
-     * @param limit     取得件数の上限（デフォルト 20）
-     * @return {@link HandHistoryResponse} のリスト、または HTTP 401
+     * 認証済みユーザーの直近ハンド履歴を返します。
      */
     @GetMapping("/hand-history")
-    public ResponseEntity<java.util.List<HandHistoryResponse>> handHistory(
+    public ResponseEntity<List<HandHistoryResponse>> handHistory(
             @AuthenticationPrincipal UserDetails principal,
             @RequestParam(name = "limit", defaultValue = "20") int limit) {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        return ResponseEntity.ok(handHistoryService.listRecentForUser(principal.getUsername(), limit).stream()
+        User user = userService.getByPublicId(principal.getUsername());
+        return ResponseEntity.ok(handHistoryService.listRecentForUser(user.username(), limit).stream()
                 .map(HandHistoryResponse::from)
                 .toList());
     }
 
     /**
-     * 現在のセッションを無効化してログアウトする。
-     *
-     * <p>セッションが存在しない場合は何もせず正常終了する。
-     * {@link SecurityContextHolder} もクリアすることで、同一スレッド内での
-     * 認証情報の残存を防ぐ。
-     *
-     * @param request セッション取得に使用するHTTPリクエスト
+     * 現在のセッションを無効化してログアウトします。
      */
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void logout(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
-        if (session != null) {
-            session.invalidate();
-        }
+        if (session != null) session.invalidate();
         SecurityContextHolder.clearContext();
+    }
+
+    private UserResponse establishSession(User user, HttpServletRequest request) {
+        return establishSessionWithResponse(user, UserResponse.from(user), request);
+    }
+
+    private UserResponse establishSessionWithResponse(User user, UserResponse response, HttpServletRequest request) {
+        var userDetails = new org.springframework.security.core.userdetails.User(
+                user.publicId(), "", List.of());
+        var auth = new UsernamePasswordAuthenticationToken(userDetails, null, List.of());
+        SecurityContextHolder.getContext().setAuthentication(auth);
+        request.getSession(true).setAttribute(
+                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
+                SecurityContextHolder.getContext());
+        return response;
     }
 }

@@ -32,6 +32,14 @@ export function ActionPanel({
     }
     return `¥${chips}`
   }
+
+  const canCheck = toCall === 0
+  const step = bb > 0 ? bb : 1
+  const adjustAmount = (delta: number) => {
+    const next = actionAmount + delta * step
+    setActionAmount(Math.min(Math.max(minRaise, next), maxBet))
+  }
+
   return (
     <div className={`action-panel ${canAct ? 'active' : 'inactive'}`}>
       <div className="action-panel-controls">
@@ -69,6 +77,12 @@ export function ActionPanel({
             ))}
           </div>
           <div className="bet-slider-wrap">
+            <button
+              className="bet-step-btn"
+              onClick={() => adjustAmount(-1)}
+              disabled={actionAmount <= minRaise}
+              aria-label="-1BB"
+            >−</button>
             <input
               type="range"
               className="bet-slider"
@@ -77,6 +91,12 @@ export function ActionPanel({
               value={actionAmount}
               onChange={(e) => setActionAmount(Number(e.target.value))}
             />
+            <button
+              className="bet-step-btn"
+              onClick={() => adjustAmount(1)}
+              disabled={actionAmount >= maxBet}
+              aria-label="+1BB"
+            >＋</button>
             <span className="bet-slider-value">{fmt(actionAmount)}</span>
           </div>
         </div>
@@ -87,16 +107,17 @@ export function ActionPanel({
           <button
             className="fold-btn"
             onClick={() => onSendAction('fold', 0)}
-            disabled={!canAct || loading}
+            disabled={!canAct || loading || canCheck}
+            title={canCheck ? 'チェックできます' : undefined}
           >
             {t('fold')}
           </button>
           <button
             className="call-btn"
-            onClick={() => onSendAction(toCall === 0 ? 'check' : 'call', 0)}
+            onClick={() => onSendAction(canCheck ? 'check' : 'call', 0)}
             disabled={!canAct || loading}
           >
-            {toCall === 0 ? t('check') : `${t('call')} ${fmt(toCall)}`}
+            {canCheck ? t('check') : `${t('call')} ${fmt(toCall)}`}
           </button>
           <button
             className="raise-btn"

@@ -35,7 +35,16 @@ public class GameEventPublisher {
     }
 
     public void publishGameState(String tableId, GameState state, Instant streetRevealedAt) {
-        GameResponse response = GameResponse.from(state, null, false);
+        int seatedCount = -1;
+        try {
+            TableService ts = tableServiceProvider.getIfAvailable();
+            if (ts != null) {
+                seatedCount = (int) ts.getMembers(tableId).stream()
+                        .filter(m -> !m.pendingLeave())
+                        .count();
+            }
+        } catch (Exception ignored) {}
+        GameResponse response = GameResponse.from(state, null, false, seatedCount);
         messaging.convertAndSend(
                 "/topic/tables/" + tableId + "/game",
                 new GameBroadcastPayload(response, streetRevealedAt)
@@ -72,7 +81,9 @@ public class GameEventPublisher {
                         member.name(),
                         member.seatIndex(),
                         member.joinedAt(),
-                        member.pendingLeave()
+                        member.pendingLeave(),
+                        member.displayName(),
+                        member.avatarUrl()
                 ))
                 .toList();
         messaging.convertAndSend(

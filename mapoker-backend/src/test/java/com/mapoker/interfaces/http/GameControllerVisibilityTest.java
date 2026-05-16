@@ -2,6 +2,7 @@ package com.mapoker.interfaces.http;
 
 import com.mapoker.application.GameService;
 import com.mapoker.application.TableService;
+import com.mapoker.application.UserService;
 import com.mapoker.domain.game.GameState;
 import com.mapoker.domain.game.OddChipRule;
 import com.mapoker.domain.game.Player;
@@ -22,17 +23,21 @@ class GameControllerVisibilityTest {
     void authenticatedUserOnlySeesOwnHoleCards() {
         GameService gameService = mock(GameService.class);
         TableService tableService = mock(TableService.class);
-        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableService);
+        UserService userService = mock(UserService.class);
+        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableService, userService);
 
         GameState state = startedGame();
         when(gameService.getGame("game-1")).thenReturn(state);
+        var appAlice = new com.mapoker.application.User(
+                1L, "pub-alice", "alice", "0000", null, java.time.LocalDateTime.now());
+        when(userService.getByPublicId("pub-alice")).thenReturn(appAlice);
         when(tableService.findSeatIndex("game-1", "alice")).thenReturn(1);
 
         var response = controller.getGame(
                 "game-1",
                 0,
                 "0",
-                new User("alice", "secret", List.of())
+                new User("pub-alice", "secret", List.of())
         );
 
         assertThat(response.players().get(0).hole()).isNull();
@@ -43,17 +48,21 @@ class GameControllerVisibilityTest {
     void authenticatedUserCannotSpoofViewerIndexWithoutSeat() {
         GameService gameService = mock(GameService.class);
         TableService tableService = mock(TableService.class);
-        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableService);
+        UserService userService = mock(UserService.class);
+        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableService, userService);
 
         GameState state = startedGame();
         when(gameService.getGame("game-1")).thenReturn(state);
+        var appMallory = new com.mapoker.application.User(
+                2L, "pub-mallory", "mallory", "0000", null, java.time.LocalDateTime.now());
+        when(userService.getByPublicId("pub-mallory")).thenReturn(appMallory);
         when(tableService.findSeatIndex("game-1", "mallory")).thenReturn(null);
 
         var response = controller.getGame(
                 "game-1",
                 0,
                 "0",
-                new User("mallory", "secret", List.of())
+                new User("pub-mallory", "secret", List.of())
         );
 
         assertThat(response.players()).allSatisfy(player -> assertThat(player.hole()).isNull());
@@ -63,7 +72,7 @@ class GameControllerVisibilityTest {
     void anonymousViewerCanUseExplicitViewerIndex() {
         GameService gameService = mock(GameService.class);
         TableService tableService = mock(TableService.class);
-        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableService);
+        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableService, mock(UserService.class));
 
         GameState state = startedGame();
         when(gameService.getGame("game-1")).thenReturn(state);

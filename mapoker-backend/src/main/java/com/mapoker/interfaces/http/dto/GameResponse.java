@@ -100,12 +100,18 @@ public record GameResponse(
     /**
      * ドメイン状態からゲームレスポンスを生成します。
      *
-     * @param g ゲーム状態
+     * @param g           ゲーム状態
      * @param viewerIndex 閲覧者の席番号
-     * @param spectator 観戦者かどうか
+     * @param spectator   観戦者かどうか
+     * @param seatedCount テーブルに着席中の実プレイヤー数（-1 の場合はロスター未考慮）
      * @return 生成したゲームレスポンス
      */
+    /** ロスター未考慮の旧シグネチャ（後方互換）。 */
     public static GameResponse from(GameState g, Integer viewerIndex, boolean spectator) {
+        return from(g, viewerIndex, spectator, -1);
+    }
+
+    public static GameResponse from(GameState g, Integer viewerIndex, boolean spectator, int seatedCount) {
         List<PlayerResponse> playerResponses = new ArrayList<>();
         boolean showAll = g.getStatus() == GameStatus.SHOWDOWN
                 || (g.getStatus() == GameStatus.FINISHED && !g.isFoldWin());
@@ -125,7 +131,8 @@ public record GameResponse(
                     p.isFolded(), p.isAllIn(), hole));
         }
 
-        boolean canStartHand = g.canStartHand();
+        boolean canStartHand = g.canStartHand()
+                && (seatedCount < 0 || seatedCount >= com.mapoker.domain.PokerConstants.MIN_PLAYERS);
         boolean viewerMembershipActive = false;
         boolean canRebuy = false;
         if (viewerIndex != null && viewerIndex >= 0 && viewerIndex < g.getPlayers().size()) {

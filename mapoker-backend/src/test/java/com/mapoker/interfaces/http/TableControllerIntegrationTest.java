@@ -2,6 +2,7 @@ package com.mapoker.interfaces.http;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mapoker.application.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -27,6 +28,9 @@ class TableControllerIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Test
     void createJoinAndListTableMembers() throws Exception {
@@ -78,16 +82,20 @@ class TableControllerIntegrationTest {
 
     @Test
     void tracksAuthenticatedUserHistoryAcrossJoinAndLeave() throws Exception {
+        // publicId ベース認証のため、事前にユーザーを作成して publicId をプリンシパルとして使用する
+        var alice = userRepository.createWithGoogle("alice-history", "0000", null);
+        String alicePublicId = alice.publicId();
+
         String tableId = createTable();
 
         mockMvc.perform(post("/v1/tables/{id}/join", tableId)
-                        .with(SecurityMockMvcRequestPostProcessors.user("alice"))
+                        .with(SecurityMockMvcRequestPostProcessors.user(alicePublicId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/v1/auth/history")
-                        .with(SecurityMockMvcRequestPostProcessors.user("alice")))
+                        .with(SecurityMockMvcRequestPostProcessors.user(alicePublicId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].table_id").value(tableId))
                 .andExpect(jsonPath("$[0].seat_index").isNumber())
@@ -95,13 +103,13 @@ class TableControllerIntegrationTest {
                 .andExpect(jsonPath("$[0].left_at").doesNotExist());
 
         mockMvc.perform(post("/v1/tables/{id}/leave", tableId)
-                        .with(SecurityMockMvcRequestPostProcessors.user("alice"))
+                        .with(SecurityMockMvcRequestPostProcessors.user(alicePublicId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/v1/auth/history")
-                        .with(SecurityMockMvcRequestPostProcessors.user("alice")))
+                        .with(SecurityMockMvcRequestPostProcessors.user(alicePublicId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].table_id").value(tableId))
                 .andExpect(jsonPath("$[0].active").value(false))
@@ -177,13 +185,12 @@ class TableControllerIntegrationTest {
     }
 
     @Test
-    void validatesLoginRequest() throws Exception {
-        mockMvc.perform(post("/v1/auth/login")
+    void validatesGoogleAuthRequest() throws Exception {
+        mockMvc.perform(post("/v1/auth/google")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "username": "ab",
-                                  "password": "123"
+                                  "idToken": ""
                                 }
                                 """))
                 .andExpect(status().isBadRequest())

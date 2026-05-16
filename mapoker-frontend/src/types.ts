@@ -28,6 +28,14 @@ export type GameState = {
   last_showdown?: Showdown
 }
 
+export type ActionLogEntry = {
+  seq: number
+  player_index: number
+  type: string
+  amount: number
+  label?: string | null
+}
+
 export type Showdown = {
   winners?: number[]
   best_hand?: { rank: string; kickers: string[] } | null
@@ -35,8 +43,12 @@ export type Showdown = {
 }
 
 export type AuthUser = {
-  id: number
+  public_id: string
   username: string
+  discriminator: string
+  display_name: string
+  avatar_url: string | null
+  new_user?: boolean
 }
 
 export type TableVisibility = 'public' | 'private'
@@ -130,6 +142,8 @@ export type RoomMember = {
   seatIndex: number
   joinedAt?: string
   pendingLeave?: boolean
+  displayName?: string
+  avatarUrl?: string | null
 }
 
 export type RoomMemberApi = {
@@ -137,6 +151,8 @@ export type RoomMemberApi = {
   seat_index: number
   joined_at: string
   pending_leave?: boolean
+  display_name?: string
+  avatar_url?: string | null
 }
 
 export type Member = RoomMemberApi

@@ -580,6 +580,25 @@
   min-width: 140px;
 }
 
+.bet-step-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: var(--surface-3);
+  color: var(--text-base);
+  font-size: 1rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.bet-step-btn:hover:not(:disabled) { background: var(--surface-2); }
+.bet-step-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
 .bet-slider {
   flex: 1;
   height: 4px;
@@ -763,6 +782,69 @@ button.icon-btn[data-label]:hover::after {
 }
 
 /* ---- 退席エリア (右下固定) ---- */
+/* ── アクションログ ダイアログ ── */
+.action-log-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.action-log-dialog {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: min(420px, 92vw);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.action-log-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.action-log-dialog-body {
+  overflow-y: auto;
+  padding: 0.5rem 0;
+  flex: 1;
+}
+
+.action-log-entry {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  padding: 0.3rem 1rem;
+  display: flex;
+  gap: 0.5rem;
+}
+.action-log-entry:nth-child(odd) { background: rgba(255,255,255,0.02); }
+
+.action-log-seq {
+  color: var(--text-muted);
+  opacity: 0.5;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+  min-width: 2rem;
+}
+
+.action-log-fold     { color: #e57373; }
+.action-log-all_in   { color: var(--poker-gold); }
+.action-log-bet,
+.action-log-raise    { color: var(--accent); }
+.action-log-showdown { color: #ce93d8; font-weight: 600; }
+.action-log-payout   { color: var(--poker-gold); font-weight: 600; }
+
 .leave-area {
   position: fixed;
   bottom: 1.25rem;
@@ -1552,6 +1634,37 @@ button.icon-btn[data-label]:hover::after {
 }
 
 /* --- Seat avatar (Phase 2) --- */
+.seat-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.seat-avatar-wrap:hover .player-tooltip {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.player-tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s, transform 0.15s;
+  box-shadow: var(--shadow-md);
+}
+
 .seat-avatar {
   width: 28px;
   height: 28px;
@@ -1565,6 +1678,7 @@ button.icon-btn[data-label]:hover::after {
   font-weight: 700;
   color: var(--text-muted);
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .seat-header {

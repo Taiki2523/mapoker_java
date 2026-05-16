@@ -88,7 +88,7 @@ function App() {
   const displayName = useMemo(() => {
     return (seatIndex: number) => {
       const member = roster.find((m) => m.seatIndex === seatIndex)
-      return member?.name || game?.players?.[seatIndex]?.id || t('seatN', { n: seatIndex + 1 })
+      return member?.displayName || member?.name || game?.players?.[seatIndex]?.id || t('seatN', { n: seatIndex + 1 })
     }
   }, [game?.players, roster])
 
@@ -276,6 +276,14 @@ function App() {
   useEffect(() => {
     if (!game) return
     if (game.status === 'showdown' && !showdown) {
+      // オールインのランアウト時はコミュニティカードアニメーション完了を待ってから解決する
+      const delay = Math.max(0, cardRevealEndsAtRef.current - Date.now())
+      if (delay > 0) {
+        const timer = window.setTimeout(() => {
+          void runShowdown({ suppressError: true })
+        }, delay)
+        return () => window.clearTimeout(timer)
+      }
       void runShowdown({ suppressError: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -283,13 +291,14 @@ function App() {
 
   useEffect(() => {
     const isAutoStartable = game?.status === 'finished' || !game?.status
-    if (!game || !isAutoStartable || !game.can_start_hand) return
+    const activeRosterCount = roster.filter((m) => !m.pendingLeave).length
+    if (!game || !isAutoStartable || !game.can_start_hand || activeRosterCount < 2) return
     const timer = window.setTimeout(() => {
       void startHand(undefined, undefined, { suppressError: true })
     }, NEXT_HAND_DELAY_MS)
     return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game?.status, game?.can_start_hand, gameId])
+  }, [game?.status, game?.can_start_hand, gameId, roster])
 
   useEffect(() => {
     if (isMyTurn && !prevIsMyTurn.current) {
@@ -469,6 +478,17 @@ function App() {
   }
 
   const handleLogout = async () => {
+    // テーブルに着席中ならログアウト前にキャッシュアウト退席する
+    if (gameId && myName.trim()) {
+      try {
+        await fetchJSON(`/v1/tables/${gameId}/leave`, {
+          method: 'POST',
+          body: JSON.stringify({ name: myName.trim(), seat_index: mySeatIndex }),
+        })
+      } catch {
+        // ignore — サーバー側で未処理のまま logout を続行
+      }
+    }
     try {
       await fetchJSON('/v1/auth/logout', { method: 'POST' })
     } catch {
@@ -872,7 +892,6 @@ function App() {
           loading={profileLoading}
           error={profileError}
           onClose={() => setShowMyPage(false)}
-          onRefresh={() => void refreshProfileTables()}
           onLogout={() => void handleLogout()}
           onUpdateUser={(user) => { setCurrentUser(user); setMyName(user.username) }}
           onClaimDailyBonus={() => void handleClaimDailyBonus()}
