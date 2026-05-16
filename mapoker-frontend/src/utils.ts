@@ -18,6 +18,8 @@ export function mapMembers(members: RoomMemberApi[] = []): RoomMember[] {
     seatIndex: member.seat_index,
     joinedAt: member.joined_at,
     pendingLeave: member.pending_leave ?? false,
+    displayName: member.display_name ?? member.name,
+    avatarUrl: member.avatar_url ?? null,
   }))
 }
 

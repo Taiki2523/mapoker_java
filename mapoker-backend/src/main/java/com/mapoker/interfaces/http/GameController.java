@@ -2,6 +2,7 @@ package com.mapoker.interfaces.http;
 
 import com.mapoker.application.GameService;
 import com.mapoker.application.TableService;
+import com.mapoker.application.UserService;
 import com.mapoker.domain.game.GameState;
 import com.mapoker.domain.game.OddChipRule;
 import com.mapoker.infrastructure.config.GameProperties;
@@ -32,11 +33,14 @@ public class GameController {
     private final GameService gameService;
     private final GameProperties gameProperties;
     private final TableService tableService;
+    private final UserService userService;
 
-    public GameController(GameService gameService, GameProperties gameProperties, TableService tableService) {
+    public GameController(GameService gameService, GameProperties gameProperties,
+                          TableService tableService, UserService userService) {
         this.gameService = gameService;
         this.gameProperties = gameProperties;
         this.tableService = tableService;
+        this.userService = userService;
     }
 
     /**
@@ -179,6 +183,7 @@ public class GameController {
         if (principal == null) {
             return requestedViewerIndex;
         }
-        return tableService.findSeatIndex(id, principal.getUsername());
+        String username = userService.getByPublicId(principal.getUsername()).username();
+        return tableService.findSeatIndex(id, username);
     }
 }

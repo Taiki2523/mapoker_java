@@ -67,7 +67,9 @@ public record TableResponse(
             String name,
             @JsonProperty("seat_index") int seatIndex,
             @JsonProperty("joined_at") String joinedAt,
-            @JsonProperty("pending_leave") boolean pendingLeave
+            @JsonProperty("pending_leave") boolean pendingLeave,
+            @JsonProperty("display_name") String displayName,
+            @JsonProperty("avatar_url") String avatarUrl
     ) {}
 
     /**
@@ -82,7 +84,8 @@ public record TableResponse(
         List<MemberDto> memberDtos = members == null
                 ? List.of()
                 : members.stream()
-                .map(member -> new MemberDto(member.name(), member.seatIndex(), member.joinedAt(), member.pendingLeave()))
+                .map(member -> new MemberDto(member.name(), member.seatIndex(), member.joinedAt(),
+                        member.pendingLeave(), member.displayName(), member.avatarUrl()))
                 .toList();
         return new TableResponse(
                 table.id(),

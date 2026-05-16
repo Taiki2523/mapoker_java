@@ -1552,6 +1552,37 @@ button.icon-btn[data-label]:hover::after {
 }
 
 /* --- Seat avatar (Phase 2) --- */
+.seat-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.seat-avatar-wrap:hover .player-tooltip {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.player-tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s, transform 0.15s;
+  box-shadow: var(--shadow-md);
+}
+
 .seat-avatar {
   width: 28px;
   height: 28px;
@@ -1565,6 +1596,7 @@ button.icon-btn[data-label]:hover::after {
   font-weight: 700;
   color: var(--text-muted);
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .seat-header {

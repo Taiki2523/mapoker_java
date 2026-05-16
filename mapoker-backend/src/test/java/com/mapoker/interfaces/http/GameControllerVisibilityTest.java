@@ -2,6 +2,7 @@ package com.mapoker.interfaces.http;
 
 import com.mapoker.application.GameService;
 import com.mapoker.application.TableService;
+import com.mapoker.application.UserService;
 import com.mapoker.domain.game.GameState;
 import com.mapoker.domain.game.OddChipRule;
 import com.mapoker.domain.game.Player;
@@ -22,7 +23,7 @@ class GameControllerVisibilityTest {
     void authenticatedUserOnlySeesOwnHoleCards() {
         GameService gameService = mock(GameService.class);
         TableService tableService = mock(TableService.class);
-        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableService);
+        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableService, mock(UserService.class));
 
         GameState state = startedGame();
         when(gameService.getGame("game-1")).thenReturn(state);
@@ -43,7 +44,7 @@ class GameControllerVisibilityTest {
     void authenticatedUserCannotSpoofViewerIndexWithoutSeat() {
         GameService gameService = mock(GameService.class);
         TableService tableService = mock(TableService.class);
-        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableService);
+        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableService, mock(UserService.class));
 
         GameState state = startedGame();
         when(gameService.getGame("game-1")).thenReturn(state);
@@ -63,7 +64,7 @@ class GameControllerVisibilityTest {
     void anonymousViewerCanUseExplicitViewerIndex() {
         GameService gameService = mock(GameService.class);
         TableService tableService = mock(TableService.class);
-        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableService);
+        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableService, mock(UserService.class));
 
         GameState state = startedGame();
         when(gameService.getGame("game-1")).thenReturn(state);

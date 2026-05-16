@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.mapoker.application.TableMemberRecord;
 import com.mapoker.application.TableRecord;
 import com.mapoker.application.TableService;
+import com.mapoker.application.UserService;
 import com.mapoker.interfaces.http.dto.CreateTableRequest;
 import com.mapoker.interfaces.http.dto.GameResponse;
 import com.mapoker.interfaces.http.dto.TableMembershipRequest;
@@ -24,9 +25,11 @@ import java.util.List;
 public class TableController {
 
     private final TableService tableService;
+    private final UserService userService;
 
-    public TableController(TableService tableService) {
+    public TableController(TableService tableService, UserService userService) {
         this.tableService = tableService;
+        this.userService = userService;
     }
 
     /**
@@ -99,9 +102,10 @@ public class TableController {
     public JoinResponse join(@PathVariable String id,
                              @Valid @RequestBody(required = false) TableMembershipRequest body,
                              @AuthenticationPrincipal UserDetails principal) {
-        String name = principal != null ? principal.getUsername() : body != null ? body.name() : null;
+        String name = resolveName(principal, body);
         int buyIn = body != null && body.buyIn() != null ? body.buyIn() : 0;
-        TableService.JoinResult result = tableService.join(id, name, buyIn);
+        String[] userInfo = resolveUserInfo(principal, name);
+        TableService.JoinResult result = tableService.join(id, name, buyIn, userInfo[0], userInfo[1]);
         return new JoinResponse(result.assignedSeatIndex(), toMembers(result.members()));
     }
 
@@ -117,13 +121,29 @@ public class TableController {
     public MembersResponse leave(@PathVariable String id,
                                  @Valid @RequestBody(required = false) TableMembershipRequest body,
                                  @AuthenticationPrincipal UserDetails principal) {
-        String name = principal != null ? principal.getUsername() : body != null ? body.name() : null;
+        String name = resolveName(principal, body);
         return new MembersResponse(toMembers(tableService.leave(id, name, null)));
+    }
+
+    /** [displayName, avatarUrl] を返す。未認証時は [name, null]。 */
+    private String[] resolveUserInfo(UserDetails principal, String name) {
+        if (principal != null) {
+            var user = userService.getByPublicId(principal.getUsername());
+            return new String[]{ user.displayName(), user.avatarUrl() };
+        }
+        return new String[]{ name, null };
+    }
+
+    private String resolveName(UserDetails principal, TableMembershipRequest body) {
+        if (body != null && body.name() != null && !body.name().isBlank()) return body.name();
+        if (principal != null) return userService.getByPublicId(principal.getUsername()).username();
+        return null;
     }
 
     private List<TableResponse.MemberDto> toMembers(List<TableMemberRecord> members) {
         return members.stream()
-                .map(member -> new TableResponse.MemberDto(member.name(), member.seatIndex(), member.joinedAt(), member.pendingLeave()))
+                .map(member -> new TableResponse.MemberDto(member.name(), member.seatIndex(), member.joinedAt(),
+                        member.pendingLeave(), member.displayName(), member.avatarUrl()))
                 .toList();
     }
 

@@ -3,6 +3,7 @@ package com.mapoker.interfaces.http;
 import com.mapoker.application.ActionRecord;
 import com.mapoker.application.GameService;
 import com.mapoker.application.TableService;
+import com.mapoker.application.UserService;
 import com.mapoker.domain.game.GameState;
 import com.mapoker.domain.game.GameStatus;
 import com.mapoker.domain.game.OddChipRule;
@@ -47,7 +48,7 @@ class GameControllerTest {
     void setUp() {
         gameService = mock(GameService.class);
         tableService = mock(TableService.class);
-        controller = new GameController(gameService, GAME_PROPS, tableService);
+        controller = new GameController(gameService, GAME_PROPS, tableService, mock(UserService.class));
     }
 
     // -----------------------------------------------------------------------
