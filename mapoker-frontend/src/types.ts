@@ -117,6 +117,7 @@ export type Table = {
     small_blind: number
     big_blind: number
     ante: number
+    straddle_enabled: boolean
   }
   min_buy_in: number
   max_buy_in: number
@@ -179,6 +180,7 @@ export type CreateGameConfig = {
   smallBlind: number
   bigBlind: number
   ante: number
+  straddleEnabled: boolean
   visibility: TableVisibility
   flags: TableFlag[]
 }

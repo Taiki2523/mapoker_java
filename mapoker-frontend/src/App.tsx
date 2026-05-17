@@ -565,6 +565,7 @@ function App() {
         small_blind: config.smallBlind,
         big_blind: config.bigBlind,
         ante: config.ante,
+        straddle_enabled: config.straddleEnabled,
         visibility: config.visibility,
         flags: config.flags,
       }

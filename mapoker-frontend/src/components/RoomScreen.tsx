@@ -30,6 +30,7 @@ export function RoomScreen({
   const [selectedFormat, setSelectedFormat] = useState(BLIND_FORMATS[0])
   const [anteEnabled, setAnteEnabled] = useState(false)
   const [ante, setAnte] = useState(() => defaultAnte(BLIND_FORMATS[0].bigBlind))
+  const [straddleEnabled, setStraddleEnabled] = useState(false)
   const [visibility, setVisibility] = useState<TableVisibility>('public')
   const [flags, setFlags] = useState<TableFlag[]>(['casual'])
 
@@ -113,6 +114,22 @@ export function RoomScreen({
           />
         )}
       </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <label className="toggle-switch">
+          <input
+            type="checkbox"
+            checked={straddleEnabled}
+            onChange={(e) => setStraddleEnabled(e.target.checked)}
+          />
+          <span className="toggle-track"><span className="toggle-thumb" /></span>
+          {t('straddle')}
+        </label>
+        {straddleEnabled && (
+          <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+            {selectedFormat.bigBlind * 2}
+          </span>
+        )}
+      </div>
       <label>
         {t('visibility')}
         <select
@@ -152,6 +169,7 @@ export function RoomScreen({
             smallBlind: selectedFormat.smallBlind,
             bigBlind: selectedFormat.bigBlind,
             ante: anteEnabled ? ante : 0,
+            straddleEnabled,
             visibility,
             flags,
           })}
