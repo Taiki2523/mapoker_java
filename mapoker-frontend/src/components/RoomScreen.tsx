@@ -23,10 +23,13 @@ export function RoomScreen({
   onBack,
   appVersion,
 }: Props) {
+  const defaultAnte = (bigBlind: number) => Math.max(1, Math.floor(bigBlind / 10))
+
   const [tableName, setTableName] = useState('Cash Orbit')
   const [playerCount, setPlayerCount] = useState(2)
   const [selectedFormat, setSelectedFormat] = useState(BLIND_FORMATS[0])
-  const [ante, setAnte] = useState(() => Math.floor(BLIND_FORMATS[0].bigBlind / 10))
+  const [anteEnabled, setAnteEnabled] = useState(false)
+  const [ante, setAnte] = useState(() => defaultAnte(BLIND_FORMATS[0].bigBlind))
   const [visibility, setVisibility] = useState<TableVisibility>('public')
   const [flags, setFlags] = useState<TableFlag[]>(['casual'])
 
@@ -71,7 +74,7 @@ export function RoomScreen({
               )
               if (nextFormat) {
                 setSelectedFormat(nextFormat)
-                setAnte(Math.floor(nextFormat.bigBlind / 10))
+                setAnte(defaultAnte(nextFormat.bigBlind))
               }
             }}
           >
@@ -91,14 +94,23 @@ export function RoomScreen({
             ))}
           </select>
         </label>
-        <label>
-          {t('ante')}
-          <input
-            type="number" min={0} value={ante}
-            onChange={(e) => setAnte(Math.max(0, Number(e.target.value)))}
-            placeholder={t('anteHelp')}
-          />
-        </label>
+        <div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={anteEnabled}
+              onChange={(e) => setAnteEnabled(e.target.checked)}
+            />
+            {t('anteEnable')}
+          </label>
+          {anteEnabled && (
+            <input
+              type="number" min={1} value={ante}
+              onChange={(e) => setAnte(Math.max(1, Number(e.target.value)))}
+              style={{ marginTop: '0.4rem' }}
+            />
+          )}
+        </div>
         <label>
           {t('visibility')}
           <select
@@ -138,7 +150,7 @@ export function RoomScreen({
             playerCount,
             smallBlind: selectedFormat.smallBlind,
             bigBlind: selectedFormat.bigBlind,
-            ante,
+            ante: anteEnabled ? ante : 0,
             visibility,
             flags,
           })}
