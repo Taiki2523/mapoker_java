@@ -144,7 +144,7 @@ class AdminWalletController {
         if (targetPublicId == null) {
             return ResponseEntity.ok(WalletResponse.from(
                     new com.mapoker.application.WalletEntry(request.targetUsername(), 0L, null),
-                    new WalletService.NextClaimTimes(null, null)));
+                    new WalletService.NextClaimTimes(null)));
         }
         return ResponseEntity.ok(WalletResponse.from(
                 walletService.getBalance(targetPublicId),
