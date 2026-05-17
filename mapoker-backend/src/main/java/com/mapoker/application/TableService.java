@@ -33,6 +33,8 @@ public class TableService {
     private final Map<String, Object> tableLocks = new ConcurrentHashMap<>();
     /** テーブルが最後に空になった日時（メンバーが0人になった瞬間を記録）。 */
     private final Map<String, java.time.Instant> lastEmptiedAt = new ConcurrentHashMap<>();
+    /** 削除済みテーブルID（listTables での gameService 経由の再生成を防ぐ）。 */
+    private final Set<String> deletedTableIds = ConcurrentHashMap.newKeySet();
 
     private final GameService gameService;
     private final GameProperties gameProperties;
@@ -98,6 +100,8 @@ public class TableService {
         );
         tables.put(table.id(), table);
         tableMembers.putIfAbsent(table.id(), new ArrayList<>());
+        // 作成直後は誰も着席していない → 即座に空テーブルとして記録し削除対象にする
+        lastEmptiedAt.put(table.id(), Instant.now());
         return new CreateTableResult(table, game);
     }
 
@@ -123,7 +127,9 @@ public class TableService {
         List<String> requiredFlags = normalizeFlagFilter(flags);
 
         gameService.listGames().forEach(game -> {
-            fromGame(game);
+            if (!deletedTableIds.contains(game.getId())) {
+                fromGame(game);
+            }
         });
         return tables.values().stream()
                 .filter(table -> !"inactive".equals(table.status()))
@@ -268,6 +274,15 @@ public class TableService {
                     gameService.setSeatStack(table.gameId(), existing.seatIndex(), buyIn);
                     gameService.setSittingOut(table.gameId(), existing.seatIndex(), false);
                 }
+                // 再入室時は pendingLeave をクリアし、空テーブル削除タイマーをリセットする
+                if (existing.pendingLeave()) {
+                    int idx = members.indexOf(existing);
+                    members.set(idx, new TableMemberRecord(
+                            existing.name(), existing.seatIndex(), existing.joinedAt(),
+                            false, existing.displayName(), existing.avatarUrl(), existing.publicId()));
+                    tableMembers.put(table.id(), members);
+                }
+                lastEmptiedAt.remove(table.id());
                 userTableHistoryService.recordJoin(name, table, existing.seatIndex());
                 result = new JoinResult(existing.seatIndex(), List.copyOf(members));
                 publishMembers(table.id(), result.members());
@@ -316,6 +331,7 @@ public class TableService {
                     displayName != null ? displayName : name, avatarUrl, publicId));
             members.sort(Comparator.comparingInt(TableMemberRecord::seatIndex));
             tableMembers.put(table.id(), members);
+            lastEmptiedAt.remove(table.id());
             userTableHistoryService.recordJoin(name, table, seatIndex);
             result = new JoinResult(seatIndex, List.copyOf(members));
             publishMembers(table.id(), result.members());
@@ -333,10 +349,16 @@ public class TableService {
      * @return 更新後の参加者一覧
      */
     public List<TableMemberRecord> leave(String id, String name, Integer seatIndex) {
+        return leave(id, name, seatIndex, null);
+    }
+
+    public List<TableMemberRecord> leave(String id, String name, Integer seatIndex, String publicId) {
         synchronized (tableLock(id)) {
             TableRecord table = getTable(id);
             List<TableMemberRecord> members = new ArrayList<>(tableMembers.computeIfAbsent(table.id(), ignored -> new ArrayList<>()));
-            TableMemberRecord member = findMember(members, name, seatIndex);
+            TableMemberRecord member = (publicId != null && !publicId.isBlank())
+                    ? members.stream().filter(m -> publicId.equals(m.publicId())).findFirst().orElse(null)
+                    : findMember(members, name, seatIndex);
             if (member == null) {
                 List<TableMemberRecord> result = List.copyOf(members);
                 publishMembers(table.id(), result);
@@ -436,6 +458,7 @@ public class TableService {
         lastEmptiedAt.entrySet().removeIf(entry -> {
             if (entry.getValue().isBefore(threshold)) {
                 String tableId = entry.getKey();
+                deletedTableIds.add(tableId);
                 tables.remove(tableId);
                 tableMembers.remove(tableId);
                 return true;

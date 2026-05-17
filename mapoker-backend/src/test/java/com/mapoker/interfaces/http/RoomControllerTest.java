@@ -145,45 +145,45 @@ class RoomControllerTest {
     @Test
     void leaveUsesBodyNameEvenWhenPrincipalPresent() {
         var principal = principalOf(ALICE_PUBLIC_ID);
-        when(tableService.leave(ROOM_ID, "bodyName", null)).thenReturn(List.of());
+        when(tableService.leave(ROOM_ID, "bodyName", null, ALICE_PUBLIC_ID)).thenReturn(List.of());
 
         controller.leave(ROOM_ID, new TableMembershipRequest("bodyName", null), principal);
 
-        verify(tableService).leave(ROOM_ID, "bodyName", null);
+        verify(tableService).leave(ROOM_ID, "bodyName", null, ALICE_PUBLIC_ID);
     }
 
     @Test
     void leaveLooksUpUsernameFromPrincipalWhenBodyHasNoName() {
         var principal = principalOf(ALICE_PUBLIC_ID);
         when(userService.getByPublicId(ALICE_PUBLIC_ID)).thenReturn(ALICE);
-        when(tableService.leave(ROOM_ID, "alice", null)).thenReturn(List.of());
+        when(tableService.leave(ROOM_ID, "alice", null, ALICE_PUBLIC_ID)).thenReturn(List.of());
 
         controller.leave(ROOM_ID, new TableMembershipRequest(null, null), principal);
 
-        verify(tableService).leave(ROOM_ID, "alice", null);
+        verify(tableService).leave(ROOM_ID, "alice", null, ALICE_PUBLIC_ID);
     }
 
     @Test
     void leaveUsesBodyNameWhenNoPrincipal() {
-        when(tableService.leave(ROOM_ID, "bob", null)).thenReturn(List.of());
+        when(tableService.leave(ROOM_ID, "bob", null, null)).thenReturn(List.of());
 
         controller.leave(ROOM_ID, new TableMembershipRequest("bob", null), null);
 
-        verify(tableService).leave(ROOM_ID, "bob", null);
+        verify(tableService).leave(ROOM_ID, "bob", null, null);
     }
 
     @Test
     void leaveUsesNullNameWhenNoPrincipalAndNoBody() {
-        when(tableService.leave(ROOM_ID, null, null)).thenReturn(List.of());
+        when(tableService.leave(ROOM_ID, null, null, null)).thenReturn(List.of());
 
         controller.leave(ROOM_ID, null, null);
 
-        verify(tableService).leave(ROOM_ID, null, null);
+        verify(tableService).leave(ROOM_ID, null, null, null);
     }
 
     @Test
     void leaveReturnsMappedMembers() {
-        when(tableService.leave(ROOM_ID, "alice", null)).thenReturn(List.of(
+        when(tableService.leave(ROOM_ID, "alice", null, null)).thenReturn(List.of(
                 new TableMemberRecord("bob", 1, "2024-01-01T00:00:00Z")));
 
         var response = controller.leave(ROOM_ID, new TableMembershipRequest("alice", null), null);
