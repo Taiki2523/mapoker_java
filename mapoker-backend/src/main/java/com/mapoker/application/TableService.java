@@ -74,7 +74,7 @@ public class TableService {
         }
 
         OddChipRule oddChipRule = gameProperties.defaultOddChipRule();
-        GameState game = gameService.createRingGame(players, input.bigBlind(), oddChipRule, input.ante());
+        GameState game = gameService.createRingGame(players, input.bigBlind(), oddChipRule, input.ante(), input.straddleEnabled());
 
         int minBuyIn = input.bigBlind() * walletProperties.minBuyinBbMultiplier();
         int maxBuyIn = input.bigBlind() * walletProperties.maxBuyinBbMultiplier();
@@ -97,7 +97,8 @@ public class TableService {
                 game.getId(),
                 Instant.now(),
                 false,
-                input.ante()
+                input.ante(),
+                input.straddleEnabled()
         );
         tables.put(table.id(), table);
         tableMembers.putIfAbsent(table.id(), new ArrayList<>());
@@ -184,6 +185,18 @@ public class TableService {
      * @return 更新後のゲーム状態
      */
     public GameState startHand(String tableId, int bigBlind) {
+        return startHand(tableId, bigBlind, false);
+    }
+
+    /**
+     * 指定テーブルで新しいハンドを開始します（ストラドル選択付き）。
+     *
+     * @param tableId    テーブル ID
+     * @param bigBlind   ビッグブラインド額
+     * @param doStraddle このハンドでUTGがストラドルするか
+     * @return 更新後のゲーム状態
+     */
+    public GameState startHand(String tableId, int bigBlind, boolean doStraddle) {
         synchronized (tableLock(tableId)) {
             GameState current = gameService.getGame(tableId);
             if (current.getStatus() == GameStatus.IN_PROGRESS) {
@@ -195,7 +208,7 @@ public class TableService {
             if (activeRosterCount < com.mapoker.domain.PokerConstants.MIN_PLAYERS) {
                 throw new IllegalStateException("not enough players at the table");
             }
-            return gameService.startHand(tableId, bigBlind);
+            return gameService.startHand(tableId, bigBlind, doStraddle);
         }
     }
 
@@ -326,7 +339,8 @@ public class TableService {
                     table.gameId(),
                     table.createdAt(),
                     true,
-                    table.ante()
+                    table.ante(),
+                    table.straddleEnabled()
             ));
 
             members.add(new TableMemberRecord(name, seatIndex, Instant.now().toString(),
@@ -632,7 +646,8 @@ public class TableService {
                 existing != null ? existing.gameId() : game.getId(),
                 existing != null ? existing.createdAt() : Instant.now(),
                 existing != null ? existing.everSeated() : false,
-                existing != null ? existing.ante() : game.getAnte()
+                existing != null ? existing.ante() : game.getAnte(),
+                existing != null ? existing.straddleEnabled() : game.isStraddleEnabled()
         );
     }
 
@@ -666,14 +681,15 @@ public class TableService {
             int bigBlind,
             String visibility,
             List<String> flags,
-            int ante
+            int ante,
+            boolean straddleEnabled
     ) {
         public CreateRingTableInput(String tableName,
                                     int playerCount,
                                     int bigBlind,
                                     String visibility,
                                     List<String> flags) {
-            this(tableName, playerCount, Math.max(1, bigBlind / 2), bigBlind, visibility, flags, 0);
+            this(tableName, playerCount, Math.max(1, bigBlind / 2), bigBlind, visibility, flags, 0, false);
         }
 
         public CreateRingTableInput(String tableName,
@@ -682,7 +698,17 @@ public class TableService {
                                     int bigBlind,
                                     String visibility,
                                     List<String> flags) {
-            this(tableName, playerCount, smallBlind, bigBlind, visibility, flags, 0);
+            this(tableName, playerCount, smallBlind, bigBlind, visibility, flags, 0, false);
+        }
+
+        public CreateRingTableInput(String tableName,
+                                    int playerCount,
+                                    int smallBlind,
+                                    int bigBlind,
+                                    String visibility,
+                                    List<String> flags,
+                                    int ante) {
+            this(tableName, playerCount, smallBlind, bigBlind, visibility, flags, ante, false);
         }
     }
 

@@ -108,8 +108,20 @@ public class GameService {
      * @return 更新後の {@link GameState}
      */
     public GameState startHand(String id, int bigBlind) {
+        return startHand(id, bigBlind, false);
+    }
+
+    /**
+     * 指定テーブルで新しいハンドを開始する（ストラドル選択付き）。
+     *
+     * @param id         ゲーム ID
+     * @param bigBlind   このハンドのビッグブラインド額
+     * @param doStraddle このハンドでUTGがストラドルするか
+     * @return 更新後の {@link GameState}
+     */
+    public GameState startHand(String id, int bigBlind, boolean doStraddle) {
         GameState state = getGame(id);
-        state.startHand(bigBlind);
+        state.startHand(bigBlind, doStraddle);
         gameRepository.update(id, state);
         publishGame(id, state);
         publishHoleCards(id, state);
@@ -142,10 +154,24 @@ public class GameService {
      * @return 作成された {@link GameState}
      */
     public GameState createRingGame(List<PlayerInput> playerInputs, int bigBlind, OddChipRule oddChipRule, int ante) {
+        return createRingGame(playerInputs, bigBlind, oddChipRule, ante, false);
+    }
+
+    /**
+     * アンティ・ストラドル設定付きリングゲーム用のゲームを作成する。
+     *
+     * @param playerInputs    プレイヤーリスト（ID とスタック）
+     * @param bigBlind        ビッグブラインドのチップ額
+     * @param oddChipRule     端数チップの配分ルール
+     * @param ante            アンティ額（0 でアンティなし）
+     * @param straddleEnabled ストラドル機能を有効にするか
+     * @return 作成された {@link GameState}
+     */
+    public GameState createRingGame(List<PlayerInput> playerInputs, int bigBlind, OddChipRule oddChipRule, int ante, boolean straddleEnabled) {
         List<Player> players = playerInputs.stream()
                 .map(pi -> new Player(pi.id(), pi.stack()))
                 .toList();
-        GameState state = GameState.newGame(players, 0, bigBlind, new Random(), oddChipRule, ante);
+        GameState state = GameState.newGame(players, 0, bigBlind, new Random(), oddChipRule, ante, straddleEnabled);
         String id = UUID.randomUUID().toString();
         state.setId(id);
         state.setStatus(GameStatus.FINISHED);

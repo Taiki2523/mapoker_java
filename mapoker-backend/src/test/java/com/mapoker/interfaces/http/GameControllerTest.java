@@ -162,18 +162,18 @@ class GameControllerTest {
     @Test
     void startHandDelegatesToTableService() {
         GameState started = startedGame();
-        when(tableService.startHand("g1", 10)).thenReturn(started);
+        when(tableService.startHand("g1", 10, false)).thenReturn(started);
 
         var response = controller.startHand("g1", new StartHandRequest(10));
 
         assertThat(response.id()).isEqualTo(started.getId());
-        verify(tableService).startHand("g1", 10);
+        verify(tableService).startHand("g1", 10, false);
     }
 
     @Test
     void startHandResponseHidesHoleCards() {
         GameState started = startedGame();
-        when(tableService.startHand("g1", 10)).thenReturn(started);
+        when(tableService.startHand("g1", 10, false)).thenReturn(started);
 
         var response = controller.startHand("g1", new StartHandRequest(10));
 

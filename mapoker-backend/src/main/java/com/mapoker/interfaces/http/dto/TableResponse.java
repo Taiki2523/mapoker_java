@@ -54,7 +54,8 @@ public record TableResponse(
     public record StakeDto(
             @JsonProperty("small_blind") int smallBlind,
             @JsonProperty("big_blind") int bigBlind,
-            int ante
+            int ante,
+            @JsonProperty("straddle_enabled") boolean straddleEnabled
     ) {}
 
     /**
@@ -94,7 +95,7 @@ public record TableResponse(
                 table.roomId(),
                 table.name(),
                 table.gameType(),
-                new StakeDto(table.smallBlind(), table.bigBlind(), table.ante()),
+                new StakeDto(table.smallBlind(), table.bigBlind(), table.ante(), table.straddleEnabled()),
                 table.minBuyIn(),
                 table.maxBuyIn(),
                 table.maxPlayers(),
