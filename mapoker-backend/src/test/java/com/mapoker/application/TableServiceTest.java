@@ -44,7 +44,7 @@ class TableServiceTest {
     private static final GameProperties GAME_PROPS =
             new GameProperties(OddChipRule.LOW_INDEX, "Player");
     private static final WalletProperties WALLET_PROPS =
-            new WalletProperties(10000, 1000, 24, 1000, 5000, 12, 20, 100, List.of());
+            new WalletProperties(10000, 1000, 24, 20, 100, List.of());
 
     /** デフォルトテーブル作成入力（2人・BB=10・public） */
     private static TableService.CreateRingTableInput defaultInput() {
