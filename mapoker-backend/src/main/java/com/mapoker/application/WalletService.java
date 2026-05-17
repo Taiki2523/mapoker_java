@@ -20,7 +20,6 @@ import java.util.List;
 public class WalletService {
 
     private static final String DAILY_BONUS = "DAILY_BONUS";
-    private static final String RECOVERY_BONUS = "RECOVERY_BONUS";
     private static final String TABLE_BUY_IN = "TABLE_BUY_IN";
     private static final String TABLE_REBUY = "TABLE_REBUY";
     private static final String TABLE_CASH_OUT = "TABLE_CASH_OUT";
@@ -77,14 +76,12 @@ public class WalletService {
      * 次回請求可能時刻を取得します。
      *
      * @param publicId ユーザーの公開 ID（UUID）
-     * @return 日次ボーナスと救済ボーナスの次回可能時刻
+     * @return 日次ボーナスの次回可能時刻
      */
     public NextClaimTimes getNextClaimTimes(String publicId) {
-        if (publicId == null || publicId.isBlank()) return new NextClaimTimes(null, null);
-        WalletEntry wallet = getBalance(publicId);
+        if (publicId == null || publicId.isBlank()) return new NextClaimTimes(null);
         return new NextClaimTimes(
-                nextClaimAt(publicId, DAILY_BONUS, walletProperties.dailyBonusCooldownHours()),
-                nextRecoveryAt(publicId, wallet));
+                nextClaimAt(publicId, DAILY_BONUS, walletProperties.dailyBonusCooldownHours()));
     }
 
     /**
@@ -98,8 +95,8 @@ public class WalletService {
         String pid = requirePublicId(publicId);
         String tid = requireRef(tableId);
         validateAmount(amount);
-        if (!walletRepository.debit(pid, amount, TABLE_BUY_IN, "TABLE", tid,
-                "BUY_IN:" + tid + ":" + pid)) {
+        String key = "BUY_IN:" + tid + ":" + pid + ":" + Instant.now().toEpochMilli();
+        if (!walletRepository.debit(pid, amount, TABLE_BUY_IN, "TABLE", tid, key)) {
             throw new IllegalStateException("insufficient funds");
         }
     }
@@ -149,22 +146,6 @@ public class WalletService {
     }
 
     /**
-     * 救済ボーナスを付与します。
-     *
-     * @param publicId ユーザーの公開 ID（UUID）
-     */
-    public void claimRecovery(String publicId) {
-        String pid = requirePublicId(publicId);
-        WalletEntry wallet = getBalance(pid);
-        if (wallet.chipBalance() > walletProperties.recoveryThreshold()) {
-            throw new IllegalStateException("recovery not available");
-        }
-        requireCooldownElapsed(pid, RECOVERY_BONUS, walletProperties.recoveryCooldownHours());
-        walletRepository.credit(pid, walletProperties.recoveryAmount(), RECOVERY_BONUS, "SYSTEM", pid,
-                "RECOVERY_BONUS:" + pid + ":" + currentWindow(walletProperties.recoveryCooldownHours()));
-    }
-
-    /**
      * 管理者権限で残高を付与します。
      *
      * <p>管理者の認可は {@code adminUsername} で行います（設定リストとの照合）。
@@ -189,11 +170,6 @@ public class WalletService {
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + targetUsername));
         walletRepository.credit(targetPublicId, amount, ADMIN_GRANT, "ADMIN", normalizedAdmin,
                 "ADMIN_GRANT:" + normalizedAdmin + ":" + targetPublicId + ":" + Instant.now().toEpochMilli());
-    }
-
-    private Instant nextRecoveryAt(String publicId, WalletEntry wallet) {
-        if (wallet.chipBalance() > walletProperties.recoveryThreshold()) return null;
-        return nextClaimAt(publicId, RECOVERY_BONUS, walletProperties.recoveryCooldownHours());
     }
 
     private Instant nextClaimAt(String publicId, String reason, int cooldownHours) {
@@ -238,7 +214,6 @@ public class WalletService {
      * 次回請求可能時刻をまとめて返すレコードです。
      *
      * @param nextDailyBonusAt 日次ボーナスの次回請求可能時刻
-     * @param nextRecoveryAt   救済ボーナスの次回請求可能時刻
      */
-    public record NextClaimTimes(Instant nextDailyBonusAt, Instant nextRecoveryAt) {}
+    public record NextClaimTimes(Instant nextDailyBonusAt) {}
 }

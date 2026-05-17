@@ -22,7 +22,6 @@ type Props = {
   onLogout: () => void
   onUpdateUser: (user: AuthUser) => void
   onClaimDailyBonus: () => void
-  onClaimRecovery: () => void
 }
 
 function ProfileEditModal({
@@ -147,7 +146,6 @@ export function MyPagePanel({
   onLogout,
   onUpdateUser,
   onClaimDailyBonus,
-  onClaimRecovery,
 }: Props) {
   const [showProfileEdit, setShowProfileEdit] = useState(false)
 
@@ -185,7 +183,6 @@ export function MyPagePanel({
   const formatDelta = (delta: number) => (delta >= 0 ? `+${delta}` : `${delta}`)
 
   const dailyBonusCooldown = wallet ? formatCooldown(wallet.next_daily_bonus_at) : null
-  const recoveryCooldown = wallet ? formatCooldown(wallet.next_recovery_at) : null
 
   return (
     <>
@@ -238,17 +235,6 @@ export function MyPagePanel({
                       {t('claimDailyBonus')}
                     </button>
                     {dailyBonusCooldown ? <span className="muted">{dailyBonusCooldown}</span> : null}
-                  </div>
-                  <div className="profile-card">
-                    <span className="label">{t('claimRecovery')}</span>
-                    <button
-                      className="secondary"
-                      onClick={onClaimRecovery}
-                      disabled={loading || recoveryCooldown !== null}
-                    >
-                      {t('claimRecovery')}
-                    </button>
-                    {recoveryCooldown ? <span className="muted">{recoveryCooldown}</span> : null}
                   </div>
                 </div>
               </section>

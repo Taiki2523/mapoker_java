@@ -11,12 +11,10 @@ import java.time.Instant;
  *
  * @param chipBalance チップ残高
  * @param nextDailyBonusAt 次回日次ボーナス可能時刻
- * @param nextRecoveryAt 次回救済ボーナス可能時刻
  */
 public record WalletResponse(
         @JsonProperty("chip_balance") long chipBalance,
-        @JsonProperty("next_daily_bonus_at") Instant nextDailyBonusAt,
-        @JsonProperty("next_recovery_at") Instant nextRecoveryAt
+        @JsonProperty("next_daily_bonus_at") Instant nextDailyBonusAt
 ) {
     /**
      * ウォレット情報からレスポンスを生成します。
@@ -28,7 +26,6 @@ public record WalletResponse(
     public static WalletResponse from(WalletEntry walletEntry, WalletService.NextClaimTimes nextClaimTimes) {
         return new WalletResponse(
                 walletEntry.chipBalance(),
-                nextClaimTimes.nextDailyBonusAt(),
-                nextClaimTimes.nextRecoveryAt());
+                nextClaimTimes.nextDailyBonusAt());
     }
 }
