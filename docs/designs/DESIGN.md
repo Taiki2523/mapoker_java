@@ -121,6 +121,37 @@ What distinguishes Spotify is its pill-and-circle geometry. Primary buttons use 
 - Radius: 50% (circle)
 - Use: Play/pause controls
 
+### Toggle Switch
+
+Boolean 設定をオン／オフするための iOS スタイルのトグル。CSS のみで実装し、ネイティブ `<input type="checkbox">` を非表示にする。
+
+**構造**
+```tsx
+<label className="toggle-switch">
+  <input type="checkbox" checked={value} onChange={...} />
+  <span className="toggle-track"><span className="toggle-thumb" /></span>
+  ラベルテキスト
+</label>
+```
+
+**OFF 状態**
+- トラック背景: `var(--surface-3)` (`#252525`)
+- トラック枠: `1px solid var(--border)` (`rgba(255,255,255,0.1)`)
+- サム: `var(--text-muted)` (`#b3b3b3`)、左寄り
+
+**ON 状態（`:has(input:checked)`）**
+- トラック背景: `var(--accent)` (`#1ed760`)
+- トラック枠: アクセントカラーに統一
+- サム: `#ffffff`、右にスライド（`translateX(1.15rem)`）
+
+**サイズ**
+- トラック: `2.6rem × 1.45rem`、`border-radius: 9999px`
+- サム: `0.95rem × 0.95rem`、`border-radius: 50%`
+
+**使用場面**
+- テーブル作成フォームのアンティ有効化（`RoomScreen.tsx`）
+- Boolean な設定項目全般（フラグ等のピル形式が合わない場合）
+
 ### Cards & Containers
 - Background: `#181818` or `#1f1f1f`
 - Radius: 6px–8px
