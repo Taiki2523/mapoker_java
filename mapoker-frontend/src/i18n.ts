@@ -43,6 +43,7 @@ const ja = {
   players: 'プレイヤー数',
   ante: 'アンティ',
   straddle: 'ストラドル',
+  straddleNext: '次のハンドでストラドル',
   stack: 'スタック',
   bigBlind: 'ビッグブラインド',
   buttonIndex: 'ボタンポジション',

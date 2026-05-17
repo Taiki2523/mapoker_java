@@ -19,6 +19,9 @@ export type GameState = {
   last_raise_size: number
   big_blind: number
   ante: number
+  straddle_enabled: boolean
+  straddle_idx: number
+  next_utg_idx: number
   pot_total: number
   players: Player[]
   community: string[]

@@ -18,12 +18,15 @@ type Props = {
   stackMode: 'chips' | 'bb'
   displayName: (idx: number) => string
   onSendAction: (type: string, amount: number) => void
+  doStraddle: boolean
+  onToggleStraddle: (v: boolean) => void
 }
 
 export function ActionPanel({
   game, mySeatIndex, canAct, loading,
   toCall, minRaise, maxBet, betPresets, actionAmount, setActionAmount,
   myHandName, currentPlayer, stackMode, displayName, onSendAction,
+  doStraddle, onToggleStraddle,
 }: Props) {
   const bb = game?.big_blind ?? 0
   const fmt = (chips: number) => {
@@ -135,6 +138,19 @@ export function ActionPanel({
           >
             {t('allInBtn')}
           </button>
+        </div>
+      )}
+      {game?.straddle_enabled && game.next_utg_idx === mySeatIndex && canAct && (
+        <div className="straddle-toggle-row">
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={doStraddle}
+              onChange={(e) => onToggleStraddle(e.target.checked)}
+            />
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
+            {t('straddleNext')}
+          </label>
         </div>
       )}
       </div>{/* end action-panel-controls */}

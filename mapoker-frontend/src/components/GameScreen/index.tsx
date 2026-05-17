@@ -39,6 +39,8 @@ type Props = {
   onOpenMyPage: () => void
   onLeaveRoom: () => void
   onSendAction: (type: string, amount: number) => void
+  doStraddle: boolean
+  onToggleStraddle: (v: boolean) => void
 }
 
 export function GameScreen({
@@ -51,7 +53,7 @@ export function GameScreen({
   myHandName, currentPlayer, canAct,
   winnerNames, payoutLines, displayName,
   onCopyInvite, onOpenMyPage, onLeaveRoom,
-  onSendAction,
+  onSendAction, doStraddle, onToggleStraddle,
 }: Props) {
   const [stackMode, setStackMode] = useState<'chips' | 'bb'>(() => {
     return (localStorage.getItem(STACK_MODE_KEY) as 'chips' | 'bb') ?? 'chips'
@@ -110,6 +112,8 @@ export function GameScreen({
         stackMode={stackMode}
         displayName={displayName}
         onSendAction={onSendAction}
+        doStraddle={doStraddle}
+        onToggleStraddle={onToggleStraddle}
       />
 
       {/* 退席ボタン・退席予約メッセージ — 右下固定 */}
