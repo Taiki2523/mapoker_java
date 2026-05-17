@@ -124,11 +124,6 @@ export function RoomScreen({
           <span className="toggle-track"><span className="toggle-thumb" /></span>
           {t('straddle')}
         </label>
-        {straddleEnabled && (
-          <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-            {selectedFormat.bigBlind * 2}
-          </span>
-        )}
       </div>
       <label>
         {t('visibility')}
