@@ -19,6 +19,7 @@ import java.util.List;
  * @param bigBlind ビッグブラインド額
  * @param visibility 公開設定
  * @param flags テーブル属性の一覧
+ * @param ante アンティ額（省略時は bigBlind / 10）
  */
 public record CreateTableRequest(
         @JsonProperty("table_name") @Size(max = 100) String tableName,
@@ -26,11 +27,15 @@ public record CreateTableRequest(
         @JsonProperty("small_blind") @Positive @Nullable Integer smallBlind,
         @JsonProperty("big_blind") @Positive int bigBlind,
         @Pattern(regexp = "(?i)public|private", message = "must be public or private") String visibility,
-        @Size(max = 8) List<@Pattern(regexp = "[a-z_]+", message = "must use lowercase snake_case") String> flags
+        @Size(max = 8) List<@Pattern(regexp = "[a-z_]+", message = "must use lowercase snake_case") String> flags,
+        @Min(0) @Nullable Integer ante
 ) {
     public CreateTableRequest {
         if (smallBlind == null) {
             smallBlind = Math.max(1, bigBlind / 2);
+        }
+        if (ante == null) {
+            ante = bigBlind / 10;
         }
     }
 }

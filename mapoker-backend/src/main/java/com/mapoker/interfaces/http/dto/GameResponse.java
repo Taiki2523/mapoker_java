@@ -36,6 +36,7 @@ import java.util.List;
  * @param viewerMembershipActive 閲覧者の参加状態
  * @param canRebuy リバイ可否
  * @param lastShowdown 直近ショーダウン結果
+ * @param ante アンティ額（0 でアンティなし）
  */
 public record GameResponse(
         String id,
@@ -55,7 +56,8 @@ public record GameResponse(
         @JsonProperty("can_start_hand") boolean canStartHand,
         @JsonProperty("viewer_membership_active") boolean viewerMembershipActive,
         @JsonProperty("can_rebuy") boolean canRebuy,
-        @JsonProperty("last_showdown") ShowdownDto lastShowdown
+        @JsonProperty("last_showdown") ShowdownDto lastShowdown,
+        int ante
 ) {
     /**
      * プレイヤー表示 DTO です。
@@ -158,6 +160,7 @@ public record GameResponse(
                 g.getButtonIndex(), g.getSmallBlindIdx(), g.getBigBlindIdx(), g.getCurrentPlayer(),
                 g.getCurrentBet(), g.getLastRaiseSize(), g.getBigBlindSize(),
                 g.getPot(), playerResponses, g.getCommunity(), g.getOddChipRule(),
-                canStartHand, viewerMembershipActive, canRebuy, showdownDto);
+                canStartHand, viewerMembershipActive, canRebuy, showdownDto,
+                g.getAnte());
     }
 }

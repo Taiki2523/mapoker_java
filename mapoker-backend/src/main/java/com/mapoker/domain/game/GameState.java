@@ -66,6 +66,7 @@ public class GameState {
     private boolean raiseOpen;
     private ShowdownResult lastShowdown;
     private boolean foldWin = false;
+    private int ante = 0;
 
     private GameState() {}
 
@@ -90,10 +91,26 @@ public class GameState {
      * @param bigBlind    ビッグブラインド額（正の値）
      * @param rng         シャッフル用乱数生成器。{@code null} の場合はデフォルト {@link Random}
      * @param oddChipRule 奇数チップの配分ルール。{@code null} の場合は {@link OddChipRule#LOW_INDEX}
-     * @return 初期化済みの {@link GameState}
+     * @return 初期化済みの {@link GameState}（アンティなし）
      * @throws IllegalArgumentException プレイヤー数・ビッグブラインド額・ボタン位置が不正な場合
      */
     public static GameState newGame(List<Player> players, int buttonIndex, int bigBlind, Random rng, OddChipRule oddChipRule) {
+        return newGame(players, buttonIndex, bigBlind, rng, oddChipRule, 0);
+    }
+
+    /**
+     * アンティ付きで新しいゲームインスタンスを生成する。プレイヤーリストはディープコピーされる。
+     *
+     * @param players     参加プレイヤーのリスト（2〜9人）
+     * @param buttonIndex ボタン位置（プレイヤーリストの 0-based インデックス）
+     * @param bigBlind    ビッグブラインド額（正の値）
+     * @param rng         シャッフル用乱数生成器。{@code null} の場合はデフォルト {@link Random}
+     * @param oddChipRule 奇数チップの配分ルール。{@code null} の場合は {@link OddChipRule#LOW_INDEX}
+     * @param ante        アンティ額（0 でアンティなし）
+     * @return 初期化済みの {@link GameState}
+     * @throws IllegalArgumentException プレイヤー数・ビッグブラインド額・ボタン位置が不正な場合
+     */
+    public static GameState newGame(List<Player> players, int buttonIndex, int bigBlind, Random rng, OddChipRule oddChipRule, int ante) {
         if (players.size() < PokerConstants.MIN_PLAYERS || players.size() > PokerConstants.MAX_PLAYERS)
             throw new IllegalArgumentException("players must be 2-9");
         if (bigBlind <= 0)
@@ -116,6 +133,7 @@ public class GameState {
         Deck.shuffle(g.deck, rng);
         g.acted = new boolean[players.size()];
         g.community = new ArrayList<>();
+        g.ante = Math.max(0, ante);
         return g;
     }
 
@@ -176,6 +194,12 @@ public class GameState {
         } else {
             smallBlindIdx = nextActive(buttonIndex);
             bigBlindIdx = nextActive(smallBlindIdx);
+        }
+
+        if (ante > 0) {
+            for (int i = 0; i < players.size(); i++) {
+                postAnte(i, ante);
+            }
         }
 
         postBlind(smallBlindIdx, bigBlind / PokerConstants.SMALL_BLIND_DIVISOR);
@@ -369,6 +393,18 @@ public class GameState {
             default -> {}
         }
         currentPlayer = firstToAct();
+    }
+
+    private void postAnte(int playerIndex, int amount) {
+        if (amount <= 0) return;
+        Player p = players.get(playerIndex);
+        if (p.isFolded() || p.isSittingOut()) return;
+        int actual = Math.min(amount, p.getStack());
+        if (actual == 0) return;
+        p.setStack(p.getStack() - actual);
+        p.setTotalContrib(p.getTotalContrib() + actual);
+        if (p.getStack() == 0) p.setAllIn(true);
+        pot += actual;
     }
 
     private void postBlind(int playerIndex, int amount) {
@@ -650,4 +686,6 @@ public class GameState {
     public void setRaiseOpen(boolean raiseOpen) { this.raiseOpen = raiseOpen; }
     public void setFoldWin(boolean foldWin) { this.foldWin = foldWin; }
     public void setLastShowdown(ShowdownResult lastShowdown) { this.lastShowdown = lastShowdown; }
+    public int getAnte() { return ante; }
+    public void setAnte(int ante) { this.ante = ante; }
 }

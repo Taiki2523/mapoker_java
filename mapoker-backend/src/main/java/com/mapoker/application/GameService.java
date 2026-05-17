@@ -126,13 +126,26 @@ public class GameService {
      * @param playerInputs プレイヤーリスト（ID とスタック）
      * @param bigBlind     ビッグブラインドのチップ額
      * @param oddChipRule  端数チップの配分ルール
-     * @return 作成された {@link GameState}
+     * @return 作成された {@link GameState}（アンティなし）
      */
     public GameState createRingGame(List<PlayerInput> playerInputs, int bigBlind, OddChipRule oddChipRule) {
+        return createRingGame(playerInputs, bigBlind, oddChipRule, 0);
+    }
+
+    /**
+     * アンティ付きリングゲーム用のゲームを作成する。
+     *
+     * @param playerInputs プレイヤーリスト（ID とスタック）
+     * @param bigBlind     ビッグブラインドのチップ額
+     * @param oddChipRule  端数チップの配分ルール
+     * @param ante         アンティ額（0 でアンティなし）
+     * @return 作成された {@link GameState}
+     */
+    public GameState createRingGame(List<PlayerInput> playerInputs, int bigBlind, OddChipRule oddChipRule, int ante) {
         List<Player> players = playerInputs.stream()
                 .map(pi -> new Player(pi.id(), pi.stack()))
                 .toList();
-        GameState state = GameState.newGame(players, 0, bigBlind, new Random(), oddChipRule);
+        GameState state = GameState.newGame(players, 0, bigBlind, new Random(), oddChipRule, ante);
         String id = UUID.randomUUID().toString();
         state.setId(id);
         state.setStatus(GameStatus.FINISHED);
