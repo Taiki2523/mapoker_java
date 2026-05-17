@@ -96,34 +96,36 @@ export function RoomScreen({
           ))}
         </select>
       </label>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-        <label className="toggle-switch">
-          <input
-            type="checkbox"
-            checked={anteEnabled}
-            onChange={(e) => setAnteEnabled(e.target.checked)}
-          />
-          <span className="toggle-track"><span className="toggle-thumb" /></span>
-          {t('ante')}
-        </label>
-        {anteEnabled && (
-          <input
-            type="number" min={1} value={ante}
-            onChange={(e) => setAnte(Math.max(1, Number(e.target.value)))}
-            style={{ width: '7rem' }}
-          />
-        )}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-        <label className="toggle-switch">
-          <input
-            type="checkbox"
-            checked={straddleEnabled}
-            onChange={(e) => setStraddleEnabled(e.target.checked)}
-          />
-          <span className="toggle-track"><span className="toggle-thumb" /></span>
-          {t('straddle')}
-        </label>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={anteEnabled}
+              onChange={(e) => setAnteEnabled(e.target.checked)}
+            />
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
+            {t('ante')}
+          </label>
+          {anteEnabled && (
+            <input
+              type="number" min={1} value={ante}
+              onChange={(e) => setAnte(Math.max(1, Number(e.target.value)))}
+              style={{ width: '7rem' }}
+            />
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={straddleEnabled}
+              onChange={(e) => setStraddleEnabled(e.target.checked)}
+            />
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
+            {t('straddle')}
+          </label>
+        </div>
       </div>
       <label>
         {t('visibility')}
