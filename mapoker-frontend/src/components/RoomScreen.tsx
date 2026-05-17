@@ -96,13 +96,14 @@ export function RoomScreen({
         </select>
       </label>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+        <label className="toggle-switch">
           <input
             type="checkbox"
             checked={anteEnabled}
             onChange={(e) => setAnteEnabled(e.target.checked)}
           />
-          {t('anteEnable')}
+          <span className="toggle-track"><span className="toggle-thumb" /></span>
+          {t('ante')}
         </label>
         {anteEnabled && (
           <input
