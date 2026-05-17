@@ -84,3 +84,4 @@ dump.sql
 
 # Upload data (generated at runtime)
 data/
+package-lock.json

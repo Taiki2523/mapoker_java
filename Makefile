@@ -20,8 +20,8 @@ build:
 	docker compose build --no-cache
 
 rebuild:
-	docker compose down
 	docker compose build --no-cache
+	docker compose down
 	$(MAKE) setup ENV=$(ENV)
 	docker compose $(ENV_FILE) up -d
 
