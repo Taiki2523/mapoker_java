@@ -140,7 +140,7 @@ export function ActionPanel({
           </button>
         </div>
       )}
-      {game?.straddle_enabled && game.big_blind_idx === mySeatIndex && canAct && (
+      {game?.straddle_enabled && game.big_blind_idx === mySeatIndex && game.status === 'in_progress' && (
         <div className="straddle-toggle-row">
           <label className="toggle-switch">
             <input
