@@ -578,11 +578,11 @@ function App() {
       const doJoinAndNavigate = async (buyIn: number) => {
         setLoading(true)
         try {
+          await doTableJoin(data.id, name, buyIn)
           setGameId(data.id)
           setGame(data.game ?? null)
           setTable(data)
           window.history.replaceState(null, '', `?tableId=${data.id}`)
-          await doTableJoin(data.id, name, buyIn)
           await refreshGame(data.id)
         } catch (err) {
           setError(formatErrorMessage(err))
@@ -592,14 +592,20 @@ function App() {
       }
 
       if (data.min_buy_in > 0) {
+        const effectiveMax = wallet ? Math.min(data.max_buy_in, wallet.chip_balance) : data.max_buy_in
+        if (wallet && wallet.chip_balance < data.min_buy_in) {
+          setError(`チップが不足しています（最低バイイン: ${data.min_buy_in.toLocaleString()}）`)
+          setRoomScreenMode('lobby')
+          return
+        }
         setBuyInContext({
           tableId: data.id,
           tableName: data.name,
           minBuyIn: data.min_buy_in,
-          maxBuyIn: wallet ? Math.min(data.max_buy_in, wallet.chip_balance) : data.max_buy_in,
+          maxBuyIn: effectiveMax,
           bigBlind: data.stake.big_blind,
           onConfirm: (amount) => { setBuyInContext(null); void doJoinAndNavigate(amount) },
-          onCancel: () => { setBuyInContext(null) },
+          onCancel: () => { setBuyInContext(null); setRoomScreenMode('lobby') },
         })
       } else {
         await doJoinAndNavigate(0)
@@ -626,23 +632,37 @@ function App() {
 
     if (!myName.trim()) return
 
+    const backToLobby = () => {
+      setGameId('')
+      setTable(null)
+      setRoomScreenMode('lobby')
+      window.history.replaceState(null, '', window.location.pathname)
+    }
+
     const doJoin = async (buyIn: number) => {
       try {
         await doTableJoin(id, myName.trim(), buyIn)
       } catch (err) {
         setError(formatErrorMessage(err))
+        backToLobby()
       }
     }
 
     if (fetchedTable && fetchedTable.min_buy_in > 0) {
+      const effectiveMax = wallet ? Math.min(fetchedTable.max_buy_in, wallet.chip_balance) : fetchedTable.max_buy_in
+      if (wallet && wallet.chip_balance < fetchedTable.min_buy_in) {
+        setError(`チップが不足しています（最低バイイン: ${fetchedTable.min_buy_in.toLocaleString()}）`)
+        backToLobby()
+        return
+      }
       setBuyInContext({
         tableId: id,
         tableName: fetchedTable.name,
         minBuyIn: fetchedTable.min_buy_in,
-        maxBuyIn: wallet ? Math.min(fetchedTable.max_buy_in, wallet.chip_balance) : fetchedTable.max_buy_in,
+        maxBuyIn: effectiveMax,
         bigBlind: fetchedTable.stake.big_blind,
         onConfirm: (amount) => { setBuyInContext(null); void doJoin(amount) },
-        onCancel: () => { setBuyInContext(null) },
+        onCancel: () => { setBuyInContext(null); backToLobby() },
       })
     } else {
       await doJoin(0)
@@ -654,19 +674,6 @@ function App() {
     setProfileError('')
     try {
       await fetchJSON('/v1/wallet/daily-bonus', { method: 'POST' })
-      await refreshWallet()
-    } catch (err) {
-      setProfileError(formatErrorMessage(err))
-    } finally {
-      setProfileLoading(false)
-    }
-  }
-
-  const handleClaimRecovery = async () => {
-    setProfileLoading(true)
-    setProfileError('')
-    try {
-      await fetchJSON('/v1/wallet/recovery', { method: 'POST' })
       await refreshWallet()
     } catch (err) {
       setProfileError(formatErrorMessage(err))
@@ -895,7 +902,6 @@ function App() {
           onLogout={() => void handleLogout()}
           onUpdateUser={(user) => { setCurrentUser(user); setMyName(user.username) }}
           onClaimDailyBonus={() => void handleClaimDailyBonus()}
-          onClaimRecovery={() => void handleClaimRecovery()}
         />
       )}
     </div>

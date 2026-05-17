@@ -89,22 +89,6 @@ public class WalletController {
         return ResponseEntity.ok(loadWalletResponse(username));
     }
 
-    /**
-     * 救済ボーナスを請求します。
-     *
-     * @param principal 認証済みユーザー
-     * @return 更新後のウォレット応答
-     */
-    @PostMapping("/recovery")
-    public ResponseEntity<WalletResponse> claimRecovery(@AuthenticationPrincipal UserDetails principal) {
-        if (principal == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        String username = resolveUsername(principal);
-        walletService.claimRecovery(username);
-        return ResponseEntity.ok(loadWalletResponse(username));
-    }
-
     /** principal.getUsername() は publicId（UUID）を返す。そのまま wallet に渡す。 */
     private String resolveUsername(UserDetails principal) {
         return principal.getUsername();
@@ -160,7 +144,7 @@ class AdminWalletController {
         if (targetPublicId == null) {
             return ResponseEntity.ok(WalletResponse.from(
                     new com.mapoker.application.WalletEntry(request.targetUsername(), 0L, null),
-                    new WalletService.NextClaimTimes(null, null)));
+                    new WalletService.NextClaimTimes(null)));
         }
         return ResponseEntity.ok(WalletResponse.from(
                 walletService.getBalance(targetPublicId),

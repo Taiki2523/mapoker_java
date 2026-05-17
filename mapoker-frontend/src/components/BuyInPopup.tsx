@@ -13,6 +13,21 @@ type Props = {
 export function BuyInPopup({ tableName, minBuyIn, maxBuyIn, bigBlind, onConfirm, onCancel }: Props) {
   const [amount, setAmount] = useState(minBuyIn)
 
+  if (maxBuyIn < minBuyIn) {
+    return (
+      <div className="modal-overlay">
+        <div className="modal-panel">
+          <h3>{t('buyInTitle')}</h3>
+          <p className="muted" style={{ margin: '0.25rem 0 1rem' }}>{tableName}</p>
+          <p className="error">チップが不足しています（最低バイイン: {minBuyIn.toLocaleString()}）</p>
+          <div className="button-row" style={{ marginTop: '1rem' }}>
+            <button className="ghost" onClick={onCancel}>{t('cancel')}</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const handleSlider = (e: React.ChangeEvent<HTMLInputElement>) => {
     setAmount(Number(e.target.value))
   }

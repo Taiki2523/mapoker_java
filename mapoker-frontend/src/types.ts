@@ -95,7 +95,6 @@ export type HandHistoryEntry = {
 export type WalletSummary = {
   chip_balance: number
   next_daily_bonus_at: string | null
-  next_recovery_at: string | null
 }
 
 export type WalletLedgerEntry = {

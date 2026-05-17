@@ -93,7 +93,8 @@ public class RoomController {
                                  @Valid @RequestBody(required = false) TableMembershipRequest body,
                                  @AuthenticationPrincipal UserDetails principal) {
         String name = resolveName(principal, body);
-        return new MembersResponse(mapMembers(tableService.leave(id, name, null)));
+        String publicId = principal != null ? principal.getUsername() : null;
+        return new MembersResponse(mapMembers(tableService.leave(id, name, null, publicId)));
     }
 
     /**

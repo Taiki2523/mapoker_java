@@ -122,7 +122,8 @@ public class TableController {
                                  @Valid @RequestBody(required = false) TableMembershipRequest body,
                                  @AuthenticationPrincipal UserDetails principal) {
         String name = resolveName(principal, body);
-        return new MembersResponse(toMembers(tableService.leave(id, name, null)));
+        String publicId = principal != null ? principal.getUsername() : null;
+        return new MembersResponse(toMembers(tableService.leave(id, name, null, publicId)));
     }
 
     /** [displayName, avatarUrl] を返す。未認証時または解決失敗時は [name, null]。 */

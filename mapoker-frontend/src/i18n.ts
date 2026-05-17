@@ -190,7 +190,6 @@ const ja = {
   streetRiver: 'リバー',
   chipBalance: '所持チップ',
   claimDailyBonus: 'デイリーボーナス',
-  claimRecovery: '回復チップ',
   walletLedger: '増減履歴',
   noWalletLedger: 'まだ増減履歴はありません',
   REGISTER_BONUS: '新規登録ボーナス',
