@@ -64,64 +64,64 @@ export function RoomScreen({
             onChange={(e) => setPlayerCount(Number(e.target.value))}
           />
         </label>
-        <label>
-          {t('stakeLabel')}
-          <select
-            value={`${selectedFormat.smallBlind}/${selectedFormat.bigBlind}`}
-            onChange={(e) => {
-              const nextFormat = BLIND_FORMATS.find(
-                (format) => `${format.smallBlind}/${format.bigBlind}` === e.target.value
-              )
-              if (nextFormat) {
-                setSelectedFormat(nextFormat)
-                setAnte(defaultAnte(nextFormat.bigBlind))
-              }
-            }}
-          >
-            {BLIND_FORMAT_CATEGORIES.map((category) => (
-              <optgroup key={category} label={category}>
-                {BLIND_FORMATS
-                  .filter((format) => format.category === category)
-                  .map((format) => (
-                    <option
-                      key={format.label}
-                      value={`${format.smallBlind}/${format.bigBlind}`}
-                    >
-                      {format.label}
-                    </option>
-                  ))}
-              </optgroup>
-            ))}
-          </select>
-        </label>
-        <div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={anteEnabled}
-              onChange={(e) => setAnteEnabled(e.target.checked)}
-            />
-            {t('anteEnable')}
-          </label>
-          {anteEnabled && (
-            <input
-              type="number" min={1} value={ante}
-              onChange={(e) => setAnte(Math.max(1, Number(e.target.value)))}
-              style={{ marginTop: '0.4rem' }}
-            />
-          )}
-        </div>
-        <label>
-          {t('visibility')}
-          <select
-            value={visibility}
-            onChange={(e) => setVisibility(e.target.value as TableVisibility)}
-          >
-            <option value="public">{t('publicTable')}</option>
-            <option value="private">{t('privateTable')}</option>
-          </select>
-        </label>
       </div>
+      <label>
+        {t('stakeLabel')}
+        <select
+          value={`${selectedFormat.smallBlind}/${selectedFormat.bigBlind}`}
+          onChange={(e) => {
+            const nextFormat = BLIND_FORMATS.find(
+              (format) => `${format.smallBlind}/${format.bigBlind}` === e.target.value
+            )
+            if (nextFormat) {
+              setSelectedFormat(nextFormat)
+              setAnte(defaultAnte(nextFormat.bigBlind))
+            }
+          }}
+        >
+          {BLIND_FORMAT_CATEGORIES.map((category) => (
+            <optgroup key={category} label={category}>
+              {BLIND_FORMATS
+                .filter((format) => format.category === category)
+                .map((format) => (
+                  <option
+                    key={format.label}
+                    value={`${format.smallBlind}/${format.bigBlind}`}
+                  >
+                    {format.label}
+                  </option>
+                ))}
+            </optgroup>
+          ))}
+        </select>
+      </label>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          <input
+            type="checkbox"
+            checked={anteEnabled}
+            onChange={(e) => setAnteEnabled(e.target.checked)}
+          />
+          {t('anteEnable')}
+        </label>
+        {anteEnabled && (
+          <input
+            type="number" min={1} value={ante}
+            onChange={(e) => setAnte(Math.max(1, Number(e.target.value)))}
+            style={{ width: '7rem' }}
+          />
+        )}
+      </div>
+      <label>
+        {t('visibility')}
+        <select
+          value={visibility}
+          onChange={(e) => setVisibility(e.target.value as TableVisibility)}
+        >
+          <option value="public">{t('publicTable')}</option>
+          <option value="private">{t('privateTable')}</option>
+        </select>
+      </label>
       <div>
         <div className="label" style={{ marginBottom: '0.45rem' }}>{t('tableFlags')}</div>
         <div className="button-row" style={{ justifyContent: 'flex-start' }}>
