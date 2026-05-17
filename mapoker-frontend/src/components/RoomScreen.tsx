@@ -26,6 +26,7 @@ export function RoomScreen({
   const [tableName, setTableName] = useState('Cash Orbit')
   const [playerCount, setPlayerCount] = useState(2)
   const [selectedFormat, setSelectedFormat] = useState(BLIND_FORMATS[0])
+  const [ante, setAnte] = useState(() => Math.floor(BLIND_FORMATS[0].bigBlind / 10))
   const [visibility, setVisibility] = useState<TableVisibility>('public')
   const [flags, setFlags] = useState<TableFlag[]>(['casual'])
 
@@ -70,6 +71,7 @@ export function RoomScreen({
               )
               if (nextFormat) {
                 setSelectedFormat(nextFormat)
+                setAnte(Math.floor(nextFormat.bigBlind / 10))
               }
             }}
           >
@@ -88,6 +90,14 @@ export function RoomScreen({
               </optgroup>
             ))}
           </select>
+        </label>
+        <label>
+          {t('ante')}
+          <input
+            type="number" min={0} value={ante}
+            onChange={(e) => setAnte(Math.max(0, Number(e.target.value)))}
+            placeholder={t('anteHelp')}
+          />
         </label>
         <label>
           {t('visibility')}
@@ -128,6 +138,7 @@ export function RoomScreen({
             playerCount,
             smallBlind: selectedFormat.smallBlind,
             bigBlind: selectedFormat.bigBlind,
+            ante,
             visibility,
             flags,
           })}

@@ -41,6 +41,8 @@ const ja = {
   flagNewbie: '初心者歓迎',
   flagShortHanded: 'ショートハンド',
   players: 'プレイヤー数',
+  ante: 'アンティ',
+  anteHelp: '0 でアンティなし',
   stack: 'スタック',
   bigBlind: 'ビッグブラインド',
   buttonIndex: 'ボタンポジション',

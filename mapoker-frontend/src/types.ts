@@ -176,6 +176,7 @@ export type CreateGameConfig = {
   playerCount: number
   smallBlind: number
   bigBlind: number
+  ante: number
   visibility: TableVisibility
   flags: TableFlag[]
 }
