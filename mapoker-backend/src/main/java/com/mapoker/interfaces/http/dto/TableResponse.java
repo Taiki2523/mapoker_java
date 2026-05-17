@@ -49,10 +49,12 @@ public record TableResponse(
      *
      * @param smallBlind スモールブラインド額
      * @param bigBlind ビッグブラインド額
+     * @param ante アンティ額（0 でアンティなし）
      */
     public record StakeDto(
             @JsonProperty("small_blind") int smallBlind,
-            @JsonProperty("big_blind") int bigBlind
+            @JsonProperty("big_blind") int bigBlind,
+            int ante
     ) {}
 
     /**
@@ -92,7 +94,7 @@ public record TableResponse(
                 table.roomId(),
                 table.name(),
                 table.gameType(),
-                new StakeDto(table.smallBlind(), table.bigBlind()),
+                new StakeDto(table.smallBlind(), table.bigBlind(), table.ante()),
                 table.minBuyIn(),
                 table.maxBuyIn(),
                 table.maxPlayers(),

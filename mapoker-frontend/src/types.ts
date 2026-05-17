@@ -18,6 +18,7 @@ export type GameState = {
   current_bet: number
   last_raise_size: number
   big_blind: number
+  ante: number
   pot_total: number
   players: Player[]
   community: string[]
@@ -115,6 +116,7 @@ export type Table = {
   stake: {
     small_blind: number
     big_blind: number
+    ante: number
   }
   min_buy_in: number
   max_buy_in: number
@@ -176,6 +178,7 @@ export type CreateGameConfig = {
   playerCount: number
   smallBlind: number
   bigBlind: number
+  ante: number
   visibility: TableVisibility
   flags: TableFlag[]
 }

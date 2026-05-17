@@ -564,6 +564,7 @@ function App() {
         player_count: config.playerCount,
         small_blind: config.smallBlind,
         big_blind: config.bigBlind,
+        ante: config.ante,
         visibility: config.visibility,
         flags: config.flags,
       }

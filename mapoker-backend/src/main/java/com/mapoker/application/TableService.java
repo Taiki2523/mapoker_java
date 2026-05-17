@@ -74,7 +74,7 @@ public class TableService {
         }
 
         OddChipRule oddChipRule = gameProperties.defaultOddChipRule();
-        GameState game = gameService.createRingGame(players, input.bigBlind(), oddChipRule);
+        GameState game = gameService.createRingGame(players, input.bigBlind(), oddChipRule, input.ante());
 
         int minBuyIn = input.bigBlind() * walletProperties.minBuyinBbMultiplier();
         int maxBuyIn = input.bigBlind() * walletProperties.maxBuyinBbMultiplier();
@@ -96,7 +96,8 @@ public class TableService {
                 "inactive",
                 game.getId(),
                 Instant.now(),
-                false
+                false,
+                input.ante()
         );
         tables.put(table.id(), table);
         tableMembers.putIfAbsent(table.id(), new ArrayList<>());
@@ -324,7 +325,8 @@ public class TableService {
                     table.status(),
                     table.gameId(),
                     table.createdAt(),
-                    true
+                    true,
+                    table.ante()
             ));
 
             members.add(new TableMemberRecord(name, seatIndex, Instant.now().toString(),
@@ -629,7 +631,8 @@ public class TableService {
                 deriveStatus(game, existing != null && existing.everSeated(), members),
                 existing != null ? existing.gameId() : game.getId(),
                 existing != null ? existing.createdAt() : Instant.now(),
-                existing != null ? existing.everSeated() : false
+                existing != null ? existing.everSeated() : false,
+                existing != null ? existing.ante() : game.getAnte()
         );
     }
 
@@ -662,14 +665,24 @@ public class TableService {
             int smallBlind,
             int bigBlind,
             String visibility,
-            List<String> flags
+            List<String> flags,
+            int ante
     ) {
         public CreateRingTableInput(String tableName,
                                     int playerCount,
                                     int bigBlind,
                                     String visibility,
                                     List<String> flags) {
-            this(tableName, playerCount, Math.max(1, bigBlind / 2), bigBlind, visibility, flags);
+            this(tableName, playerCount, Math.max(1, bigBlind / 2), bigBlind, visibility, flags, 0);
+        }
+
+        public CreateRingTableInput(String tableName,
+                                    int playerCount,
+                                    int smallBlind,
+                                    int bigBlind,
+                                    String visibility,
+                                    List<String> flags) {
+            this(tableName, playerCount, smallBlind, bigBlind, visibility, flags, 0);
         }
     }
 

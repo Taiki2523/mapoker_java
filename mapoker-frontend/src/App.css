@@ -932,6 +932,55 @@ button.icon-btn[data-label]:hover::after {
   grid-template-columns: 1fr;
 }
 
+.toggle-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  user-select: none;
+  color: var(--text-base);
+}
+
+.toggle-switch input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.toggle-track {
+  position: relative;
+  width: 2.6rem;
+  height: 1.45rem;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  flex-shrink: 0;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.toggle-thumb {
+  position: absolute;
+  top: 0.2rem;
+  left: 0.2rem;
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform 0.2s, background 0.2s;
+}
+
+.toggle-switch:has(input:checked) .toggle-track {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.toggle-switch:has(input:checked) .toggle-thumb {
+  transform: translateX(1.15rem);
+  background: #fff;
+}
+
 .button-row {
   display: flex;
   flex-wrap: wrap;

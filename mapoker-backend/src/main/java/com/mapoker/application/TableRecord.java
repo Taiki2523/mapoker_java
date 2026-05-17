@@ -37,7 +37,8 @@ public record TableRecord(
         String status,
         String gameId,
         Instant createdAt,
-        boolean everSeated
+        boolean everSeated,
+        int ante
 ) {
     public TableRecord {
         if (name == null || name.isBlank()) {
@@ -56,5 +57,6 @@ public record TableRecord(
         if (createdAt == null) {
             createdAt = Instant.now();
         }
+        ante = Math.max(0, ante);
     }
 }

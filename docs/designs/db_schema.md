@@ -1,6 +1,6 @@
 # PostgreSQL スキーマ
 
-Flyway マイグレーション V1〜V11 が適用された後の完全なスキーマ。
+Flyway マイグレーション V1〜V12 が適用された後の完全なスキーマ。
 マイグレーションファイルは `mapoker-backend/src/main/resources/db/migration/` にある。
 
 ## 永続化方針
@@ -58,6 +58,7 @@ CREATE TABLE games (
   raise_open      BOOLEAN      NOT NULL,
   fold_win        BOOLEAN      NOT NULL DEFAULT FALSE,  -- フォールドによる勝利か
   last_showdown   JSONB,
+  ante            INT          NOT NULL DEFAULT 0,      -- V12 追加: ハンドごとのアンティ額
   created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -251,6 +252,7 @@ CREATE TABLE tables (
   status       VARCHAR(32)  NOT NULL DEFAULT 'inactive',
   ever_seated  BOOLEAN      NOT NULL DEFAULT FALSE,
   game_id      VARCHAR(128),
+  ante         INT          NOT NULL DEFAULT 0,  -- V12 追加: テーブルのアンティ額設定
   created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 ```
@@ -272,3 +274,4 @@ CREATE TABLE tables (
 | V9 | `V9__add_google_id_to_users.sql` | users に `google_id` カラム追加（V10 で削除・置換） |
 | V10 | `V10__add_discriminator_and_auth_identities.sql` | Google Auth 本対応: `google_id` を削除し `discriminator` / `public_id` / `avatar_url` を追加、`user_auth_identities` テーブル作成 |
 | V11 | `V11__add_label_to_actions.sql` | actions に `label` カラム追加、`action_type` ENUM に `showdown` / `payout` を追加 |
+| V12 | `V12__add_ante.sql` | games に `ante` カラム追加、tables に `ante` カラム追加 |
