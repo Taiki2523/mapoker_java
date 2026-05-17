@@ -25,35 +25,29 @@ Texas Hold'em ポーカー HTTP API の仕様。
 ## 認証 API — `/v1/auth`
 
 セッション Cookie ベース。ローカルプロファイルでは認証が無効化される（`SPRING_PROFILES_ACTIVE=local`）。
+認証は Google ID Token のみ。username/password 認証は廃止済み。
 
-### ユーザー登録
+### Google ログイン
 
-`POST /v1/auth/register`
+`POST /v1/auth/google`
 
-登録と同時にセッションを確立して返す（別途ログイン不要）。
-
-リクエスト:
-```json
-{ "username": "alice", "password": "secret" }
-```
-
-レスポンス `201 Created` + `Set-Cookie: JSESSIONID=...`:
-```json
-{ "id": 1, "username": "alice" }
-```
-
-### ログイン
-
-`POST /v1/auth/login`
+Google ID Token をバックエンドで検証してセッションを確立する。
+DB にはメールアドレスを保存しない（`sub` claim のみ使用）。
 
 リクエスト:
 ```json
-{ "username": "alice", "password": "secret" }
+{ "id_token": "xxxxx.yyyyy.zzzzz" }
 ```
 
 レスポンス `200 OK` + `Set-Cookie: JSESSIONID=...`:
 ```json
-{ "id": 1, "username": "alice" }
+{
+  "public_id": "8f6f0e3a-...",
+  "username": "alice",
+  "discriminator": "1234",
+  "display_name": "alice#1234",
+  "avatar_url": "https://example.com/avatar.png"
+}
 ```
 
 ### 現在ユーザー取得
@@ -62,23 +56,53 @@ Texas Hold'em ポーカー HTTP API の仕様。
 
 レスポンス `200 OK` / `401 Unauthorized`:
 ```json
-{ "id": 1, "username": "alice" }
-```
-
-### プロフィール更新
-
-`PUT /v1/auth/me`
-
-リクエスト（すべてのフィールドは省略可能）:
-```json
 {
-  "new_username": "alice2",
-  "current_password": "secret",
-  "new_password": "newsecret"
+  "public_id": "8f6f0e3a-...",
+  "username": "alice",
+  "discriminator": "1234",
+  "display_name": "alice#1234",
+  "avatar_url": "https://example.com/avatar.png"
 }
 ```
 
-ユーザー名を変更した場合はセッションを再発行する。レスポンス `200 OK` / `400 Bad Request` / `401 Unauthorized`。
+### ユーザー名変更
+
+`PATCH /v1/auth/me/username`
+
+認証必須。`username + discriminator` の組み合わせが既に存在する場合は `409 Conflict`。
+
+リクエスト:
+```json
+{ "new_username": "alice2" }
+```
+
+レスポンス `200 OK`:
+```json
+{
+  "public_id": "8f6f0e3a-...",
+  "username": "alice2",
+  "discriminator": "1234",
+  "display_name": "alice2#1234",
+  "avatar_url": "https://example.com/avatar.png"
+}
+```
+
+### アバター変更
+
+`POST /v1/auth/me/avatar`
+
+`multipart/form-data` で画像ファイルを送信する。認証必須。
+
+レスポンス `200 OK`:
+```json
+{
+  "public_id": "8f6f0e3a-...",
+  "username": "alice",
+  "discriminator": "1234",
+  "display_name": "alice#1234",
+  "avatar_url": "/uploads/avatars/8f6f0e3a-....jpg"
+}
+```
 
 ### テーブル参加履歴
 
@@ -401,8 +425,7 @@ Texas Hold'em ポーカー HTTP API の仕様。
 ```json
 {
   "chip_balance": 9500,
-  "next_daily_bonus_at": "2026-04-22T03:00:00Z",
-  "next_recovery_at": null
+  "next_daily_bonus_at": "2026-04-22T03:00:00Z"
 }
 ```
 
@@ -415,12 +438,6 @@ Texas Hold'em ポーカー HTTP API の仕様。
 `POST /v1/wallet/daily-bonus`
 
 クールダウン: 24 時間（`wallet.daily-bonus-cooldown-hours`）。
-
-### 救済ボーナス
-
-`POST /v1/wallet/recovery`
-
-残高が閾値（デフォルト 1000 chips）以下の場合のみ請求可能。クールダウン: 12 時間。
 
 ---
 

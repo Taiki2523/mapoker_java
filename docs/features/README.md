@@ -34,7 +34,6 @@
 | [straddle.md](straddle.md) | ストラドル | `planned` | マイナー |
 | [table-join-bb.md](table-join-bb.md) | テーブル参加時の 1BB 強制支払い | `planned` | マイナー |
 | [turn-sound.md](turn-sound.md) | 手番通知サウンド | `planned` | マイナー |
-| [google-auth.md](google-auth.md) | Google Auth + username/discriminator | `planned` | マイナー |
 | [spectator-mode.md](spectator-mode.md) | 観戦モード | `planned` | マイナー |
 | [table-chat.md](table-chat.md) | テーブルチャット | `planned` | マイナー |
 | [hand-history-viewer.md](hand-history-viewer.md) | ハンド履歴ビューアー | `planned` | マイナー |
