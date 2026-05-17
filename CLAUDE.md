@@ -4,11 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-Java 実装は完成・稼働中（v1.0.2）。Go プロジェクト（`/home/taiki/projects/mapoker`）は参照実装として残すが、主体は本リポジトリの Java 実装に移っている。
+Java 実装は完成・稼働中（v1.1.2）。Go プロジェクト（`/home/taiki/projects/mapoker`）は参照実装として残すが、主体は本リポジトリの Java 実装に移っている。
 
 ## Commands
 
-> **重要**: 以下のコマンドはすべてdevcontainer内で実行する必要があります。Claude Codeはdevcontainer内でコマンドを直接実行できないため、実行が必要な場合はユーザーに依頼してください。
+コマンドは `mapoker-backend/` ディレクトリ内で `./mvnw` を使って実行する。
+ホスト環境（WSL2）に OpenJDK 21 + Maven wrapper が設定済みのため、Claude Code から直接実行できる。
 
 ```bash
 # Format
@@ -33,6 +34,9 @@ SPRING_PROFILES_ACTIVE=local,postgresql \
 # DB migration (runs automatically on startup; manual override)
 ./mvnw flyway:migrate
 ```
+
+> **注意**: PostgreSQL が必要なテスト（integration test）や `spring-boot:run` の postgresql プロファイルは、
+> Docker コンテナが起動している必要がある。ユニットテスト（`./mvnw test`）はホスト環境で単独実行可能。
 
 ## フロントエンド設計方針
 
