@@ -1,6 +1,6 @@
 package com.mapoker.application.table;
 
-import com.mapoker.application.game.GameService;
+import com.mapoker.application.game.GameReadService;
 import com.mapoker.domain.game.GameState;
 import com.mapoker.domain.game.GameStatus;
 import org.springframework.stereotype.Service;
@@ -20,9 +20,9 @@ import java.util.Set;
 public class TableQueryService {
 
     private final TableStore store;
-    private final GameService gameService;
+    private final GameReadService gameService;
 
-    public TableQueryService(TableStore store, GameService gameService) {
+    public TableQueryService(TableStore store, GameReadService gameService) {
         this.store = store;
         this.gameService = gameService;
     }

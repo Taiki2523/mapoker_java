@@ -1,7 +1,9 @@
 package com.mapoker.interfaces.http;
 
 import com.mapoker.application.game.ActionRecord;
-import com.mapoker.application.game.GameService;
+import com.mapoker.application.game.GameActionService;
+import com.mapoker.application.game.GameLifecycleService;
+import com.mapoker.application.game.GameReadService;
 import com.mapoker.application.table.TableLifecycleService;
 import com.mapoker.application.table.TableMembershipService;
 import com.mapoker.application.table.TableQueryService;
@@ -39,7 +41,9 @@ import static org.mockito.Mockito.when;
  */
 class GameControllerTest {
 
-    private GameService gameService;
+    private GameReadService gameService;
+    private GameLifecycleService gameLifecycle;
+    private GameActionService gameAction;
     private TableQueryService tableQueryService;
     private TableLifecycleService tableLifecycleService;
     private UserService userService;
@@ -50,11 +54,13 @@ class GameControllerTest {
 
     @BeforeEach
     void setUp() {
-        gameService = mock(GameService.class);
+        gameService = mock(GameReadService.class);
+        gameLifecycle = mock(GameLifecycleService.class);
+        gameAction = mock(GameActionService.class);
         tableQueryService = mock(TableQueryService.class);
         tableLifecycleService = mock(TableLifecycleService.class);
         userService = mock(UserService.class);
-        controller = new GameController(gameService, GAME_PROPS, tableQueryService, tableLifecycleService, userService);
+        controller = new GameController(gameService, gameLifecycle, gameAction, GAME_PROPS, tableQueryService, tableLifecycleService, userService);
     }
 
     // -----------------------------------------------------------------------
@@ -64,7 +70,7 @@ class GameControllerTest {
     @Test
     void createGameReturnsGameResponse() {
         GameState state = newGame();
-        when(gameService.createGame(any(), anyInt(), anyInt(), any(), any())).thenReturn(state);
+        when(gameLifecycle.createGame(any(), anyInt(), anyInt(), any(), any())).thenReturn(state);
 
         var req = new CreateGameRequest(
                 List.of(new CreateGameRequest.PlayerDto("alice", 1000),
@@ -80,7 +86,7 @@ class GameControllerTest {
     @Test
     void createGameUsesDefaultOddChipRuleWhenNull() {
         GameState state = newGame();
-        when(gameService.createGame(any(), anyInt(), anyInt(), any(), eq(OddChipRule.LOW_INDEX)))
+        when(gameLifecycle.createGame(any(), anyInt(), anyInt(), any(), eq(OddChipRule.LOW_INDEX)))
                 .thenReturn(state);
 
         var req = new CreateGameRequest(
@@ -88,13 +94,13 @@ class GameControllerTest {
 
         controller.createGame(req);
 
-        verify(gameService).createGame(any(), anyInt(), anyInt(), any(), eq(OddChipRule.LOW_INDEX));
+        verify(gameLifecycle).createGame(any(), anyInt(), anyInt(), any(), eq(OddChipRule.LOW_INDEX));
     }
 
     @Test
     void createGameForwardsExplicitOddChipRule() {
         GameState state = newGame();
-        when(gameService.createGame(any(), anyInt(), anyInt(), any(), eq(OddChipRule.BUTTON_LEFT)))
+        when(gameLifecycle.createGame(any(), anyInt(), anyInt(), any(), eq(OddChipRule.BUTTON_LEFT)))
                 .thenReturn(state);
 
         var req = new CreateGameRequest(
@@ -102,7 +108,7 @@ class GameControllerTest {
 
         controller.createGame(req);
 
-        verify(gameService).createGame(any(), anyInt(), anyInt(), any(), eq(OddChipRule.BUTTON_LEFT));
+        verify(gameLifecycle).createGame(any(), anyInt(), anyInt(), any(), eq(OddChipRule.BUTTON_LEFT));
     }
 
     // -----------------------------------------------------------------------
@@ -191,18 +197,18 @@ class GameControllerTest {
     @Test
     void applyActionDelegatesToGameService() {
         GameState state = startedGame();
-        when(gameService.applyAction("g1", 0, ActionType.FOLD, 0)).thenReturn(state);
+        when(gameAction.applyAction("g1", 0, ActionType.FOLD, 0)).thenReturn(state);
 
         var req = new ApplyActionRequest(0, new ApplyActionRequest.ActionDto(ActionType.FOLD, 0));
         controller.applyAction("g1", req, null, null);
 
-        verify(gameService).applyAction("g1", 0, ActionType.FOLD, 0);
+        verify(gameAction).applyAction("g1", 0, ActionType.FOLD, 0);
     }
 
     @Test
     void applyActionReturnsGameResponse() {
         GameState state = startedGame();
-        when(gameService.applyAction(anyString(), anyInt(), any(), anyInt())).thenReturn(state);
+        when(gameAction.applyAction(anyString(), anyInt(), any(), anyInt())).thenReturn(state);
 
         var req = new ApplyActionRequest(1, new ApplyActionRequest.ActionDto(ActionType.CALL, 0));
         var response = controller.applyAction("g1", req, null, null);
@@ -213,7 +219,7 @@ class GameControllerTest {
     @Test
     void applyActionResolvesViewerIndexForAuthenticatedUser() {
         GameState state = startedGame();
-        when(gameService.applyAction(anyString(), anyInt(), any(), anyInt())).thenReturn(state);
+        when(gameAction.applyAction(anyString(), anyInt(), any(), anyInt())).thenReturn(state);
         var appAlice = new com.mapoker.application.auth.User(
                 1L, "pub-alice", "alice", "0000", null, java.time.LocalDateTime.now());
         when(userService.getByPublicId("pub-alice")).thenReturn(appAlice);
@@ -261,19 +267,19 @@ class GameControllerTest {
     @Test
     void resolveShowdownCallsServiceAndReturnsState() {
         GameState finished = finishedGame();
-        when(gameService.resolveShowdown("g1")).thenReturn(null);
+        when(gameAction.resolveShowdown("g1")).thenReturn(null);
         when(gameService.getGame("g1")).thenReturn(finished);
 
         var response = controller.resolveShowdown("g1");
 
-        verify(gameService).resolveShowdown("g1");
+        verify(gameAction).resolveShowdown("g1");
         assertThat(response.status()).isEqualTo(GameStatus.FINISHED);
     }
 
     @Test
     void resolveShowdownRevealsAllHoleCards() {
         GameState finished = finishedGame();
-        when(gameService.resolveShowdown("g1")).thenReturn(null);
+        when(gameAction.resolveShowdown("g1")).thenReturn(null);
         when(gameService.getGame("g1")).thenReturn(finished);
 
         var response = controller.resolveShowdown("g1");

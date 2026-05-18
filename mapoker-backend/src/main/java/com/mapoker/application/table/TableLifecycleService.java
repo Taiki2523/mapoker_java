@@ -1,6 +1,7 @@
 package com.mapoker.application.table;
 
-import com.mapoker.application.game.GameService;
+import com.mapoker.application.game.GameLifecycleService;
+import com.mapoker.application.game.GameReadService;
 import com.mapoker.domain.game.GameState;
 import com.mapoker.domain.game.GameStatus;
 import com.mapoker.domain.game.OddChipRule;
@@ -24,18 +25,21 @@ public class TableLifecycleService {
 
     private final TableStore store;
     private final TableQueryService queryService;
-    private final GameService gameService;
+    private final GameLifecycleService gameService;
+    private final GameReadService gameRead;
     private final GameProperties gameProperties;
     private final WalletProperties walletProperties;
 
     public TableLifecycleService(TableStore store,
                                  TableQueryService queryService,
-                                 GameService gameService,
+                                 GameLifecycleService gameService,
+                                 GameReadService gameRead,
                                  GameProperties gameProperties,
                                  WalletProperties walletProperties) {
         this.store = store;
         this.queryService = queryService;
         this.gameService = gameService;
+        this.gameRead = gameRead;
         this.gameProperties = gameProperties;
         this.walletProperties = walletProperties;
     }
@@ -43,9 +47,9 @@ public class TableLifecycleService {
     public CreateTableResult createRingTable(CreateRingTableInput input) {
         validateCreateInput(input);
 
-        List<GameService.PlayerInput> players = new ArrayList<>();
+        List<GameLifecycleService.PlayerInput> players = new ArrayList<>();
         for (int i = 0; i < input.playerCount(); i++) {
-            players.add(new GameService.PlayerInput("p" + (i + 1), 0));
+            players.add(new GameLifecycleService.PlayerInput("p" + (i + 1), 0));
         }
 
         OddChipRule oddChipRule = gameProperties.defaultOddChipRule();
@@ -82,7 +86,7 @@ public class TableLifecycleService {
 
     public GameState startHand(String tableId, int bigBlind, boolean doStraddle) {
         synchronized (store.lock(tableId)) {
-            GameState current = gameService.getGame(tableId);
+            GameState current = gameRead.getGame(tableId);
             if (current.getStatus() == GameStatus.IN_PROGRESS) {
                 return current;
             }

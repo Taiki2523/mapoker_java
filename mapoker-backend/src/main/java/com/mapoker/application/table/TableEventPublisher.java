@@ -1,6 +1,6 @@
 package com.mapoker.application.table;
 
-import com.mapoker.application.game.GameService;
+import com.mapoker.application.game.GameReadService;
 import com.mapoker.infrastructure.messaging.GameEventPublisher;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
@@ -12,10 +12,10 @@ import java.util.List;
 public class TableEventPublisher {
 
     private final ObjectProvider<GameEventPublisher> eventPublisherProvider;
-    private final GameService gameService;
+    private final GameReadService gameService;
 
     public TableEventPublisher(ObjectProvider<GameEventPublisher> eventPublisherProvider,
-                               GameService gameService) {
+                               GameReadService gameService) {
         this.eventPublisherProvider = eventPublisherProvider;
         this.gameService = gameService;
     }

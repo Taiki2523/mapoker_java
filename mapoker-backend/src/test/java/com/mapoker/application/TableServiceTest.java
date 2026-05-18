@@ -1,6 +1,8 @@
 package com.mapoker.application;
 
-import com.mapoker.application.game.GameService;
+import com.mapoker.application.game.GameActionService;
+import com.mapoker.application.game.GameLifecycleService;
+import com.mapoker.application.game.GameReadService;
 import com.mapoker.application.history.HandHistoryService;
 import com.mapoker.application.history.UserTableHistoryService;
 import com.mapoker.application.table.TableEventPublisher;
@@ -78,14 +80,16 @@ class TableServiceTest {
         var userTableHistoryRepo = new InMemoryUserTableHistoryRepository();
         var userTableHistoryService = new UserTableHistoryService(userTableHistoryRepo);
         var handHistoryService = new HandHistoryService(historyRepo, userTableHistoryService);
-        var gameService = new GameService(gameRepo, handHistoryService, membershipProvider, queryProvider, publisherProvider);
+        var gameRead = new GameReadService(gameRepo);
+        var gameLifecycle = new GameLifecycleService(gameRepo, gameRead, publisherProvider);
+        var gameAction = new GameActionService(gameRepo, gameRead, handHistoryService, membershipProvider, queryProvider, publisherProvider);
 
         store = new TableStore();
-        var eventPublisher = new TableEventPublisher(publisherProvider, gameService);
-        queryService = new TableQueryService(store, gameService);
-        membershipService = new TableMembershipService(store, queryService, eventPublisher, gameService,
-                GAME_PROPS, walletProvider, userTableHistoryService);
-        lifecycleService = new TableLifecycleService(store, queryService, gameService, GAME_PROPS, WALLET_PROPS);
+        var eventPublisher = new TableEventPublisher(publisherProvider, gameRead);
+        queryService = new TableQueryService(store, gameRead);
+        membershipService = new TableMembershipService(store, queryService, eventPublisher, gameLifecycle,
+                gameRead, GAME_PROPS, walletProvider, userTableHistoryService);
+        lifecycleService = new TableLifecycleService(store, queryService, gameLifecycle, gameRead, GAME_PROPS, WALLET_PROPS);
     }
 
     // -----------------------------------------------------------------------

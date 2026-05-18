@@ -1,6 +1,7 @@
 package com.mapoker.application.table;
 
-import com.mapoker.application.game.GameService;
+import com.mapoker.application.game.GameLifecycleService;
+import com.mapoker.application.game.GameReadService;
 import com.mapoker.application.history.UserTableHistoryService;
 import com.mapoker.application.wallet.WalletService;
 import com.mapoker.domain.game.GameState;
@@ -24,7 +25,8 @@ public class TableMembershipService {
     private final TableStore store;
     private final TableQueryService queryService;
     private final TableEventPublisher eventPublisher;
-    private final GameService gameService;
+    private final GameLifecycleService gameLifecycle;
+    private final GameReadService gameRead;
     private final GameProperties gameProperties;
     private final ObjectProvider<WalletService> walletServiceProvider;
     private final UserTableHistoryService userTableHistoryService;
@@ -33,14 +35,16 @@ public class TableMembershipService {
     public TableMembershipService(TableStore store,
                                   TableQueryService queryService,
                                   TableEventPublisher eventPublisher,
-                                  GameService gameService,
+                                  GameLifecycleService gameLifecycle,
+                                  GameReadService gameRead,
                                   GameProperties gameProperties,
                                   ObjectProvider<WalletService> walletServiceProvider,
                                   UserTableHistoryService userTableHistoryService) {
         this.store = store;
         this.queryService = queryService;
         this.eventPublisher = eventPublisher;
-        this.gameService = gameService;
+        this.gameLifecycle = gameLifecycle;
+        this.gameRead = gameRead;
         this.gameProperties = gameProperties;
         this.walletServiceProvider = walletServiceProvider;
         this.userTableHistoryService = userTableHistoryService;
@@ -69,8 +73,8 @@ public class TableMembershipService {
                     .orElse(null);
 
             if (existing != null) {
-                int currentStack = gameService.getSeatStack(table.gameId(), existing.seatIndex());
-                GameState state = gameService.getGame(table.gameId());
+                int currentStack = gameLifecycle.getSeatStack(table.gameId(), existing.seatIndex());
+                GameState state = gameRead.getGame(table.gameId());
                 boolean handActive = (state.getStatus() == GameStatus.IN_PROGRESS && state.getPot() > 0)
                         || state.getStatus() == GameStatus.SHOWDOWN;
 
@@ -91,8 +95,8 @@ public class TableMembershipService {
                             walletService.rebuy(publicId, table.id(), buyIn);
                         }
                     }
-                    gameService.setSeatStack(table.gameId(), existing.seatIndex(), buyIn);
-                    gameService.setSittingOut(table.gameId(), existing.seatIndex(), false);
+                    gameLifecycle.setSeatStack(table.gameId(), existing.seatIndex(), buyIn);
+                    gameLifecycle.setSittingOut(table.gameId(), existing.seatIndex(), false);
                 }
 
                 if (existing.pendingLeave()) {
@@ -123,12 +127,12 @@ public class TableMembershipService {
                 walletService.buyIn(publicId, table.id(), buyIn);
             }
 
-            GameState state = gameService.getGame(table.gameId());
+            GameState state = gameRead.getGame(table.gameId());
             boolean handActive = state.getStatus() == GameStatus.IN_PROGRESS && state.getPot() > 0;
             if (handActive) {
-                gameService.setSittingOut(table.gameId(), seatIndex, true);
+                gameLifecycle.setSittingOut(table.gameId(), seatIndex, true);
             }
-            gameService.setSeatStack(table.gameId(), seatIndex, buyIn);
+            gameLifecycle.setSeatStack(table.gameId(), seatIndex, buyIn);
 
             store.tables.put(table.id(), new TableRecord(
                     table.id(), table.roomId(), table.name(), table.gameType(),
@@ -167,7 +171,7 @@ public class TableMembershipService {
                 return result;
             }
 
-            GameState state = gameService.getGame(table.gameId());
+            GameState state = gameRead.getGame(table.gameId());
             boolean handActive = (state.getStatus() == GameStatus.IN_PROGRESS && state.getPot() > 0)
                     || state.getStatus() == GameStatus.SHOWDOWN;
 
@@ -233,13 +237,13 @@ public class TableMembershipService {
     }
 
     private void cashOutSeatStackIfPossible(String publicIdOrName, String gameId, int seatIndex) {
-        int stack = gameService.getSeatStack(gameId, seatIndex);
+        int stack = gameLifecycle.getSeatStack(gameId, seatIndex);
         if (stack <= 0) return;
         WalletService walletService = walletServiceProvider.getIfAvailable();
         if (walletService != null && publicIdOrName != null) {
             walletService.cashOut(publicIdOrName, gameId, stack);
         }
-        gameService.setSeatStack(gameId, seatIndex, 0);
+        gameLifecycle.setSeatStack(gameId, seatIndex, 0);
     }
 
     private String normalizeMemberName(String requestedName) {
