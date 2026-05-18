@@ -5,23 +5,22 @@ import {
 
 /**
  * プロフィール関連データ（wallet / tables / history）を TanStack Query で管理する hook。
+ * MyPage が表示されたタイミングで全データをフェッチする。
  *
- * @param showMyPage  MyPage が表示中かどうか（tables/history の fetch トリガー）
- * @param loggedIn    認証済みかどうか（wallet の fetch トリガー）
+ * @param showMyPage  MyPage が表示中かどうか（全クエリの fetch トリガー）
  * @param formatError エラーメッセージ整形関数
  */
 export function useProfileData(
   showMyPage: boolean,
-  loggedIn: boolean,
   formatError: (e: unknown) => string
 ) {
   const queryClient = useQueryClient()
 
-  // wallet は buy-in フローでも参照するため、ログイン中は常時フェッチ
+  // wallet は MyPage 表示時のみフェッチ（ウォレット機能が未設定の環境でも 500 を出さないため）
   const walletQuery = useQuery({
     queryKey: ['wallet'],
     queryFn: fetchWallet,
-    enabled: loggedIn,
+    enabled: loggedIn && showMyPage,
     staleTime: 2 * 60_000,
   })
 

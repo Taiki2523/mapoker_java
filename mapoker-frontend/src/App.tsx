@@ -66,7 +66,7 @@ function App() {
   const session = useTableSession(gameId, roster)
   const { myName, setMyName, mySeatIndex, setMySeatIndex, mySeat, persistSession, clearGameSession } = session
 
-  const profile = useProfileData(showMyPage, !!currentUser, formatErrorMessage)
+  const profile = useProfileData(showMyPage, formatErrorMessage)
   const { wallet, walletLedger, profileTables, profileHistory, profileLoading, profileError, handleClaimDailyBonus } = profile
 
   // ---- 派生値 ----
