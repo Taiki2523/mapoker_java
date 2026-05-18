@@ -98,7 +98,7 @@ export function GameScreen({
       />
       <ActionPanel
         game={game}
-        mySeatIndex={mySeatIndex}
+        mySeatIndex={mySeat}
         canAct={canAct}
         loading={loading}
         toCall={toCall}

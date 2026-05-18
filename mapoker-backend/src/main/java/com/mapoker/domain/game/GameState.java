@@ -69,6 +69,7 @@ public class GameState {
     private int ante = 0;
     private boolean straddleEnabled = false;
     private int straddleIdx = -1;
+    private boolean nextHandStraddle = false;
 
     private GameState() {}
 
@@ -259,7 +260,9 @@ public class GameState {
         acted = new boolean[players.size()];
 
         straddleIdx = -1;
-        if (straddleEnabled && doStraddle && activePlayers > 2) {
+        boolean effectiveStraddle = doStraddle || nextHandStraddle;
+        nextHandStraddle = false;
+        if (straddleEnabled && effectiveStraddle && activePlayers > 2) {
             int candidate = nextActive(bigBlindIdx);
             int straddleAmount = bigBlind * 2;
             if (players.get(candidate).getStack() >= straddleAmount) {
@@ -769,4 +772,6 @@ public class GameState {
     public void setStraddleEnabled(boolean straddleEnabled) { this.straddleEnabled = straddleEnabled; }
     public int getStraddleIdx() { return straddleIdx; }
     public void setStraddleIdx(int straddleIdx) { this.straddleIdx = straddleIdx; }
+    public boolean isNextHandStraddle() { return nextHandStraddle; }
+    public void setNextHandStraddle(boolean nextHandStraddle) { this.nextHandStraddle = nextHandStraddle; }
 }

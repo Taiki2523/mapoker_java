@@ -882,7 +882,15 @@ function App() {
           onLeaveRoom={leaveRoom}
           onSendAction={(type, amount) => void sendAction(type, amount)}
           doStraddle={doStraddle}
-          onToggleStraddle={setDoStraddle}
+          onToggleStraddle={(v) => {
+            setDoStraddle(v)
+            if (gameId) {
+              void fetchJSON(`/v1/games/${gameId}/straddle-intent`, {
+                method: 'POST',
+                body: JSON.stringify({ straddle: v }),
+              }).catch(() => {})
+            }
+          }}
         />
       )}
       {buyInContext && (

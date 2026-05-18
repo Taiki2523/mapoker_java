@@ -156,12 +156,12 @@ public class PostgresGameRepository implements GameRepository {
                   id, status, street, button_index, small_blind_idx, big_blind_idx,
                   current_player, current_bet, last_raise_size, big_blind, pot_total,
                   odd_chip_rule, deck, deck_pos, community, acted, raise_open, fold_win, last_showdown,
-                  ante
+                  ante, straddle_enabled, next_hand_straddle
                 ) VALUES (
                   ?, CAST(? AS game_status), CAST(? AS game_street), ?, ?, ?, ?, ?, ?, ?, ?,
                   CAST(? AS odd_chip_rule),
                   CAST(? AS jsonb), ?, CAST(? AS jsonb), CAST(? AS jsonb), ?, ?, CAST(? AS jsonb),
-                  ?
+                  ?, ?, ?
                 )
                 """,
                 id,
@@ -183,7 +183,9 @@ public class PostgresGameRepository implements GameRepository {
                 s.isRaiseOpen(),
                 s.isFoldWin(),
                 s.getLastShowdown() != null ? toJson(s.getLastShowdown()) : null,
-                s.getAnte());
+                s.getAnte(),
+                s.isStraddleEnabled(),
+                s.isNextHandStraddle());
     }
 
     private void updateGame(String id, GameState s) {
@@ -208,6 +210,8 @@ public class PostgresGameRepository implements GameRepository {
                   fold_win        = ?,
                   last_showdown   = CAST(? AS jsonb),
                   ante            = ?,
+                  straddle_enabled = ?,
+                  next_hand_straddle = ?,
                   updated_at      = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
@@ -230,6 +234,8 @@ public class PostgresGameRepository implements GameRepository {
                 s.isFoldWin(),
                 s.getLastShowdown() != null ? toJson(s.getLastShowdown()) : null,
                 s.getAnte(),
+                s.isStraddleEnabled(),
+                s.isNextHandStraddle(),
                 id);
     }
 
@@ -315,6 +321,14 @@ public class PostgresGameRepository implements GameRepository {
         Object anteRaw = row.get("ante");
         if (anteRaw != null) {
             s.setAnte((Integer) anteRaw);
+        }
+        Object straddleRaw = row.get("straddle_enabled");
+        if (straddleRaw != null) {
+            s.setStraddleEnabled((Boolean) straddleRaw);
+        }
+        Object nextStraddleRaw = row.get("next_hand_straddle");
+        if (nextStraddleRaw != null) {
+            s.setNextHandStraddle((Boolean) nextStraddleRaw);
         }
 
         List<Player> players = new ArrayList<>();

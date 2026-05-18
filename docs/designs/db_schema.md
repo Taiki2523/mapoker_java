@@ -59,6 +59,8 @@ CREATE TABLE games (
   fold_win        BOOLEAN      NOT NULL DEFAULT FALSE,  -- フォールドによる勝利か
   last_showdown   JSONB,
   ante            INT          NOT NULL DEFAULT 0,      -- V12 追加: ハンドごとのアンティ額
+  straddle_enabled BOOLEAN     NOT NULL DEFAULT FALSE,  -- V14 追加: ストラドル有効フラグ
+  next_hand_straddle BOOLEAN   NOT NULL DEFAULT FALSE,  -- V15 追加: 次ハンドのストラドル意思（startHand後リセット）
   created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -253,6 +255,7 @@ CREATE TABLE tables (
   ever_seated  BOOLEAN      NOT NULL DEFAULT FALSE,
   game_id      VARCHAR(128),
   ante         INT          NOT NULL DEFAULT 0,  -- V12 追加: テーブルのアンティ額設定
+  straddle_enabled BOOLEAN  NOT NULL DEFAULT FALSE,  -- V13 追加: ストラドル有効フラグ
   created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 ```
@@ -275,3 +278,6 @@ CREATE TABLE tables (
 | V10 | `V10__add_discriminator_and_auth_identities.sql` | Google Auth 本対応: `google_id` を削除し `discriminator` / `public_id` / `avatar_url` を追加、`user_auth_identities` テーブル作成 |
 | V11 | `V11__add_label_to_actions.sql` | actions に `label` カラム追加、`action_type` ENUM に `showdown` / `payout` を追加 |
 | V12 | `V12__add_ante.sql` | games に `ante` カラム追加、tables に `ante` カラム追加 |
+| V13 | `V13__add_straddle_enabled.sql` | tables に `straddle_enabled` カラム追加 |
+| V14 | `V14__add_straddle_enabled_to_games.sql` | games に `straddle_enabled` カラム追加 |
+| V15 | `V15__add_next_hand_straddle.sql` | games に `next_hand_straddle` カラム追加（ストラドル意思の永続化） |

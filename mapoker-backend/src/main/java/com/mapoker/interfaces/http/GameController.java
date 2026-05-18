@@ -115,6 +115,11 @@ public class GameController {
         return GameResponse.from(tableService.startHand(id, req.bigBlind(), req.doStraddle()), null, false, seatedCount(id));
     }
 
+    @PostMapping("/{id}/straddle-intent")
+    public void setStraddleIntent(@PathVariable String id, @RequestBody StraddleIntentRequest req) {
+        tableService.setStraddleIntent(id, req.straddle());
+    }
+
     /**
      * プレイヤーのアクションを適用する。
      *

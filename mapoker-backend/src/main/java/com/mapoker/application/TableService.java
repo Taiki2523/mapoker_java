@@ -189,6 +189,19 @@ public class TableService {
     }
 
     /**
+     * 次のハンドでのストラドル意思をサーバー側に保存します。
+     * どのクライアントが startHand を呼んでも正しく反映されます。
+     *
+     * @param tableId  テーブル ID
+     * @param straddle ストラドルするか
+     */
+    public void setStraddleIntent(String tableId, boolean straddle) {
+        synchronized (tableLock(tableId)) {
+            gameService.setStraddleIntent(tableId, straddle);
+        }
+    }
+
+    /**
      * 指定テーブルで新しいハンドを開始します（ストラドル選択付き）。
      *
      * @param tableId    テーブル ID

@@ -111,6 +111,12 @@ public class GameService {
         return startHand(id, bigBlind, false);
     }
 
+    public void setStraddleIntent(String id, boolean straddle) {
+        GameState state = getGame(id);
+        state.setNextHandStraddle(straddle);
+        gameRepository.update(id, state);
+    }
+
     /**
      * 指定テーブルで新しいハンドを開始する（ストラドル選択付き）。
      *
