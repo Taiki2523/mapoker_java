@@ -1,4 +1,4 @@
-package com.mapoker.application;
+package com.mapoker.application.game;
 
 import com.mapoker.domain.rules.ActionType;
 

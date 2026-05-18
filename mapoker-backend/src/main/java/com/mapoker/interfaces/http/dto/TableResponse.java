@@ -1,8 +1,8 @@
 package com.mapoker.interfaces.http.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.mapoker.application.TableMemberRecord;
-import com.mapoker.application.TableRecord;
+import com.mapoker.application.table.TableMemberRecord;
+import com.mapoker.application.table.TableRecord;
 
 import java.util.List;
 

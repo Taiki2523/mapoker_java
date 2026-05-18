@@ -1,5 +1,7 @@
-package com.mapoker.application;
+package com.mapoker.application.ports;
 
+import com.mapoker.application.wallet.WalletEntry;
+import com.mapoker.application.wallet.WalletLedgerEntry;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;

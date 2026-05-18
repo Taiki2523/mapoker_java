@@ -1,4 +1,8 @@
-package com.mapoker.application;
+package com.mapoker.application.history;
+import com.mapoker.application.history.UserTableHistoryEntry;
+import com.mapoker.application.ports.UserTableHistoryRepository;
+import com.mapoker.application.table.TableMemberRecord;
+import com.mapoker.application.table.TableRecord;
 
 import org.springframework.stereotype.Service;
 

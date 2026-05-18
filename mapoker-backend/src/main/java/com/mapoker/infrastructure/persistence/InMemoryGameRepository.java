@@ -1,7 +1,7 @@
 package com.mapoker.infrastructure.persistence;
 
-import com.mapoker.application.ActionRecord;
-import com.mapoker.application.GameRepository;
+import com.mapoker.application.game.ActionRecord;
+import com.mapoker.application.ports.GameRepository;
 import com.mapoker.domain.game.GameState;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;

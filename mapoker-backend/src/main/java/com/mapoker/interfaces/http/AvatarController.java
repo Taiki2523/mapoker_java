@@ -1,8 +1,8 @@
 package com.mapoker.interfaces.http;
 
-import com.mapoker.application.User;
-import com.mapoker.application.UserRepository;
-import com.mapoker.application.UserService;
+import com.mapoker.application.auth.User;
+import com.mapoker.application.ports.UserRepository;
+import com.mapoker.application.auth.UserService;
 import com.mapoker.interfaces.http.dto.UserResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;

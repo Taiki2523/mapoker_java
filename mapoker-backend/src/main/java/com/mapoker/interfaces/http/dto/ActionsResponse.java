@@ -2,7 +2,7 @@ package com.mapoker.interfaces.http.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.mapoker.application.ActionRecord;
+import com.mapoker.application.game.ActionRecord;
 import com.mapoker.domain.rules.ActionType;
 
 import java.util.List;

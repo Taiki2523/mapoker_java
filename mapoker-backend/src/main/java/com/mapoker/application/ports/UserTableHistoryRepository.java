@@ -1,4 +1,7 @@
-package com.mapoker.application;
+package com.mapoker.application.ports;
+
+import com.mapoker.application.table.TableRecord;
+import com.mapoker.application.history.UserTableHistoryEntry;
 
 import java.util.List;
 

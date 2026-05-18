@@ -1,8 +1,8 @@
 package com.mapoker.interfaces.http;
 
-import com.mapoker.application.GameService;
-import com.mapoker.application.TableService;
-import com.mapoker.application.UserService;
+import com.mapoker.application.game.GameService;
+import com.mapoker.application.table.TableService;
+import com.mapoker.application.auth.UserService;
 import com.mapoker.domain.game.GameState;
 import com.mapoker.domain.game.OddChipRule;
 import com.mapoker.domain.game.Player;
@@ -28,7 +28,7 @@ class GameControllerVisibilityTest {
 
         GameState state = startedGame();
         when(gameService.getGame("game-1")).thenReturn(state);
-        var appAlice = new com.mapoker.application.User(
+        var appAlice = new com.mapoker.application.auth.User(
                 1L, "pub-alice", "alice", "0000", null, java.time.LocalDateTime.now());
         when(userService.getByPublicId("pub-alice")).thenReturn(appAlice);
         when(tableService.findSeatIndex("game-1", "alice")).thenReturn(1);
@@ -53,7 +53,7 @@ class GameControllerVisibilityTest {
 
         GameState state = startedGame();
         when(gameService.getGame("game-1")).thenReturn(state);
-        var appMallory = new com.mapoker.application.User(
+        var appMallory = new com.mapoker.application.auth.User(
                 2L, "pub-mallory", "mallory", "0000", null, java.time.LocalDateTime.now());
         when(userService.getByPublicId("pub-mallory")).thenReturn(appMallory);
         when(tableService.findSeatIndex("game-1", "mallory")).thenReturn(null);

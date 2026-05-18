@@ -1,9 +1,9 @@
 package com.mapoker.interfaces.http;
 
-import com.mapoker.application.TableMemberRecord;
-import com.mapoker.application.TableService;
-import com.mapoker.application.User;
-import com.mapoker.application.UserService;
+import com.mapoker.application.table.TableMemberRecord;
+import com.mapoker.application.table.TableService;
+import com.mapoker.application.auth.User;
+import com.mapoker.application.auth.UserService;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.mapoker.interfaces.http.dto.TableMembershipRequest;
 import jakarta.validation.Valid;

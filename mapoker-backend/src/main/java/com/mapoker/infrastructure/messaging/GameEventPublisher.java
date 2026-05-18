@@ -1,7 +1,7 @@
 package com.mapoker.infrastructure.messaging;
 
-import com.mapoker.application.TableMemberRecord;
-import com.mapoker.application.TableService;
+import com.mapoker.application.table.TableMemberRecord;
+import com.mapoker.application.table.TableService;
 import com.mapoker.domain.card.Card;
 import com.mapoker.domain.game.GameState;
 import com.mapoker.interfaces.http.dto.GameResponse;

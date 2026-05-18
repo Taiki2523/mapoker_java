@@ -1,9 +1,9 @@
 package com.mapoker;
 
-import com.mapoker.application.GameService;
-import com.mapoker.application.TableService;
-import com.mapoker.application.UserRepository;
-import com.mapoker.application.UserTableHistoryService;
+import com.mapoker.application.game.GameService;
+import com.mapoker.application.table.TableService;
+import com.mapoker.application.ports.UserRepository;
+import com.mapoker.application.history.UserTableHistoryService;
 import com.mapoker.domain.game.GameStatus;
 import com.mapoker.domain.game.OddChipRule;
 import com.mapoker.domain.rules.ActionType;

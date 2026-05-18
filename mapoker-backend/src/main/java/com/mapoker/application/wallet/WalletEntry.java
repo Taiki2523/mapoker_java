@@ -1,4 +1,4 @@
-package com.mapoker.application;
+package com.mapoker.application.wallet;
 
 import java.time.Instant;
 

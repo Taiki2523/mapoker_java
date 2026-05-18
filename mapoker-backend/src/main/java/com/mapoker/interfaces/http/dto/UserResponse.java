@@ -1,7 +1,7 @@
 package com.mapoker.interfaces.http.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.mapoker.application.User;
+import com.mapoker.application.auth.User;
 
 /**
  * ユーザー表示レスポンスです。

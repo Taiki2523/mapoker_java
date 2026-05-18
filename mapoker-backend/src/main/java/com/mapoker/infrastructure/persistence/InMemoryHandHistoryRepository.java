@@ -1,7 +1,7 @@
 package com.mapoker.infrastructure.persistence;
 
-import com.mapoker.application.HandHistoryEntry;
-import com.mapoker.application.HandHistoryRepository;
+import com.mapoker.application.history.HandHistoryEntry;
+import com.mapoker.application.ports.HandHistoryRepository;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 

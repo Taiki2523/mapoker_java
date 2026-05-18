@@ -1,8 +1,8 @@
 package com.mapoker.interfaces.http;
 
-import com.mapoker.application.GameService;
-import com.mapoker.application.TableService;
-import com.mapoker.application.UserService;
+import com.mapoker.application.game.GameService;
+import com.mapoker.application.table.TableService;
+import com.mapoker.application.auth.UserService;
 import com.mapoker.domain.game.GameState;
 import com.mapoker.domain.game.OddChipRule;
 import com.mapoker.infrastructure.config.GameProperties;

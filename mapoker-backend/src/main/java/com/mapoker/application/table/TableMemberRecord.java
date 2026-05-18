@@ -1,4 +1,4 @@
-package com.mapoker.application;
+package com.mapoker.application.table;
 
 /**
  * テーブル参加者の表示用情報です。
