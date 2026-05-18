@@ -4,7 +4,9 @@ import com.mapoker.application.game.ActionRecord;
 import com.mapoker.application.game.GameService;
 import com.mapoker.application.history.HandHistoryService;
 import com.mapoker.application.history.UserTableHistoryService;
-import com.mapoker.application.table.TableService;
+import com.mapoker.application.table.TableLifecycleService;
+import com.mapoker.application.table.TableMembershipService;
+import com.mapoker.application.table.TableQueryService;
 import com.mapoker.domain.game.GameState;
 import com.mapoker.domain.game.GameStatus;
 import com.mapoker.domain.game.OddChipRule;
@@ -39,7 +41,8 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class GameServiceTest {
 
-    @Mock ObjectProvider<TableService> tableServiceProvider;
+    @Mock ObjectProvider<TableMembershipService> tableMembershipProvider;
+    @Mock ObjectProvider<TableQueryService> tableQueryProvider;
     @Mock ObjectProvider<GameEventPublisher> publisherProvider;
 
     private GameService gameService;
@@ -52,7 +55,8 @@ class GameServiceTest {
 
     @BeforeEach
     void setUp() {
-        when(tableServiceProvider.getIfAvailable()).thenReturn(null);
+        when(tableMembershipProvider.getIfAvailable()).thenReturn(null);
+        when(tableQueryProvider.getIfAvailable()).thenReturn(null);
         when(publisherProvider.getIfAvailable()).thenReturn(null);
 
         gameRepo = new InMemoryGameRepository();
@@ -61,7 +65,7 @@ class GameServiceTest {
         var userTableHistoryService = new UserTableHistoryService(userTableHistoryRepo);
         var handHistoryService = new HandHistoryService(historyRepo, userTableHistoryService);
 
-        gameService = new GameService(gameRepo, handHistoryService, tableServiceProvider, publisherProvider);
+        gameService = new GameService(gameRepo, handHistoryService, tableMembershipProvider, tableQueryProvider, publisherProvider);
     }
 
     // -----------------------------------------------------------------------

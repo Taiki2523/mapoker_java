@@ -1,7 +1,9 @@
 package com.mapoker.interfaces.http;
 
 import com.mapoker.application.table.TableMemberRecord;
-import com.mapoker.application.table.TableService;
+import com.mapoker.application.table.TableLifecycleService;
+import com.mapoker.application.table.TableMembershipService;
+import com.mapoker.application.table.TableQueryService;
 import com.mapoker.application.auth.User;
 import com.mapoker.application.auth.UserService;
 import com.mapoker.interfaces.http.dto.TableMembershipRequest;
@@ -26,7 +28,8 @@ import static org.mockito.Mockito.when;
  */
 class RoomControllerTest {
 
-    private TableService tableService;
+    private TableQueryService queryService;
+    private TableMembershipService membershipService;
     private UserService userService;
     private RoomController controller;
 
@@ -37,14 +40,15 @@ class RoomControllerTest {
 
     @BeforeEach
     void setUp() {
-        tableService = mock(TableService.class);
+        queryService = mock(TableQueryService.class);
+        membershipService = mock(TableMembershipService.class);
         userService = mock(UserService.class);
-        controller = new RoomController(tableService, userService);
+        controller = new RoomController(queryService, membershipService, userService);
     }
 
     @Test
     void getMembersReturnsMappedList() {
-        when(tableService.getMembers(ROOM_ID)).thenReturn(List.of(
+        when(queryService.getMembers(ROOM_ID)).thenReturn(List.of(
                 new TableMemberRecord("alice", 0, "2024-01-01T00:00:00Z"),
                 new TableMemberRecord("bob", 1, "2024-01-01T00:01:00Z")
         ));
@@ -58,7 +62,7 @@ class RoomControllerTest {
 
     @Test
     void getMembersReturnsEmptyList() {
-        when(tableService.getMembers(ROOM_ID)).thenReturn(List.of());
+        when(queryService.getMembers(ROOM_ID)).thenReturn(List.of());
         assertThat(controller.getMembers(ROOM_ID).members()).isEmpty();
     }
 
@@ -66,75 +70,75 @@ class RoomControllerTest {
     void joinIgnoresBodyNameWhenPrincipalPresent() {
         var principal = principalOf(ALICE_PUBLIC_ID);
         when(userService.getByPublicId(ALICE_PUBLIC_ID)).thenReturn(ALICE);
-        var joinResult = new TableService.JoinResult(0, List.of(
+        var joinResult = new TableMembershipService.JoinResult(0, List.of(
                 new TableMemberRecord("alice", 0, "2024-01-01T00:00:00Z")));
-        when(tableService.join(eq(ROOM_ID), eq("alice"), eq(0), any(), any(), any())).thenReturn(joinResult);
+        when(membershipService.join(eq(ROOM_ID), eq("alice"), eq(0), any(), any(), any())).thenReturn(joinResult);
 
         // body に別名を入れても principal のユーザー名が使われる（席乗っ取り防止）
         controller.join(ROOM_ID, new TableMembershipRequest("bodyName", null), principal);
 
-        verify(tableService).join(eq(ROOM_ID), eq("alice"), eq(0), any(), any(), any());
+        verify(membershipService).join(eq(ROOM_ID), eq("alice"), eq(0), any(), any(), any());
     }
 
     @Test
     void joinLooksUpUsernameFromPrincipalWhenBodyHasNoName() {
         var principal = principalOf(ALICE_PUBLIC_ID);
         when(userService.getByPublicId(ALICE_PUBLIC_ID)).thenReturn(ALICE);
-        var joinResult = new TableService.JoinResult(0, List.of(
+        var joinResult = new TableMembershipService.JoinResult(0, List.of(
                 new TableMemberRecord("alice", 0, "2024-01-01T00:00:00Z")));
-        when(tableService.join(eq(ROOM_ID), eq("alice"), eq(0), any(), any(), any())).thenReturn(joinResult);
+        when(membershipService.join(eq(ROOM_ID), eq("alice"), eq(0), any(), any(), any())).thenReturn(joinResult);
 
         controller.join(ROOM_ID, new TableMembershipRequest(null, null), principal);
 
-        verify(tableService).join(eq(ROOM_ID), eq("alice"), eq(0), any(), any(), any());
+        verify(membershipService).join(eq(ROOM_ID), eq("alice"), eq(0), any(), any(), any());
     }
 
     @Test
     void joinUsesBodyNameWhenNoPrincipal() {
-        var joinResult = new TableService.JoinResult(1, List.of(
+        var joinResult = new TableMembershipService.JoinResult(1, List.of(
                 new TableMemberRecord("bob", 1, "2024-01-01T00:00:00Z")));
-        when(tableService.join(eq(ROOM_ID), eq("bob"), eq(0), any(), any(), any())).thenReturn(joinResult);
+        when(membershipService.join(eq(ROOM_ID), eq("bob"), eq(0), any(), any(), any())).thenReturn(joinResult);
 
         controller.join(ROOM_ID, new TableMembershipRequest("bob", null), null);
 
-        verify(tableService).join(eq(ROOM_ID), eq("bob"), eq(0), any(), any(), any());
+        verify(membershipService).join(eq(ROOM_ID), eq("bob"), eq(0), any(), any(), any());
     }
 
     @Test
     void joinUsesNullNameWhenNoPrincipalAndNoBody() {
-        var joinResult = new TableService.JoinResult(0, List.of());
-        when(tableService.join(eq(ROOM_ID), eq(null), eq(0), any(), any(), any())).thenReturn(joinResult);
+        var joinResult = new TableMembershipService.JoinResult(0, List.of());
+        when(membershipService.join(eq(ROOM_ID), eq(null), eq(0), any(), any(), any())).thenReturn(joinResult);
 
         controller.join(ROOM_ID, null, null);
 
-        verify(tableService).join(eq(ROOM_ID), eq(null), eq(0), any(), any(), any());
+        verify(membershipService).join(eq(ROOM_ID), eq(null), eq(0), any(), any(), any());
     }
 
     @Test
     void joinUsesBuyInFromBodyWhenProvided() {
-        var joinResult = new TableService.JoinResult(0, List.of());
-        when(tableService.join(eq(ROOM_ID), eq("charlie"), eq(500), any(), any(), any())).thenReturn(joinResult);
+        var joinResult = new TableMembershipService.JoinResult(0, List.of());
+        when(membershipService.join(eq(ROOM_ID), eq("charlie"), eq(500), any(), any(), any())).thenReturn(joinResult);
 
         controller.join(ROOM_ID, new TableMembershipRequest("charlie", 500), null);
 
-        verify(tableService).join(eq(ROOM_ID), eq("charlie"), eq(500), any(), any(), any());
+        verify(membershipService).join(eq(ROOM_ID), eq("charlie"), eq(500), any(), any(), any());
     }
 
     @Test
     void joinDefaultsBuyInToZeroWhenBodyBuyInIsNull() {
-        var joinResult = new TableService.JoinResult(0, List.of());
-        when(tableService.join(eq(ROOM_ID), eq("dave"), eq(0), any(), any(), any())).thenReturn(joinResult);
+        var joinResult = new TableMembershipService.JoinResult(0, List.of());
+        when(membershipService.join(eq(ROOM_ID), eq("dave"), eq(0), any(), any(), any())).thenReturn(joinResult);
 
         controller.join(ROOM_ID, new TableMembershipRequest("dave", null), null);
 
-        verify(tableService).join(eq(ROOM_ID), eq("dave"), eq(0), any(), any(), any());
+        verify(membershipService).join(eq(ROOM_ID), eq("dave"), eq(0), any(), any(), any());
     }
 
     @Test
     void joinReturnsMappedMembers() {
-        var joinResult = new TableService.JoinResult(0, List.of(
+        var joinResult = new TableMembershipService.JoinResult(0, List.of(
                 new TableMemberRecord("alice", 0, "2024-01-01T00:00:00Z")));
-        when(tableService.join(eq(ROOM_ID), eq("alice"), eq(0), any(), any(), any())).thenReturn(joinResult);
+        when(membershipService.join(eq(ROOM_ID), eq("alice"), eq(0), any(), any(), any())).thenReturn(joinResult);
 
         var response = controller.join(ROOM_ID, new TableMembershipRequest("alice", null), null);
 
@@ -147,46 +151,46 @@ class RoomControllerTest {
     void leaveIgnoresBodyNameWhenPrincipalPresent() {
         var principal = principalOf(ALICE_PUBLIC_ID);
         when(userService.getByPublicId(ALICE_PUBLIC_ID)).thenReturn(ALICE);
-        when(tableService.leave(ROOM_ID, "alice", null, ALICE_PUBLIC_ID)).thenReturn(List.of());
+        when(membershipService.leave(ROOM_ID, "alice", null, ALICE_PUBLIC_ID)).thenReturn(List.of());
 
         // body に別名を入れても principal のユーザー名が使われる
         controller.leave(ROOM_ID, new TableMembershipRequest("bodyName", null), principal);
 
-        verify(tableService).leave(ROOM_ID, "alice", null, ALICE_PUBLIC_ID);
+        verify(membershipService).leave(ROOM_ID, "alice", null, ALICE_PUBLIC_ID);
     }
 
     @Test
     void leaveLooksUpUsernameFromPrincipalWhenBodyHasNoName() {
         var principal = principalOf(ALICE_PUBLIC_ID);
         when(userService.getByPublicId(ALICE_PUBLIC_ID)).thenReturn(ALICE);
-        when(tableService.leave(ROOM_ID, "alice", null, ALICE_PUBLIC_ID)).thenReturn(List.of());
+        when(membershipService.leave(ROOM_ID, "alice", null, ALICE_PUBLIC_ID)).thenReturn(List.of());
 
         controller.leave(ROOM_ID, new TableMembershipRequest(null, null), principal);
 
-        verify(tableService).leave(ROOM_ID, "alice", null, ALICE_PUBLIC_ID);
+        verify(membershipService).leave(ROOM_ID, "alice", null, ALICE_PUBLIC_ID);
     }
 
     @Test
     void leaveUsesBodyNameWhenNoPrincipal() {
-        when(tableService.leave(ROOM_ID, "bob", null, null)).thenReturn(List.of());
+        when(membershipService.leave(ROOM_ID, "bob", null, null)).thenReturn(List.of());
 
         controller.leave(ROOM_ID, new TableMembershipRequest("bob", null), null);
 
-        verify(tableService).leave(ROOM_ID, "bob", null, null);
+        verify(membershipService).leave(ROOM_ID, "bob", null, null);
     }
 
     @Test
     void leaveUsesNullNameWhenNoPrincipalAndNoBody() {
-        when(tableService.leave(ROOM_ID, null, null, null)).thenReturn(List.of());
+        when(membershipService.leave(ROOM_ID, null, null, null)).thenReturn(List.of());
 
         controller.leave(ROOM_ID, null, null);
 
-        verify(tableService).leave(ROOM_ID, null, null, null);
+        verify(membershipService).leave(ROOM_ID, null, null, null);
     }
 
     @Test
     void leaveReturnsMappedMembers() {
-        when(tableService.leave(ROOM_ID, "alice", null, null)).thenReturn(List.of(
+        when(membershipService.leave(ROOM_ID, "alice", null, null)).thenReturn(List.of(
                 new TableMemberRecord("bob", 1, "2024-01-01T00:00:00Z")));
 
         var response = controller.leave(ROOM_ID, new TableMembershipRequest("alice", null), null);

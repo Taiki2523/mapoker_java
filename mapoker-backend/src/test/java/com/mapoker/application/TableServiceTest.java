@@ -3,8 +3,12 @@ package com.mapoker.application;
 import com.mapoker.application.game.GameService;
 import com.mapoker.application.history.HandHistoryService;
 import com.mapoker.application.history.UserTableHistoryService;
+import com.mapoker.application.table.TableEventPublisher;
+import com.mapoker.application.table.TableLifecycleService;
 import com.mapoker.application.table.TableMemberRecord;
-import com.mapoker.application.table.TableService;
+import com.mapoker.application.table.TableMembershipService;
+import com.mapoker.application.table.TableQueryService;
+import com.mapoker.application.table.TableStore;
 import com.mapoker.application.wallet.WalletService;
 import com.mapoker.domain.game.OddChipRule;
 import com.mapoker.infrastructure.config.GameProperties;
@@ -43,9 +47,13 @@ class TableServiceTest {
 
     @Mock ObjectProvider<WalletService> walletProvider;
     @Mock ObjectProvider<GameEventPublisher> publisherProvider;
-    @Mock ObjectProvider<TableService> tableServiceProvider;
+    @Mock ObjectProvider<TableMembershipService> membershipProvider;
+    @Mock ObjectProvider<TableQueryService> queryProvider;
 
-    private TableService tableService;
+    private TableStore store;
+    private TableQueryService queryService;
+    private TableMembershipService membershipService;
+    private TableLifecycleService lifecycleService;
 
     private static final GameProperties GAME_PROPS =
             new GameProperties(OddChipRule.LOW_INDEX, "Player");
@@ -53,8 +61,8 @@ class TableServiceTest {
             new WalletProperties(10000, 1000, 24, 20, 100, List.of());
 
     /** デフォルトテーブル作成入力（2人・BB=10・public） */
-    private static TableService.CreateRingTableInput defaultInput() {
-        return new TableService.CreateRingTableInput("Test Table", 2, 10, "public", List.of("casual"));
+    private static TableLifecycleService.CreateRingTableInput defaultInput() {
+        return new TableLifecycleService.CreateRingTableInput("Test Table", 2, 10, "public", List.of("casual"));
     }
 
     @BeforeEach
@@ -62,18 +70,22 @@ class TableServiceTest {
         // ObjectProvider は常に null を返す（Wallet・Publisher 不要なテスト用）
         when(walletProvider.getIfAvailable()).thenReturn(null);
         when(publisherProvider.getIfAvailable()).thenReturn(null);
-        when(tableServiceProvider.getObject()).thenReturn(null);
+        when(membershipProvider.getIfAvailable()).thenReturn(null);
+        when(queryProvider.getIfAvailable()).thenReturn(null);
 
         var gameRepo = new InMemoryGameRepository();
         var historyRepo = new InMemoryHandHistoryRepository();
         var userTableHistoryRepo = new InMemoryUserTableHistoryRepository();
         var userTableHistoryService = new UserTableHistoryService(userTableHistoryRepo);
         var handHistoryService = new HandHistoryService(historyRepo, userTableHistoryService);
-        var gameService = new GameService(gameRepo, handHistoryService, tableServiceProvider, publisherProvider);
+        var gameService = new GameService(gameRepo, handHistoryService, membershipProvider, queryProvider, publisherProvider);
 
-        tableService = new TableService(
-                gameService, GAME_PROPS, WALLET_PROPS,
-                userTableHistoryService, walletProvider, publisherProvider);
+        store = new TableStore();
+        var eventPublisher = new TableEventPublisher(publisherProvider, gameService);
+        queryService = new TableQueryService(store, gameService);
+        membershipService = new TableMembershipService(store, queryService, eventPublisher, gameService,
+                GAME_PROPS, walletProvider, userTableHistoryService);
+        lifecycleService = new TableLifecycleService(store, queryService, gameService, GAME_PROPS, WALLET_PROPS);
     }
 
     // -----------------------------------------------------------------------
@@ -82,7 +94,7 @@ class TableServiceTest {
 
     @Test
     void createTableReturnsTableWithCorrectProperties() {
-        var result = tableService.createRingTable(defaultInput());
+        var result = lifecycleService.createRingTable(defaultInput());
         assertThat(result.table().name()).isEqualTo("Test Table");
         assertThat(result.table().bigBlind()).isEqualTo(10);
         assertThat(result.table().maxPlayers()).isEqualTo(2);
@@ -93,40 +105,40 @@ class TableServiceTest {
 
     @Test
     void createTableAutoGeneratesNameWhenBlank() {
-        var input = new TableService.CreateRingTableInput(null, 2, 10, "public", null);
-        var result = tableService.createRingTable(input);
+        var input = new TableLifecycleService.CreateRingTableInput(null, 2, 10, "public", null);
+        var result = lifecycleService.createRingTable(input);
         assertThat(result.table().name()).startsWith("Cash Orbit");
     }
 
     @Test
     void createTableNormalizesPrivateVisibility() {
-        var input = new TableService.CreateRingTableInput("T", 2, 10, "private", null);
-        assertThat(tableService.createRingTable(input).table().visibility()).isEqualTo("private");
+        var input = new TableLifecycleService.CreateRingTableInput("T", 2, 10, "private", null);
+        assertThat(lifecycleService.createRingTable(input).table().visibility()).isEqualTo("private");
     }
 
     @Test
     void createTableDefaultsToPublicForUnknownVisibility() {
-        var input = new TableService.CreateRingTableInput("T", 2, 10, null, null);
-        assertThat(tableService.createRingTable(input).table().visibility()).isEqualTo("public");
+        var input = new TableLifecycleService.CreateRingTableInput("T", 2, 10, null, null);
+        assertThat(lifecycleService.createRingTable(input).table().visibility()).isEqualTo("public");
     }
 
     @Test
     void createTableDefaultsFlagsToCasualWhenNull() {
-        var input = new TableService.CreateRingTableInput("T", 2, 10, "public", null);
-        assertThat(tableService.createRingTable(input).table().flags()).containsExactly("casual");
+        var input = new TableLifecycleService.CreateRingTableInput("T", 2, 10, "public", null);
+        assertThat(lifecycleService.createRingTable(input).table().flags()).containsExactly("casual");
     }
 
     @Test
     void createTableNormalizesFlags() {
-        var input = new TableService.CreateRingTableInput("T", 2, 10, "public", List.of("Newbie", "CASUAL", "casual"));
-        var flags = tableService.createRingTable(input).table().flags();
+        var input = new TableLifecycleService.CreateRingTableInput("T", 2, 10, "public", List.of("Newbie", "CASUAL", "casual"));
+        var flags = lifecycleService.createRingTable(input).table().flags();
         // 大文字→小文字、重複除去
         assertThat(flags).containsExactlyInAnyOrder("newbie", "casual");
     }
 
     @Test
     void createTableMinBuyInIsBigBlindTimesMultiplier() {
-        var result = tableService.createRingTable(defaultInput());
+        var result = lifecycleService.createRingTable(defaultInput());
         // minBuyinBbMultiplier=20, BB=10 → 200
         assertThat(result.table().minBuyIn()).isEqualTo(200);
     }
@@ -137,24 +149,24 @@ class TableServiceTest {
 
     @Test
     void createTableThrowsForPlayerCountTooSmall() {
-        var input = new TableService.CreateRingTableInput("T", 1, 10, "public", null);
-        assertThatThrownBy(() -> tableService.createRingTable(input))
+        var input = new TableLifecycleService.CreateRingTableInput("T", 1, 10, "public", null);
+        assertThatThrownBy(() -> lifecycleService.createRingTable(input))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("player count");
     }
 
     @Test
     void createTableThrowsForPlayerCountTooLarge() {
-        var input = new TableService.CreateRingTableInput("T", 10, 10, "public", null);
-        assertThatThrownBy(() -> tableService.createRingTable(input))
+        var input = new TableLifecycleService.CreateRingTableInput("T", 10, 10, "public", null);
+        assertThatThrownBy(() -> lifecycleService.createRingTable(input))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("player count");
     }
 
     @Test
     void createTableThrowsForZeroBigBlind() {
-        var input = new TableService.CreateRingTableInput("T", 2, 0, "public", null);
-        assertThatThrownBy(() -> tableService.createRingTable(input))
+        var input = new TableLifecycleService.CreateRingTableInput("T", 2, 0, "public", null);
+        assertThatThrownBy(() -> lifecycleService.createRingTable(input))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("big blind");
     }
@@ -165,8 +177,8 @@ class TableServiceTest {
 
     @Test
     void joinAssignsSeatToNewMember() {
-        var table = tableService.createRingTable(defaultInput()).table();
-        var result = tableService.join(table.id(), "alice", 0);
+        var table = lifecycleService.createRingTable(defaultInput()).table();
+        var result = membershipService.join(table.id(), "alice", 0);
         assertThat(result.assignedSeatIndex()).isBetween(0, 1);
         assertThat(result.members()).hasSize(1);
         assertThat(result.members().get(0).name()).isEqualTo("alice");
@@ -174,32 +186,32 @@ class TableServiceTest {
 
     @Test
     void joinTwoMembersFillsSeats() {
-        var table = tableService.createRingTable(defaultInput()).table();
-        tableService.join(table.id(), "alice", 0);
-        var result = tableService.join(table.id(), "bob", 0);
+        var table = lifecycleService.createRingTable(defaultInput()).table();
+        membershipService.join(table.id(), "alice", 0);
+        var result = membershipService.join(table.id(), "bob", 0);
         assertThat(result.members()).hasSize(2);
     }
 
     @Test
     void joinWithSameNameReturnsExistingSeat() {
-        var table = tableService.createRingTable(defaultInput()).table();
-        var first = tableService.join(table.id(), "alice", 0);
-        var second = tableService.join(table.id(), "alice", 0);
+        var table = lifecycleService.createRingTable(defaultInput()).table();
+        var first = membershipService.join(table.id(), "alice", 0);
+        var second = membershipService.join(table.id(), "alice", 0);
         assertThat(second.assignedSeatIndex()).isEqualTo(first.assignedSeatIndex());
         assertThat(second.members()).hasSize(1);
     }
 
     @Test
     void joinWithBlankNameUsesDefaultPlayerName() {
-        var table = tableService.createRingTable(defaultInput()).table();
-        var result = tableService.join(table.id(), "  ", 0);
+        var table = lifecycleService.createRingTable(defaultInput()).table();
+        var result = membershipService.join(table.id(), "  ", 0);
         assertThat(result.members().get(0).name()).isEqualTo("Player");
     }
 
     @Test
     void joinWithNullNameUsesDefaultPlayerName() {
-        var table = tableService.createRingTable(defaultInput()).table();
-        var result = tableService.join(table.id(), null, 0);
+        var table = lifecycleService.createRingTable(defaultInput()).table();
+        var result = membershipService.join(table.id(), null, 0);
         assertThat(result.members().get(0).name()).isEqualTo("Player");
     }
 
@@ -209,10 +221,10 @@ class TableServiceTest {
 
     @Test
     void joinThrowsWhenTableFull() {
-        var table = tableService.createRingTable(defaultInput()).table(); // maxPlayers=2
-        tableService.join(table.id(), "alice", 0);
-        tableService.join(table.id(), "bob", 0);
-        assertThatThrownBy(() -> tableService.join(table.id(), "charlie", 0))
+        var table = lifecycleService.createRingTable(defaultInput()).table(); // maxPlayers=2
+        membershipService.join(table.id(), "alice", 0);
+        membershipService.join(table.id(), "bob", 0);
+        assertThatThrownBy(() -> membershipService.join(table.id(), "charlie", 0))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("full");
     }
@@ -225,18 +237,18 @@ class TableServiceTest {
     void joinDuringActiveHandSetsSittingOut() {
         // 2人テーブルを作って先に2人入れてハンド開始、3人目を途中参加させる試みは
         // maxPlayers=2 で満席になるため、3人テーブルで確認する
-        var input = new TableService.CreateRingTableInput("T", 3, 10, "public", null);
-        var table = tableService.createRingTable(input).table();
-        tableService.join(table.id(), "alice", 1000);
-        tableService.join(table.id(), "bob", 1000);
+        var input = new TableLifecycleService.CreateRingTableInput("T", 3, 10, "public", null);
+        var table = lifecycleService.createRingTable(input).table();
+        membershipService.join(table.id(), "alice", 1000);
+        membershipService.join(table.id(), "bob", 1000);
         // ハンド開始（pot>0 → active）
-        tableService.startHand(table.id(), 10);
+        lifecycleService.startHand(table.id(), 10);
 
         // ハンド中に charlie が参加 → sittingOut=true でゲームに反映されているはず
-        var result = tableService.join(table.id(), "charlie", 0);
+        var result = membershipService.join(table.id(), "charlie", 0);
         assertThat(result.members()).hasSize(3);
         // sittingOut の確認はゲーム状態を直接見る
-        var game = tableService.getTableGame(table.id());
+        var game = queryService.getTableGame(table.id());
         int charlieSeat = result.assignedSeatIndex();
         assertThat(game.getPlayers().get(charlieSeat).isSittingOut()).isTrue();
     }
@@ -247,17 +259,17 @@ class TableServiceTest {
 
     @Test
     void leaveRemovesMemberWhenHandNotActive() {
-        var table = tableService.createRingTable(defaultInput()).table();
-        tableService.join(table.id(), "alice", 0);
-        var result = tableService.leave(table.id(), "alice", null);
+        var table = lifecycleService.createRingTable(defaultInput()).table();
+        membershipService.join(table.id(), "alice", 0);
+        var result = membershipService.leave(table.id(), "alice", null);
         assertThat(result).isEmpty();
     }
 
     @Test
     void leaveUnknownNameIsNoOp() {
-        var table = tableService.createRingTable(defaultInput()).table();
-        tableService.join(table.id(), "alice", 0);
-        var result = tableService.leave(table.id(), "nobody", null);
+        var table = lifecycleService.createRingTable(defaultInput()).table();
+        membershipService.join(table.id(), "alice", 0);
+        var result = membershipService.leave(table.id(), "nobody", null);
         assertThat(result).hasSize(1);
     }
 
@@ -267,12 +279,12 @@ class TableServiceTest {
 
     @Test
     void leaveDuringActiveHandSetsPendingLeave() {
-        var table = tableService.createRingTable(defaultInput()).table();
-        tableService.join(table.id(), "alice", 1000);
-        tableService.join(table.id(), "bob", 1000);
-        tableService.startHand(table.id(), 10); // pot=15 → active
+        var table = lifecycleService.createRingTable(defaultInput()).table();
+        membershipService.join(table.id(), "alice", 1000);
+        membershipService.join(table.id(), "bob", 1000);
+        lifecycleService.startHand(table.id(), 10); // pot=15 → active
 
-        var members = tableService.leave(table.id(), "alice", null);
+        var members = membershipService.leave(table.id(), "alice", null);
         var alice = members.stream().filter(m -> m.name().equals("alice")).findFirst().orElseThrow();
         assertThat(alice.pendingLeave()).isTrue();
     }
@@ -283,43 +295,43 @@ class TableServiceTest {
 
     @Test
     void processPendingLeavesRemovesPendingMembers() {
-        var table = tableService.createRingTable(defaultInput()).table();
-        tableService.join(table.id(), "alice", 1000);
-        tableService.join(table.id(), "bob", 1000);
-        tableService.startHand(table.id(), 10);  // hand active
+        var table = lifecycleService.createRingTable(defaultInput()).table();
+        membershipService.join(table.id(), "alice", 1000);
+        membershipService.join(table.id(), "bob", 1000);
+        lifecycleService.startHand(table.id(), 10);  // hand active
 
-        tableService.leave(table.id(), "alice", null); // pendingLeave=true
+        membershipService.leave(table.id(), "alice", null); // pendingLeave=true
 
         // ハンド終了を模倣してから processPendingLeaves を呼ぶ
-        tableService.processPendingLeaves(table.id());
+        membershipService.processPendingLeaves(table.id());
 
-        var members = tableService.getMembers(table.id());
+        var members = queryService.getMembers(table.id());
         assertThat(members.stream().noneMatch(m -> m.name().equals("alice"))).isTrue();
         assertThat(members.stream().anyMatch(m -> m.name().equals("bob"))).isTrue();
     }
 
     @Test
     void processPendingLeavesKeepsNonPendingMembers() {
-        var table = tableService.createRingTable(defaultInput()).table();
-        tableService.join(table.id(), "alice", 1000);
-        tableService.join(table.id(), "bob", 1000);
-        tableService.startHand(table.id(), 10);
+        var table = lifecycleService.createRingTable(defaultInput()).table();
+        membershipService.join(table.id(), "alice", 1000);
+        membershipService.join(table.id(), "bob", 1000);
+        lifecycleService.startHand(table.id(), 10);
 
         // bob だけ pendingLeave
-        tableService.leave(table.id(), "bob", null);
-        tableService.processPendingLeaves(table.id());
+        membershipService.leave(table.id(), "bob", null);
+        membershipService.processPendingLeaves(table.id());
 
-        var members = tableService.getMembers(table.id());
+        var members = queryService.getMembers(table.id());
         assertThat(members.stream().anyMatch(m -> m.name().equals("alice"))).isTrue();
         assertThat(members.stream().noneMatch(m -> m.name().equals("bob"))).isTrue();
     }
 
     @Test
     void processPendingLeavesOnEmptyTableIsNoOp() {
-        var table = tableService.createRingTable(defaultInput()).table();
+        var table = lifecycleService.createRingTable(defaultInput()).table();
         // 例外なく完了すればよい
-        tableService.processPendingLeaves(table.id());
-        assertThat(tableService.getMembers(table.id())).isEmpty();
+        membershipService.processPendingLeaves(table.id());
+        assertThat(queryService.getMembers(table.id())).isEmpty();
     }
 
     // -----------------------------------------------------------------------
@@ -328,22 +340,22 @@ class TableServiceTest {
 
     @Test
     void findSeatIndexReturnsCorrectIndex() {
-        var table = tableService.createRingTable(defaultInput()).table();
-        var joinResult = tableService.join(table.id(), "alice", 0);
-        Integer found = tableService.findSeatIndex(table.id(), "alice");
+        var table = lifecycleService.createRingTable(defaultInput()).table();
+        var joinResult = membershipService.join(table.id(), "alice", 0);
+        Integer found = queryService.findSeatIndex(table.id(), "alice");
         assertThat(found).isEqualTo(joinResult.assignedSeatIndex());
     }
 
     @Test
     void findSeatIndexReturnsNullForUnknownName() {
-        var table = tableService.createRingTable(defaultInput()).table();
-        assertThat(tableService.findSeatIndex(table.id(), "nobody")).isNull();
+        var table = lifecycleService.createRingTable(defaultInput()).table();
+        assertThat(queryService.findSeatIndex(table.id(), "nobody")).isNull();
     }
 
     @Test
     void findSeatIndexReturnsNullForBlankName() {
-        var table = tableService.createRingTable(defaultInput()).table();
-        assertThat(tableService.findSeatIndex(table.id(), "  ")).isNull();
+        var table = lifecycleService.createRingTable(defaultInput()).table();
+        assertThat(queryService.findSeatIndex(table.id(), "  ")).isNull();
     }
 
     // -----------------------------------------------------------------------
@@ -352,14 +364,14 @@ class TableServiceTest {
 
     @Test
     void getMembersReturnsEmptyListInitially() {
-        var table = tableService.createRingTable(defaultInput()).table();
-        assertThat(tableService.getMembers(table.id())).isEmpty();
+        var table = lifecycleService.createRingTable(defaultInput()).table();
+        assertThat(queryService.getMembers(table.id())).isEmpty();
     }
 
     @Test
     void getTableReturnsCreatedTable() {
-        var created = tableService.createRingTable(defaultInput()).table();
-        var fetched = tableService.getTable(created.id());
+        var created = lifecycleService.createRingTable(defaultInput()).table();
+        var fetched = queryService.getTable(created.id());
         assertThat(fetched.id()).isEqualTo(created.id());
         assertThat(fetched.name()).isEqualTo(created.name());
     }

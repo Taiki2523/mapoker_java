@@ -2,7 +2,9 @@ package com.mapoker.interfaces.http;
 
 import com.mapoker.application.game.ActionRecord;
 import com.mapoker.application.game.GameService;
-import com.mapoker.application.table.TableService;
+import com.mapoker.application.table.TableLifecycleService;
+import com.mapoker.application.table.TableMembershipService;
+import com.mapoker.application.table.TableQueryService;
 import com.mapoker.application.auth.UserService;
 import com.mapoker.domain.game.GameState;
 import com.mapoker.domain.game.GameStatus;
@@ -38,7 +40,8 @@ import static org.mockito.Mockito.when;
 class GameControllerTest {
 
     private GameService gameService;
-    private TableService tableService;
+    private TableQueryService tableQueryService;
+    private TableLifecycleService tableLifecycleService;
     private UserService userService;
     private GameController controller;
 
@@ -48,9 +51,10 @@ class GameControllerTest {
     @BeforeEach
     void setUp() {
         gameService = mock(GameService.class);
-        tableService = mock(TableService.class);
+        tableQueryService = mock(TableQueryService.class);
+        tableLifecycleService = mock(TableLifecycleService.class);
         userService = mock(UserService.class);
-        controller = new GameController(gameService, GAME_PROPS, tableService, userService);
+        controller = new GameController(gameService, GAME_PROPS, tableQueryService, tableLifecycleService, userService);
     }
 
     // -----------------------------------------------------------------------
@@ -162,18 +166,18 @@ class GameControllerTest {
     @Test
     void startHandDelegatesToTableService() {
         GameState started = startedGame();
-        when(tableService.startHand("g1", 10, false)).thenReturn(started);
+        when(tableLifecycleService.startHand("g1", 10, false)).thenReturn(started);
 
         var response = controller.startHand("g1", new StartHandRequest(10));
 
         assertThat(response.id()).isEqualTo(started.getId());
-        verify(tableService).startHand("g1", 10, false);
+        verify(tableLifecycleService).startHand("g1", 10, false);
     }
 
     @Test
     void startHandResponseHidesHoleCards() {
         GameState started = startedGame();
-        when(tableService.startHand("g1", 10, false)).thenReturn(started);
+        when(tableLifecycleService.startHand("g1", 10, false)).thenReturn(started);
 
         var response = controller.startHand("g1", new StartHandRequest(10));
 
@@ -213,7 +217,7 @@ class GameControllerTest {
         var appAlice = new com.mapoker.application.auth.User(
                 1L, "pub-alice", "alice", "0000", null, java.time.LocalDateTime.now());
         when(userService.getByPublicId("pub-alice")).thenReturn(appAlice);
-        when(tableService.findSeatIndex("g1", "alice")).thenReturn(1);
+        when(tableQueryService.findSeatIndex("g1", "alice")).thenReturn(1);
 
         var req = new ApplyActionRequest(1, new ApplyActionRequest.ActionDto(ActionType.CALL, 0));
         var response = controller.applyAction("g1", req, null,

@@ -1,7 +1,8 @@
 package com.mapoker.interfaces.http;
 
 import com.mapoker.application.table.TableMemberRecord;
-import com.mapoker.application.table.TableService;
+import com.mapoker.application.table.TableMembershipService;
+import com.mapoker.application.table.TableQueryService;
 import com.mapoker.application.auth.User;
 import com.mapoker.application.auth.UserService;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -20,15 +21,15 @@ import java.util.List;
 @RequestMapping("/v1/rooms")
 public class RoomController {
 
-    private final TableService tableService;
+    private final TableQueryService tableQueryService;
+    private final TableMembershipService tableMembershipService;
     private final UserService userService;
 
-    /**
-     * @param tableService テーブル管理サービス
-     * @param userService  ユーザー管理サービス
-     */
-    public RoomController(TableService tableService, UserService userService) {
-        this.tableService = tableService;
+    public RoomController(TableQueryService tableQueryService,
+                          TableMembershipService tableMembershipService,
+                          UserService userService) {
+        this.tableQueryService = tableQueryService;
+        this.tableMembershipService = tableMembershipService;
         this.userService = userService;
     }
 
@@ -59,7 +60,7 @@ public class RoomController {
      */
     @GetMapping("/{id}/members")
     public MembersResponse getMembers(@PathVariable String id) {
-        return new MembersResponse(mapMembers(tableService.getMembers(id)));
+        return new MembersResponse(mapMembers(tableQueryService.getMembers(id)));
     }
 
     /**
@@ -77,7 +78,7 @@ public class RoomController {
         String name = resolveName(principal, body);
         int buyIn = body != null && body.buyIn() != null ? body.buyIn() : 0;
         String[] userInfo = resolveUserInfo(principal, name);
-        return new MembersResponse(mapMembers(tableService.join(id, name, buyIn, userInfo[0], userInfo[1], userInfo[2]).members()));
+        return new MembersResponse(mapMembers(tableMembershipService.join(id, name, buyIn, userInfo[0], userInfo[1], userInfo[2]).members()));
     }
 
     /**
@@ -94,7 +95,7 @@ public class RoomController {
                                  @AuthenticationPrincipal UserDetails principal) {
         String name = resolveName(principal, body);
         String publicId = principal != null ? principal.getUsername() : null;
-        return new MembersResponse(mapMembers(tableService.leave(id, name, null, publicId)));
+        return new MembersResponse(mapMembers(tableMembershipService.leave(id, name, null, publicId)));
     }
 
     /**

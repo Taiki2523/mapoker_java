@@ -1,9 +1,11 @@
 package com.mapoker.interfaces.http;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.mapoker.application.table.TableLifecycleService;
 import com.mapoker.application.table.TableMemberRecord;
+import com.mapoker.application.table.TableMembershipService;
+import com.mapoker.application.table.TableQueryService;
 import com.mapoker.application.table.TableRecord;
-import com.mapoker.application.table.TableService;
 import com.mapoker.application.auth.UserService;
 import com.mapoker.interfaces.http.dto.CreateTableRequest;
 import com.mapoker.interfaces.http.dto.GameResponse;
@@ -24,11 +26,18 @@ import java.util.List;
 @RequestMapping("/v1/tables")
 public class TableController {
 
-    private final TableService tableService;
+    private final TableQueryService tableQueryService;
+    private final TableMembershipService tableMembershipService;
+    private final TableLifecycleService tableLifecycleService;
     private final UserService userService;
 
-    public TableController(TableService tableService, UserService userService) {
-        this.tableService = tableService;
+    public TableController(TableQueryService tableQueryService,
+                           TableMembershipService tableMembershipService,
+                           TableLifecycleService tableLifecycleService,
+                           UserService userService) {
+        this.tableQueryService = tableQueryService;
+        this.tableMembershipService = tableMembershipService;
+        this.tableLifecycleService = tableLifecycleService;
         this.userService = userService;
     }
 
@@ -41,17 +50,15 @@ public class TableController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public TableResponse createTable(@Valid @RequestBody CreateTableRequest request) {
-        TableService.CreateTableResult result = tableService.createRingTable(new TableService.CreateRingTableInput(
-                request.tableName(),
-                request.playerCount(),
-                request.smallBlind(),
-                request.bigBlind(),
-                request.visibility(),
-                request.flags(),
-                request.ante(),
-                request.straddleEnabled()
-        ));
-        return TableResponse.from(result.table(), tableService.getMembers(result.table().id()), GameResponse.from(result.game(), null, false));
+        TableLifecycleService.CreateTableResult result = tableLifecycleService.createRingTable(
+                new TableLifecycleService.CreateRingTableInput(
+                        request.tableName(), request.playerCount(),
+                        request.smallBlind(), request.bigBlind(),
+                        request.visibility(), request.flags(),
+                        request.ante(), request.straddleEnabled()));
+        return TableResponse.from(result.table(),
+                tableQueryService.getMembers(result.table().id()),
+                GameResponse.from(result.game(), null, false));
     }
 
     /**
@@ -64,8 +71,8 @@ public class TableController {
     @GetMapping
     public List<TableResponse> listTables(@RequestParam(required = false) String visibility,
                                           @RequestParam(required = false) String flags) {
-        return tableService.listTables(visibility, flags).stream()
-                .map(table -> TableResponse.from(table, tableService.getMembers(table.id()), null))
+        return tableQueryService.listTables(visibility, flags).stream()
+                .map(table -> TableResponse.from(table, tableQueryService.getMembers(table.id()), null))
                 .toList();
     }
 
@@ -77,8 +84,9 @@ public class TableController {
      */
     @GetMapping("/{id}")
     public TableResponse getTable(@PathVariable String id) {
-        TableRecord table = tableService.getTable(id);
-        return TableResponse.from(table, tableService.getMembers(id), GameResponse.from(tableService.getTableGame(id), null, false));
+        TableRecord table = tableQueryService.getTable(id);
+        return TableResponse.from(table, tableQueryService.getMembers(id),
+                GameResponse.from(tableQueryService.getTableGame(id), null, false));
     }
 
     /**
@@ -89,7 +97,7 @@ public class TableController {
      */
     @GetMapping("/{id}/members")
     public MembersResponse getMembers(@PathVariable String id) {
-        return new MembersResponse(toMembers(tableService.getMembers(id)));
+        return new MembersResponse(toMembers(tableQueryService.getMembers(id)));
     }
 
     /**
@@ -107,7 +115,8 @@ public class TableController {
         String name = resolveName(principal, body);
         int buyIn = body != null && body.buyIn() != null ? body.buyIn() : 0;
         String[] userInfo = resolveUserInfo(principal, name);
-        TableService.JoinResult result = tableService.join(id, name, buyIn, userInfo[0], userInfo[1], userInfo[2]);
+        TableMembershipService.JoinResult result =
+                tableMembershipService.join(id, name, buyIn, userInfo[0], userInfo[1], userInfo[2]);
         return new JoinResponse(result.assignedSeatIndex(), toMembers(result.members()));
     }
 
@@ -125,7 +134,7 @@ public class TableController {
                                  @AuthenticationPrincipal UserDetails principal) {
         String name = resolveName(principal, body);
         String publicId = principal != null ? principal.getUsername() : null;
-        return new MembersResponse(toMembers(tableService.leave(id, name, null, publicId)));
+        return new MembersResponse(toMembers(tableMembershipService.leave(id, name, null, publicId)));
     }
 
     /** [displayName, avatarUrl] を返す。未認証時または解決失敗時は [name, null]。 */
