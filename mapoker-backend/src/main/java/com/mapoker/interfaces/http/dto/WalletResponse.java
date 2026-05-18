@@ -1,8 +1,8 @@
 package com.mapoker.interfaces.http.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.mapoker.application.WalletEntry;
-import com.mapoker.application.WalletService;
+import com.mapoker.application.wallet.WalletEntry;
+import com.mapoker.application.wallet.WalletService;
 
 import java.time.Instant;
 

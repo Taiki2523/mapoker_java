@@ -1,4 +1,5 @@
-package com.mapoker.application;
+package com.mapoker.application.auth;
+import com.mapoker.application.ports.UserRepository;
 
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;

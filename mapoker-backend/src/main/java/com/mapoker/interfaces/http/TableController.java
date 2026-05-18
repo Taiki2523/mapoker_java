@@ -1,10 +1,10 @@
 package com.mapoker.interfaces.http;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.mapoker.application.TableMemberRecord;
-import com.mapoker.application.TableRecord;
-import com.mapoker.application.TableService;
-import com.mapoker.application.UserService;
+import com.mapoker.application.table.TableMemberRecord;
+import com.mapoker.application.table.TableRecord;
+import com.mapoker.application.table.TableService;
+import com.mapoker.application.auth.UserService;
 import com.mapoker.interfaces.http.dto.CreateTableRequest;
 import com.mapoker.interfaces.http.dto.GameResponse;
 import com.mapoker.interfaces.http.dto.TableMembershipRequest;

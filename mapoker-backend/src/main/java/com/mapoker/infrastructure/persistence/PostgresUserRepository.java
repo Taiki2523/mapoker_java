@@ -1,7 +1,7 @@
 package com.mapoker.infrastructure.persistence;
 
-import com.mapoker.application.User;
-import com.mapoker.application.UserRepository;
+import com.mapoker.application.auth.User;
+import com.mapoker.application.ports.UserRepository;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;

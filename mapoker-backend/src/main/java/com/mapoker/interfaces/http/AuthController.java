@@ -1,10 +1,10 @@
 package com.mapoker.interfaces.http;
 
-import com.mapoker.application.GoogleAuthService;
-import com.mapoker.application.HandHistoryService;
-import com.mapoker.application.User;
-import com.mapoker.application.UserService;
-import com.mapoker.application.UserTableHistoryService;
+import com.mapoker.application.auth.GoogleAuthService;
+import com.mapoker.application.history.HandHistoryService;
+import com.mapoker.application.auth.User;
+import com.mapoker.application.auth.UserService;
+import com.mapoker.application.history.UserTableHistoryService;
 import com.mapoker.interfaces.http.dto.GoogleAuthRequest;
 import com.mapoker.interfaces.http.dto.HandHistoryResponse;
 import com.mapoker.interfaces.http.dto.UpdateUsernameRequest;

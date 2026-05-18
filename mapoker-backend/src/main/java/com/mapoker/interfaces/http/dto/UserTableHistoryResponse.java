@@ -2,7 +2,7 @@ package com.mapoker.interfaces.http.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.mapoker.application.UserTableHistoryEntry;
+import com.mapoker.application.history.UserTableHistoryEntry;
 
 import java.util.List;
 

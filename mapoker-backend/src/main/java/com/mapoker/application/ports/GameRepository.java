@@ -1,5 +1,6 @@
-package com.mapoker.application;
+package com.mapoker.application.ports;
 
+import com.mapoker.application.game.ActionRecord;
 import com.mapoker.domain.game.GameState;
 import java.util.List;
 import java.util.Optional;

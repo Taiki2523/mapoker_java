@@ -1,9 +1,9 @@
 package com.mapoker.interfaces.http;
 
-import com.mapoker.application.ActionRecord;
-import com.mapoker.application.GameService;
-import com.mapoker.application.TableService;
-import com.mapoker.application.UserService;
+import com.mapoker.application.game.ActionRecord;
+import com.mapoker.application.game.GameService;
+import com.mapoker.application.table.TableService;
+import com.mapoker.application.auth.UserService;
 import com.mapoker.domain.game.GameState;
 import com.mapoker.domain.game.GameStatus;
 import com.mapoker.domain.game.OddChipRule;
@@ -210,7 +210,7 @@ class GameControllerTest {
     void applyActionResolvesViewerIndexForAuthenticatedUser() {
         GameState state = startedGame();
         when(gameService.applyAction(anyString(), anyInt(), any(), anyInt())).thenReturn(state);
-        var appAlice = new com.mapoker.application.User(
+        var appAlice = new com.mapoker.application.auth.User(
                 1L, "pub-alice", "alice", "0000", null, java.time.LocalDateTime.now());
         when(userService.getByPublicId("pub-alice")).thenReturn(appAlice);
         when(tableService.findSeatIndex("g1", "alice")).thenReturn(1);

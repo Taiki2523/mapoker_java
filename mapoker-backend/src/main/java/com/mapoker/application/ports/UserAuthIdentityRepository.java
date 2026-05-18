@@ -1,4 +1,6 @@
-package com.mapoker.application;
+package com.mapoker.application.ports;
+
+import com.mapoker.application.auth.UserAuthIdentity;
 
 import java.util.Optional;
 

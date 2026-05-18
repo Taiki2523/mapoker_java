@@ -1,8 +1,8 @@
 package com.mapoker.infrastructure.persistence;
 
-import com.mapoker.application.WalletEntry;
-import com.mapoker.application.WalletLedgerEntry;
-import com.mapoker.application.WalletRepository;
+import com.mapoker.application.wallet.WalletEntry;
+import com.mapoker.application.wallet.WalletLedgerEntry;
+import com.mapoker.application.ports.WalletRepository;
 import com.mapoker.infrastructure.config.WalletProperties;
 import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataIntegrityViolationException;

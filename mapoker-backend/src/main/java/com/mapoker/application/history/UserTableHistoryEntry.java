@@ -1,4 +1,4 @@
-package com.mapoker.application;
+package com.mapoker.application.history;
 
 import java.time.Instant;
 import java.util.List;

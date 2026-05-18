@@ -1,4 +1,4 @@
-package com.mapoker.application;
+package com.mapoker.application.auth;
 
 /** 認証プロバイダー識別子の定数クラスです。 */
 public final class AuthProvider {

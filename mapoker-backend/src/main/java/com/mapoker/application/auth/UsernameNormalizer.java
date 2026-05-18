@@ -1,4 +1,4 @@
-package com.mapoker.application;
+package com.mapoker.application.auth;
 
 /**
  * Google アカウント名をアプリ内表示名に正規化するユーティリティです。

@@ -1,4 +1,12 @@
-package com.mapoker.application;
+package com.mapoker.application.table;
+import com.mapoker.application.table.TableMemberRecord;
+import com.mapoker.application.table.TableRecord;
+import com.mapoker.application.history.UserTableHistoryService;
+import com.mapoker.application.wallet.WalletService;
+import com.mapoker.application.auth.User;
+import com.mapoker.application.game.ActionRecord;
+import com.mapoker.application.game.GameService;
+import com.mapoker.application.ports.GameRepository;
 
 import com.mapoker.domain.game.GameState;
 import com.mapoker.domain.game.GameStatus;

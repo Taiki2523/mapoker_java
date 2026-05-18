@@ -1,7 +1,7 @@
 package com.mapoker.infrastructure.messaging;
 
-import com.mapoker.application.TableService;
-import com.mapoker.application.UserService;
+import com.mapoker.application.table.TableService;
+import com.mapoker.application.auth.UserService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;

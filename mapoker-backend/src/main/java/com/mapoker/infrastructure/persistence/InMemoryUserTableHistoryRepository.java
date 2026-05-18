@@ -1,8 +1,8 @@
 package com.mapoker.infrastructure.persistence;
 
-import com.mapoker.application.TableRecord;
-import com.mapoker.application.UserTableHistoryEntry;
-import com.mapoker.application.UserTableHistoryRepository;
+import com.mapoker.application.table.TableRecord;
+import com.mapoker.application.history.UserTableHistoryEntry;
+import com.mapoker.application.ports.UserTableHistoryRepository;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 

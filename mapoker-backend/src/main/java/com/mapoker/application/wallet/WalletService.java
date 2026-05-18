@@ -1,4 +1,9 @@
-package com.mapoker.application;
+package com.mapoker.application.wallet;
+import com.mapoker.application.ports.UserRepository;
+import com.mapoker.application.auth.User;
+import com.mapoker.application.wallet.WalletLedgerEntry;
+import com.mapoker.application.wallet.WalletEntry;
+import com.mapoker.application.ports.WalletRepository;
 
 import com.mapoker.infrastructure.config.WalletProperties;
 import org.springframework.context.annotation.Profile;

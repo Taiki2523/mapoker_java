@@ -1,5 +1,10 @@
 package com.mapoker.application;
 
+import com.mapoker.application.game.ActionRecord;
+import com.mapoker.application.game.GameService;
+import com.mapoker.application.history.HandHistoryService;
+import com.mapoker.application.history.UserTableHistoryService;
+import com.mapoker.application.table.TableService;
 import com.mapoker.domain.game.GameState;
 import com.mapoker.domain.game.GameStatus;
 import com.mapoker.domain.game.OddChipRule;

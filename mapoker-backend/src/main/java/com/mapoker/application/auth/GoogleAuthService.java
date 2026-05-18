@@ -1,4 +1,9 @@
-package com.mapoker.application;
+package com.mapoker.application.auth;
+import com.mapoker.application.auth.UserAuthIdentity;
+import com.mapoker.application.auth.User;
+import com.mapoker.application.wallet.WalletService;
+import com.mapoker.application.ports.UserAuthIdentityRepository;
+import com.mapoker.application.ports.UserRepository;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;

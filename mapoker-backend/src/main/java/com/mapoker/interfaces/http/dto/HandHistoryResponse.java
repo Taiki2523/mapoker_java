@@ -1,7 +1,7 @@
 package com.mapoker.interfaces.http.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.mapoker.application.HandHistoryEntry;
+import com.mapoker.application.history.HandHistoryEntry;
 
 import java.util.List;
 

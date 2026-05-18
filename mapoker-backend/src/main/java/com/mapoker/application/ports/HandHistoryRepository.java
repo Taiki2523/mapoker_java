@@ -1,4 +1,6 @@
-package com.mapoker.application;
+package com.mapoker.application.ports;
+
+import com.mapoker.application.history.HandHistoryEntry;
 
 import java.util.List;
 

@@ -1,6 +1,6 @@
 package com.mapoker;
 
-import com.mapoker.application.TableService;
+import com.mapoker.application.table.TableService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
