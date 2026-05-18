@@ -1,13 +1,17 @@
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   claimDailyBonus, fetchHistory, fetchTables, fetchWallet, fetchWalletLedger,
 } from '../api'
+import type { Table, UserTableHistoryEntry, WalletLedgerEntry, WalletSummary } from '../types'
 
 /**
- * プロフィール関連データ（wallet / tables / history）を TanStack Query で管理する hook。
- * MyPage が表示されたタイミングで全データをフェッチする。
+ * プロフィール関連データを管理する hook。
  *
- * @param showMyPage  MyPage が表示中かどうか（全クエリの fetch トリガー）
+ * - wallet / wallet-ledger: 手動フェッチ（ウォレット未設定環境での意図しない 500 を防ぐ）
+ * - tables / history: TanStack Query（showMyPage=true で自動フェッチ）
+ *
+ * @param showMyPage  MyPage が表示中かどうか（tables/history の fetch トリガー）
  * @param formatError エラーメッセージ整形関数
  */
 export function useProfileData(
@@ -16,21 +20,28 @@ export function useProfileData(
 ) {
   const queryClient = useQueryClient()
 
-  // wallet は MyPage 表示時のみフェッチ（ウォレット機能が未設定の環境でも 500 を出さないため）
-  const walletQuery = useQuery({
-    queryKey: ['wallet'],
-    queryFn: fetchWallet,
-    enabled: showMyPage,
-    staleTime: 2 * 60_000,
-  })
+  // wallet は手動フェッチ（ウォレット機能が未設定の環境でも 500 を出さないため）
+  const [wallet, setWallet] = useState<WalletSummary | null>(null)
+  const [walletLedger, setWalletLedger] = useState<WalletLedgerEntry[]>([])
 
-  const ledgerQuery = useQuery({
-    queryKey: ['wallet-ledger'],
-    queryFn: fetchWalletLedger,
-    enabled: showMyPage,
-    staleTime: 60_000,
-  })
+  const refreshWallet = async () => {
+    let next: WalletSummary | null = null
+    try {
+      next = await fetchWallet()
+      setWallet(next)
+    } catch {
+      setWallet(null)
+      setWalletLedger([])
+      return
+    }
+    try {
+      setWalletLedger(await fetchWalletLedger())
+    } catch {
+      setWalletLedger([])
+    }
+  }
 
+  // tables / history は TanStack Query（MyPage 表示時に自動フェッチ）
   const tablesQuery = useQuery({
     queryKey: ['profile-tables'],
     queryFn: fetchTables,
@@ -47,42 +58,39 @@ export function useProfileData(
 
   const claimMutation = useMutation({
     mutationFn: claimDailyBonus,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['wallet'] })
-      void queryClient.invalidateQueries({ queryKey: ['wallet-ledger'] })
-    },
+    onSuccess: () => void refreshWallet(),
   })
 
-  const refreshWallet = () => {
-    void queryClient.invalidateQueries({ queryKey: ['wallet'] })
-    void queryClient.invalidateQueries({ queryKey: ['wallet-ledger'] })
-  }
-
-  const clear = () => {
-    queryClient.removeQueries({ queryKey: ['wallet'] })
-    queryClient.removeQueries({ queryKey: ['wallet-ledger'] })
-    queryClient.removeQueries({ queryKey: ['profile-tables'] })
-    queryClient.removeQueries({ queryKey: ['profile-history'] })
-  }
+  const profileLoading =
+    tablesQuery.isFetching || historyQuery.isFetching || claimMutation.isPending
 
   const anyError = tablesQuery.error ?? historyQuery.error ?? claimMutation.error
   const profileError = anyError ? formatError(anyError) : ''
 
+  const refreshProfileTables = async () => {
+    await Promise.all([
+      tablesQuery.refetch(),
+      historyQuery.refetch(),
+      refreshWallet(),
+    ])
+  }
+
+  const clear = () => {
+    setWallet(null)
+    setWalletLedger([])
+    queryClient.removeQueries({ queryKey: ['profile-tables'] })
+    queryClient.removeQueries({ queryKey: ['profile-history'] })
+  }
+
   return {
-    wallet: walletQuery.data ?? null,
-    walletLedger: ledgerQuery.data ?? [],
-    profileTables: tablesQuery.data ?? [],
-    profileHistory: historyQuery.data ?? [],
-    profileLoading:
-      tablesQuery.isFetching || historyQuery.isFetching || walletQuery.isFetching,
+    wallet,
+    walletLedger,
+    profileTables: tablesQuery.data ?? [] as Table[],
+    profileHistory: historyQuery.data ?? [] as UserTableHistoryEntry[],
+    profileLoading,
     profileError,
     refreshWallet,
-    // showMyPage=true なら自動フェッチ済みだが、手動トリガーも可
-    refreshProfileTables: () => {
-      void tablesQuery.refetch()
-      void historyQuery.refetch()
-      void walletQuery.refetch()
-    },
+    refreshProfileTables,
     handleClaimDailyBonus: () => claimMutation.mutate(),
     clear,
   }
