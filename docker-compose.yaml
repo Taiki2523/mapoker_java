@@ -66,8 +66,11 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       # Avatar storage
       AVATAR_STORAGE_PATH: /data/uploads/avatars
+      # Logging
+      LOGS_LOCATION: /data/logs
     volumes:
       - ${UPLOADS_LOCATION:-/srv/mapoker/data/uploads}/avatars:/data/uploads/avatars
+      - ${LOGS_LOCATION:-/srv/mapoker/data/logs}:/data/logs
     ports:
       - "8080:8080"
     healthcheck:
@@ -87,6 +90,9 @@ services:
       dockerfile: Dockerfile
     environment:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      LOGS_LOCATION: /data/logs
+    volumes:
+      - ${LOGS_LOCATION:-/srv/mapoker/data/logs}:/data/logs
     container_name: mapoker-frontend
     restart: unless-stopped
     depends_on:

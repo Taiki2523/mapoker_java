@@ -13,11 +13,17 @@ RUN npm run build
 # Runtime stage - nginx
 FROM nginx:alpine
 
+# logrotate と dcron（Alpine の cron 実装）をインストール
+RUN apk add --no-cache logrotate dcron
+
 # Copy built files
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Copy nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# logrotate 設定
+COPY logrotate-nginx.conf /etc/logrotate.d/nginx-app
 
 # Copy entrypoint (generates config.js from env vars at startup)
 COPY docker-entrypoint.sh /docker-entrypoint.sh
