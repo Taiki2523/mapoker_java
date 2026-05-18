@@ -98,16 +98,17 @@ public class RoomController {
     }
 
     /**
-     * body.name() を優先し、未指定なら principal の publicId からユーザー名を解決します。
+     * 認証済みユーザーは principal の publicId からユーザー名を解決します（body.name は無視）。
+     * 未認証時のみ body.name を使用します。
      */
     private String resolveName(UserDetails principal, TableMembershipRequest body) {
-        if (body != null && body.name() != null && !body.name().isBlank()) {
-            return body.name();
-        }
         if (principal != null) {
             try {
                 return userService.getByPublicId(principal.getUsername()).username();
             } catch (Exception ignored) {}
+        }
+        if (body != null && body.name() != null && !body.name().isBlank()) {
+            return body.name();
         }
         return null;
     }
