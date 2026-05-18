@@ -154,6 +154,7 @@ class GlobalExceptionHandlerTest {
         var response = handler.handleGeneral(new RuntimeException("unexpected"));
 
         assertThat(response.error().code()).isEqualTo("internal_error");
-        assertThat(response.error().message()).isEqualTo("unexpected");
+        // 内部詳細は返さず汎用メッセージのみ
+        assertThat(response.error().message()).isEqualTo("サーバーエラーが発生しました");
     }
 }
