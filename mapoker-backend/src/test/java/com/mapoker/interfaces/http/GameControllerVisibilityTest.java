@@ -1,7 +1,9 @@
 package com.mapoker.interfaces.http;
 
 import com.mapoker.application.game.GameService;
-import com.mapoker.application.table.TableService;
+import com.mapoker.application.table.TableLifecycleService;
+import com.mapoker.application.table.TableMembershipService;
+import com.mapoker.application.table.TableQueryService;
 import com.mapoker.application.auth.UserService;
 import com.mapoker.domain.game.GameState;
 import com.mapoker.domain.game.OddChipRule;
@@ -22,16 +24,17 @@ class GameControllerVisibilityTest {
     @Test
     void authenticatedUserOnlySeesOwnHoleCards() {
         GameService gameService = mock(GameService.class);
-        TableService tableService = mock(TableService.class);
+        TableQueryService tableQueryService = mock(TableQueryService.class);
+        TableLifecycleService tableLifecycleService = mock(TableLifecycleService.class);
         UserService userService = mock(UserService.class);
-        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableService, userService);
+        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableQueryService, tableLifecycleService, userService);
 
         GameState state = startedGame();
         when(gameService.getGame("game-1")).thenReturn(state);
         var appAlice = new com.mapoker.application.auth.User(
                 1L, "pub-alice", "alice", "0000", null, java.time.LocalDateTime.now());
         when(userService.getByPublicId("pub-alice")).thenReturn(appAlice);
-        when(tableService.findSeatIndex("game-1", "alice")).thenReturn(1);
+        when(tableQueryService.findSeatIndex("game-1", "alice")).thenReturn(1);
 
         var response = controller.getGame(
                 "game-1",
@@ -47,16 +50,17 @@ class GameControllerVisibilityTest {
     @Test
     void authenticatedUserCannotSpoofViewerIndexWithoutSeat() {
         GameService gameService = mock(GameService.class);
-        TableService tableService = mock(TableService.class);
+        TableQueryService tableQueryService = mock(TableQueryService.class);
+        TableLifecycleService tableLifecycleService = mock(TableLifecycleService.class);
         UserService userService = mock(UserService.class);
-        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableService, userService);
+        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableQueryService, tableLifecycleService, userService);
 
         GameState state = startedGame();
         when(gameService.getGame("game-1")).thenReturn(state);
         var appMallory = new com.mapoker.application.auth.User(
                 2L, "pub-mallory", "mallory", "0000", null, java.time.LocalDateTime.now());
         when(userService.getByPublicId("pub-mallory")).thenReturn(appMallory);
-        when(tableService.findSeatIndex("game-1", "mallory")).thenReturn(null);
+        when(tableQueryService.findSeatIndex("game-1", "mallory")).thenReturn(null);
 
         var response = controller.getGame(
                 "game-1",
@@ -71,8 +75,9 @@ class GameControllerVisibilityTest {
     @Test
     void anonymousViewerCanUseExplicitViewerIndex() {
         GameService gameService = mock(GameService.class);
-        TableService tableService = mock(TableService.class);
-        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableService, mock(UserService.class));
+        TableQueryService tableQueryService = mock(TableQueryService.class);
+        TableLifecycleService tableLifecycleService = mock(TableLifecycleService.class);
+        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableQueryService, tableLifecycleService, mock(UserService.class));
 
         GameState state = startedGame();
         when(gameService.getGame("game-1")).thenReturn(state);

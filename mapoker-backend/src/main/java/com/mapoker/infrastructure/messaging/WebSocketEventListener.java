@@ -1,6 +1,6 @@
 package com.mapoker.infrastructure.messaging;
 
-import com.mapoker.application.table.TableService;
+import com.mapoker.application.table.TableMembershipService;
 import com.mapoker.application.auth.UserService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.event.EventListener;
@@ -31,11 +31,11 @@ public class WebSocketEventListener {
     /** sessionId → pending leave task */
     private final Map<String, ScheduledFuture<?>> pendingLeaves = new ConcurrentHashMap<>();
 
-    private final ObjectProvider<TableService> tableServiceProvider;
+    private final ObjectProvider<TableMembershipService> tableServiceProvider;
     private final ObjectProvider<UserService> userServiceProvider;
     private final ThreadPoolTaskScheduler scheduler;
 
-    public WebSocketEventListener(ObjectProvider<TableService> tableServiceProvider,
+    public WebSocketEventListener(ObjectProvider<TableMembershipService> tableServiceProvider,
                                   ObjectProvider<UserService> userServiceProvider) {
         this.tableServiceProvider = tableServiceProvider;
         this.userServiceProvider = userServiceProvider;
@@ -101,7 +101,7 @@ public class WebSocketEventListener {
         ScheduledFuture<?> task = scheduler.schedule(() -> {
             sessionToTable.remove(sessionId);
             pendingLeaves.remove(sessionId);
-            TableService tableService = tableServiceProvider.getIfAvailable();
+            TableMembershipService tableService = tableServiceProvider.getIfAvailable();
             if (tableService == null) return;
             try {
                 tableService.leave(tableId, username, null);

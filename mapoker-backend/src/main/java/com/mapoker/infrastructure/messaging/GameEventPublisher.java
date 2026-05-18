@@ -1,7 +1,7 @@
 package com.mapoker.infrastructure.messaging;
 
 import com.mapoker.application.table.TableMemberRecord;
-import com.mapoker.application.table.TableService;
+import com.mapoker.application.table.TableQueryService;
 import com.mapoker.domain.card.Card;
 import com.mapoker.domain.game.GameState;
 import com.mapoker.interfaces.http.dto.GameResponse;
@@ -22,12 +22,12 @@ import java.util.Objects;
 public class GameEventPublisher {
 
     private final SimpMessagingTemplate messaging;
-    private final ObjectProvider<TableService> tableServiceProvider;
+    private final ObjectProvider<TableQueryService> tableQueryServiceProvider;
 
     public GameEventPublisher(SimpMessagingTemplate messaging,
-                              ObjectProvider<TableService> tableServiceProvider) {
+                              ObjectProvider<TableQueryService> tableQueryServiceProvider) {
         this.messaging = messaging;
-        this.tableServiceProvider = tableServiceProvider;
+        this.tableQueryServiceProvider = tableQueryServiceProvider;
     }
 
     public void publishGameState(String tableId, GameState state) {
@@ -37,9 +37,9 @@ public class GameEventPublisher {
     public void publishGameState(String tableId, GameState state, Instant streetRevealedAt) {
         int seatedCount = -1;
         try {
-            TableService ts = tableServiceProvider.getIfAvailable();
-            if (ts != null) {
-                seatedCount = (int) ts.getMembers(tableId).stream()
+            TableQueryService qs = tableQueryServiceProvider.getIfAvailable();
+            if (qs != null) {
+                seatedCount = (int) qs.getMembers(tableId).stream()
                         .filter(m -> !m.pendingLeave())
                         .count();
             }
@@ -53,7 +53,7 @@ public class GameEventPublisher {
 
     public void publishHoleCards(String tableId, GameState state) {
         try {
-            List<TableMemberRecord> members = tableServiceProvider.getObject().getMembers(tableId);
+            List<TableMemberRecord> members = tableQueryServiceProvider.getObject().getMembers(tableId);
             for (TableMemberRecord member : members) {
                 if (member.seatIndex() < 0 || member.seatIndex() >= state.getPlayers().size()) {
                     continue;

@@ -4,7 +4,8 @@ import com.mapoker.application.table.TableMemberRecord;
 import com.mapoker.application.history.HandHistoryEntry;
 import com.mapoker.application.history.HandHistoryService;
 import com.mapoker.application.ports.GameRepository;
-import com.mapoker.application.table.TableService;
+import com.mapoker.application.table.TableMembershipService;
+import com.mapoker.application.table.TableQueryService;
 
 import com.mapoker.domain.card.Card;
 import com.mapoker.domain.game.GameState;
@@ -46,16 +47,19 @@ public class GameService {
 
     private final GameRepository gameRepository;
     private final HandHistoryService handHistoryService;
-    private final ObjectProvider<TableService> tableServiceProvider;
+    private final ObjectProvider<TableMembershipService> tableMembershipProvider;
+    private final ObjectProvider<TableQueryService> tableQueryProvider;
     private final ObjectProvider<GameEventPublisher> eventPublisherProvider;
 
     public GameService(GameRepository gameRepository,
                        HandHistoryService handHistoryService,
-                       ObjectProvider<TableService> tableServiceProvider,
+                       ObjectProvider<TableMembershipService> tableMembershipProvider,
+                       ObjectProvider<TableQueryService> tableQueryProvider,
                        ObjectProvider<GameEventPublisher> eventPublisherProvider) {
         this.gameRepository = gameRepository;
         this.handHistoryService = handHistoryService;
-        this.tableServiceProvider = tableServiceProvider;
+        this.tableMembershipProvider = tableMembershipProvider;
+        this.tableQueryProvider = tableQueryProvider;
         this.eventPublisherProvider = eventPublisherProvider;
     }
 
@@ -273,7 +277,7 @@ public class GameService {
         publishGame(id, state, streetRevealedAt);
         recordHandHistoryIfFinished(id, state);
         if (state.isFoldWin()) {
-            TableService tableService = tableServiceProvider.getIfAvailable();
+            TableMembershipService tableService = tableMembershipProvider.getIfAvailable();
             if (tableService != null) {
                 tableService.processPendingLeaves(id);
             }
@@ -332,9 +336,9 @@ public class GameService {
         }
 
         recordHandHistoryIfFinished(id, state);
-        TableService tableService = tableServiceProvider.getIfAvailable();
-        if (tableService != null) {
-            tableService.processPendingLeaves(id);
+        TableMembershipService membershipService = tableMembershipProvider.getIfAvailable();
+        if (membershipService != null) {
+            membershipService.processPendingLeaves(id);
         }
         publishGame(id, getGame(id));
         return result;
@@ -395,12 +399,12 @@ public class GameService {
     }
 
     private List<TableMemberRecord> lookupMembers(String tableId) {
-        TableService tableService = tableServiceProvider.getIfAvailable();
-        if (tableService == null) {
+        TableQueryService queryService = tableQueryProvider.getIfAvailable();
+        if (queryService == null) {
             return List.of();
         }
         try {
-            return tableService.getMembers(tableId);
+            return queryService.getMembers(tableId);
         } catch (RuntimeException ignored) {
             return List.of();
         }

@@ -1,7 +1,9 @@
 package com.mapoker;
 
 import com.mapoker.application.game.GameService;
-import com.mapoker.application.table.TableService;
+import com.mapoker.application.table.TableLifecycleService;
+import com.mapoker.application.table.TableMembershipService;
+import com.mapoker.application.table.TableQueryService;
 import com.mapoker.application.ports.UserRepository;
 import com.mapoker.application.history.UserTableHistoryService;
 import com.mapoker.domain.game.GameStatus;
@@ -31,7 +33,9 @@ class PostgresPersistenceIntegrationTest {
     private GameService gameService;
 
     @Autowired
-    private TableService tableService;
+    private TableLifecycleService tableLifecycleService;
+    @Autowired
+    private TableMembershipService tableMembershipService;
 
     @Autowired
     private UserTableHistoryService userTableHistoryService;
@@ -69,7 +73,7 @@ class PostgresPersistenceIntegrationTest {
     void persistsUserTableHistoryInPostgres() {
         userRepository.createWithGoogle("history_alice", "0001", null);
 
-        var created = tableService.createRingTable(new TableService.CreateRingTableInput(
+        var created = tableLifecycleService.createRingTable(new TableLifecycleService.CreateRingTableInput(
                 "History Table",
                 3,
                 10,
@@ -77,8 +81,8 @@ class PostgresPersistenceIntegrationTest {
                 List.of("casual", "newbie")
         ));
 
-        var joinResult = tableService.join(created.table().id(), "history_alice", 0);
-        tableService.leave(created.table().id(), "history_alice", null);
+        var joinResult = tableMembershipService.join(created.table().id(), "history_alice", 0);
+        tableMembershipService.leave(created.table().id(), "history_alice", null);
 
         var history = userTableHistoryService.listRecent("history_alice", 10);
         assertThat(history).hasSize(1);

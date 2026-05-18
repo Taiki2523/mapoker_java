@@ -1,6 +1,8 @@
 package com.mapoker;
 
-import com.mapoker.application.table.TableService;
+import com.mapoker.application.table.TableLifecycleService;
+import com.mapoker.application.table.TableMembershipService;
+import com.mapoker.application.table.TableQueryService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -22,11 +24,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TableServiceConcurrencyTest {
 
     @Autowired
-    private TableService tableService;
+    private TableQueryService queryService;
+    @Autowired
+    private TableMembershipService membershipService;
+    @Autowired
+    private TableLifecycleService lifecycleService;
 
     @Test
     void concurrentJoinsDoNotReuseTheSameSeat() throws Exception {
-        var created = tableService.createRingTable(new TableService.CreateRingTableInput(
+        var created = lifecycleService.createRingTable(new TableLifecycleService.CreateRingTableInput(
                 "Concurrent Join Table",
                 9,
                 10,
@@ -44,7 +50,7 @@ class TableServiceConcurrencyTest {
                 tasks.add(() -> {
                     ready.countDown();
                     start.await();
-                    return tableService.join(created.table().id(), name, 0).assignedSeatIndex();
+                    return membershipService.join(created.table().id(), name, 0).assignedSeatIndex();
                 });
             }
 
@@ -63,8 +69,8 @@ class TableServiceConcurrencyTest {
 
             assertThat(assignedSeats).hasSize(9);
             assertThat(Set.copyOf(assignedSeats)).hasSize(9);
-            assertThat(tableService.getMembers(created.table().id())).hasSize(9);
-            assertThat(tableService.getMembers(created.table().id()).stream()
+            assertThat(queryService.getMembers(created.table().id())).hasSize(9);
+            assertThat(queryService.getMembers(created.table().id()).stream()
                     .map(member -> member.seatIndex())
                     .distinct()
                     .count()).isEqualTo(9);

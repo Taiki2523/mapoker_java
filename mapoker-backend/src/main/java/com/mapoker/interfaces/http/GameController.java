@@ -1,7 +1,8 @@
 package com.mapoker.interfaces.http;
 
 import com.mapoker.application.game.GameService;
-import com.mapoker.application.table.TableService;
+import com.mapoker.application.table.TableLifecycleService;
+import com.mapoker.application.table.TableQueryService;
 import com.mapoker.application.auth.UserService;
 import com.mapoker.domain.game.GameState;
 import com.mapoker.domain.game.OddChipRule;
@@ -32,14 +33,18 @@ public class GameController {
 
     private final GameService gameService;
     private final GameProperties gameProperties;
-    private final TableService tableService;
+    private final TableQueryService tableQueryService;
+    private final TableLifecycleService tableLifecycleService;
     private final UserService userService;
 
     public GameController(GameService gameService, GameProperties gameProperties,
-                          TableService tableService, UserService userService) {
+                          TableQueryService tableQueryService,
+                          TableLifecycleService tableLifecycleService,
+                          UserService userService) {
         this.gameService = gameService;
         this.gameProperties = gameProperties;
-        this.tableService = tableService;
+        this.tableQueryService = tableQueryService;
+        this.tableLifecycleService = tableLifecycleService;
         this.userService = userService;
     }
 
@@ -112,12 +117,12 @@ public class GameController {
      */
     @PostMapping("/{id}/start")
     public GameResponse startHand(@PathVariable String id, @Valid @RequestBody StartHandRequest req) {
-        return GameResponse.from(tableService.startHand(id, req.bigBlind(), req.doStraddle()), null, false, seatedCount(id));
+        return GameResponse.from(tableLifecycleService.startHand(id, req.bigBlind(), req.doStraddle()), null, false, seatedCount(id));
     }
 
     @PostMapping("/{id}/straddle-intent")
     public void setStraddleIntent(@PathVariable String id, @RequestBody StraddleIntentRequest req) {
-        tableService.setStraddleIntent(id, req.straddle());
+        tableLifecycleService.setStraddleIntent(id, req.straddle());
     }
 
     /**
@@ -187,7 +192,7 @@ public class GameController {
     /** テーブルの着席中プレイヤー数（pendingLeave 除く）を返す。テーブルが存在しない場合は -1。 */
     private int seatedCount(String id) {
         try {
-            return (int) tableService.getMembers(id).stream()
+            return (int) tableQueryService.getMembers(id).stream()
                     .filter(m -> !m.pendingLeave())
                     .count();
         } catch (Exception e) {
@@ -201,7 +206,7 @@ public class GameController {
         }
         try {
             String username = userService.getByPublicId(principal.getUsername()).username();
-            return tableService.findSeatIndex(id, username);
+            return tableQueryService.findSeatIndex(id, username);
         } catch (Exception ignored) {
             return requestedViewerIndex;
         }
