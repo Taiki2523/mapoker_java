@@ -63,16 +63,17 @@ class RoomControllerTest {
     }
 
     @Test
-    void joinUsesBodyNameEvenWhenPrincipalPresent() {
+    void joinIgnoresBodyNameWhenPrincipalPresent() {
         var principal = principalOf(ALICE_PUBLIC_ID);
         when(userService.getByPublicId(ALICE_PUBLIC_ID)).thenReturn(ALICE);
         var joinResult = new TableService.JoinResult(0, List.of(
-                new TableMemberRecord("bodyName", 0, "2024-01-01T00:00:00Z")));
-        when(tableService.join(eq(ROOM_ID), eq("bodyName"), eq(0), any(), any(), any())).thenReturn(joinResult);
+                new TableMemberRecord("alice", 0, "2024-01-01T00:00:00Z")));
+        when(tableService.join(eq(ROOM_ID), eq("alice"), eq(0), any(), any(), any())).thenReturn(joinResult);
 
+        // body に別名を入れても principal のユーザー名が使われる（席乗っ取り防止）
         controller.join(ROOM_ID, new TableMembershipRequest("bodyName", null), principal);
 
-        verify(tableService).join(eq(ROOM_ID), eq("bodyName"), eq(0), any(), any(), any());
+        verify(tableService).join(eq(ROOM_ID), eq("alice"), eq(0), any(), any(), any());
     }
 
     @Test
@@ -143,13 +144,15 @@ class RoomControllerTest {
     }
 
     @Test
-    void leaveUsesBodyNameEvenWhenPrincipalPresent() {
+    void leaveIgnoresBodyNameWhenPrincipalPresent() {
         var principal = principalOf(ALICE_PUBLIC_ID);
-        when(tableService.leave(ROOM_ID, "bodyName", null, ALICE_PUBLIC_ID)).thenReturn(List.of());
+        when(userService.getByPublicId(ALICE_PUBLIC_ID)).thenReturn(ALICE);
+        when(tableService.leave(ROOM_ID, "alice", null, ALICE_PUBLIC_ID)).thenReturn(List.of());
 
+        // body に別名を入れても principal のユーザー名が使われる
         controller.leave(ROOM_ID, new TableMembershipRequest("bodyName", null), principal);
 
-        verify(tableService).leave(ROOM_ID, "bodyName", null, ALICE_PUBLIC_ID);
+        verify(tableService).leave(ROOM_ID, "alice", null, ALICE_PUBLIC_ID);
     }
 
     @Test

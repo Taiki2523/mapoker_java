@@ -268,8 +268,12 @@ public class TableService {
             List<TableMemberRecord> members = new ArrayList<>(tableMembers.computeIfAbsent(table.id(), ignored -> new ArrayList<>()));
             JoinResult result;
 
+            // publicId がある場合は publicId で同一人物を判定する（同名別人による席乗っ取りを防ぐ）
+            // 未認証（ローカルモード）の場合のみ name でフォールバックする
             TableMemberRecord existing = members.stream()
-                    .filter(member -> member.name().equals(name))
+                    .filter(member -> publicId != null
+                            ? publicId.equals(member.publicId())
+                            : member.name().equals(name))
                     .findFirst()
                     .orElse(null);
             if (existing != null) {
@@ -305,8 +309,11 @@ public class TableService {
                 if (existing.pendingLeave()) {
                     int idx = members.indexOf(existing);
                     members.set(idx, new TableMemberRecord(
-                            existing.name(), existing.seatIndex(), existing.joinedAt(),
-                            false, existing.displayName(), existing.avatarUrl(), existing.publicId()));
+                            name, existing.seatIndex(), existing.joinedAt(),
+                            false,
+                            displayName != null ? displayName : existing.displayName(),
+                            avatarUrl != null ? avatarUrl : existing.avatarUrl(),
+                            publicId != null ? publicId : existing.publicId()));
                     tableMembers.put(table.id(), members);
                 }
                 lastEmptiedAt.remove(table.id());
