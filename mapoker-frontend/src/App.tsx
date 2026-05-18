@@ -67,7 +67,7 @@ function App() {
   const { myName, setMyName, mySeatIndex, setMySeatIndex, mySeat, persistSession, clearGameSession } = session
 
   const profile = useProfileData(showMyPage, !!currentUser, formatErrorMessage)
-  const { wallet, walletLedger, profileTables, profileHistory, profileLoading, profileError, refreshProfileTables, handleClaimDailyBonus } = profile
+  const { wallet, walletLedger, profileTables, profileHistory, profileLoading, profileError, handleClaimDailyBonus } = profile
 
   // ---- 派生値 ----
   const currentPlayer = useMemo(() => game ? game.players[game.current_player] : null, [game])
@@ -216,7 +216,8 @@ function App() {
     void fetchVersion()
       .then((res) => setAppVersion(res.version))
       .catch(() => {})
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // mount 時のみ実行
 
   // URL に tableId があれば初回ロード
   useEffect(() => {
