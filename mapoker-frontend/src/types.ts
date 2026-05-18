@@ -19,6 +19,9 @@ export type GameState = {
   last_raise_size: number
   big_blind: number
   ante: number
+  straddle_enabled: boolean
+  straddle_idx: number
+  next_utg_idx: number
   pot_total: number
   players: Player[]
   community: string[]
@@ -117,6 +120,7 @@ export type Table = {
     small_blind: number
     big_blind: number
     ante: number
+    straddle_enabled: boolean
   }
   min_buy_in: number
   max_buy_in: number
@@ -179,6 +183,7 @@ export type CreateGameConfig = {
   smallBlind: number
   bigBlind: number
   ante: number
+  straddleEnabled: boolean
   visibility: TableVisibility
   flags: TableFlag[]
 }

@@ -37,6 +37,9 @@ import java.util.List;
  * @param canRebuy リバイ可否
  * @param lastShowdown 直近ショーダウン結果
  * @param ante アンティ額（0 でアンティなし）
+ * @param straddleEnabled ストラドル機能が有効かどうか
+ * @param straddleIdx 現ハンドでストラドルしているプレイヤーのインデックス（-1 はストラドルなし）
+ * @param nextUtgIdx 次ハンドでUTGになるプレイヤーのインデックス（-1 は3人未満）
  */
 public record GameResponse(
         String id,
@@ -57,7 +60,10 @@ public record GameResponse(
         @JsonProperty("viewer_membership_active") boolean viewerMembershipActive,
         @JsonProperty("can_rebuy") boolean canRebuy,
         @JsonProperty("last_showdown") ShowdownDto lastShowdown,
-        int ante
+        int ante,
+        @JsonProperty("straddle_enabled") boolean straddleEnabled,
+        @JsonProperty("straddle_idx") int straddleIdx,
+        @JsonProperty("next_utg_idx") int nextUtgIdx
 ) {
     /**
      * プレイヤー表示 DTO です。
@@ -161,6 +167,6 @@ public record GameResponse(
                 g.getCurrentBet(), g.getLastRaiseSize(), g.getBigBlindSize(),
                 g.getPot(), playerResponses, g.getCommunity(), g.getOddChipRule(),
                 canStartHand, viewerMembershipActive, canRebuy, showdownDto,
-                g.getAnte());
+                g.getAnte(), g.isStraddleEnabled(), g.getStraddleIdx(), g.computeNextUtgIdx());
     }
 }

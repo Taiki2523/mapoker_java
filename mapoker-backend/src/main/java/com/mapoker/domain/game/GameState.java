@@ -67,6 +67,9 @@ public class GameState {
     private ShowdownResult lastShowdown;
     private boolean foldWin = false;
     private int ante = 0;
+    private boolean straddleEnabled = false;
+    private int straddleIdx = -1;
+    private boolean nextHandStraddle = false;
 
     private GameState() {}
 
@@ -111,6 +114,23 @@ public class GameState {
      * @throws IllegalArgumentException プレイヤー数・ビッグブラインド額・ボタン位置が不正な場合
      */
     public static GameState newGame(List<Player> players, int buttonIndex, int bigBlind, Random rng, OddChipRule oddChipRule, int ante) {
+        return newGame(players, buttonIndex, bigBlind, rng, oddChipRule, ante, false);
+    }
+
+    /**
+     * アンティ・ストラドル設定付きで新しいゲームインスタンスを生成する。
+     *
+     * @param players         参加プレイヤーのリスト（2〜9人）
+     * @param buttonIndex     ボタン位置（プレイヤーリストの 0-based インデックス）
+     * @param bigBlind        ビッグブラインド額（正の値）
+     * @param rng             シャッフル用乱数生成器。{@code null} の場合はデフォルト {@link Random}
+     * @param oddChipRule     奇数チップの配分ルール。{@code null} の場合は {@link OddChipRule#LOW_INDEX}
+     * @param ante            アンティ額（0 でアンティなし）
+     * @param straddleEnabled ストラドル機能を有効にするか
+     * @return 初期化済みの {@link GameState}
+     * @throws IllegalArgumentException プレイヤー数・ビッグブラインド額・ボタン位置が不正な場合
+     */
+    public static GameState newGame(List<Player> players, int buttonIndex, int bigBlind, Random rng, OddChipRule oddChipRule, int ante, boolean straddleEnabled) {
         if (players.size() < PokerConstants.MIN_PLAYERS || players.size() > PokerConstants.MAX_PLAYERS)
             throw new IllegalArgumentException("players must be 2-9");
         if (bigBlind <= 0)
@@ -134,7 +154,18 @@ public class GameState {
         g.acted = new boolean[players.size()];
         g.community = new ArrayList<>();
         g.ante = Math.max(0, ante);
+        g.straddleEnabled = straddleEnabled;
         return g;
+    }
+
+    /**
+     * 新しいハンドを開始する（ストラドルなし）。
+     *
+     * @param bigBlind ビッグブラインド額
+     * @throws IllegalStateException ショーダウンが未解決の場合、またはチップ保有者が2人未満の場合
+     */
+    public void startHand(int bigBlind) {
+        startHand(bigBlind, false);
     }
 
     /**
@@ -143,11 +174,14 @@ public class GameState {
      *
      * <p>チップが0のプレイヤーは自動的にフォールド扱いになる。
      * ヘッズアップ（2人）のときはボタン = スモールブラインドとなる（ポーカールール準拠）。
+     * {@code straddleEnabled} かつ {@code doStraddle} かつ3人以上のとき、UTGがストラドルをポストする。
+     * UTGのスタックがストラドル額未満の場合はストラドルをスキップする。
      *
-     * @param bigBlind ビッグブラインド額
+     * @param bigBlind   ビッグブラインド額
+     * @param doStraddle このハンドでストラドルするか（{@code straddleEnabled} が false のときは無視される）
      * @throws IllegalStateException ショーダウンが未解決の場合、またはチップ保有者が2人未満の場合
      */
-    public void startHand(int bigBlind) {
+    public void startHand(int bigBlind, boolean doStraddle) {
         if (status == GameStatus.SHOWDOWN)
             throw new IllegalStateException("cannot start hand: showdown not resolved");
         status = GameStatus.IN_PROGRESS;
@@ -222,9 +256,23 @@ public class GameState {
         currentBet = players.get(bigBlindIdx).getContributed();
         lastRaiseSize = bigBlind;
         bigBlindSize = bigBlind;
-        resetActed();
         raiseOpen = true;
         acted = new boolean[players.size()];
+
+        straddleIdx = -1;
+        boolean effectiveStraddle = doStraddle || nextHandStraddle;
+        nextHandStraddle = false;
+        if (straddleEnabled && effectiveStraddle && activePlayers > 2) {
+            int candidate = nextActive(bigBlindIdx);
+            int straddleAmount = bigBlind * 2;
+            if (players.get(candidate).getStack() >= straddleAmount) {
+                straddleIdx = candidate;
+                postBlind(straddleIdx, straddleAmount);
+                currentBet = straddleAmount;
+                lastRaiseSize = straddleAmount;
+            }
+        }
+
         currentPlayer = firstToAct();
     }
 
@@ -498,7 +546,39 @@ public class GameState {
     }
 
     private int firstToAct() {
-        return street == Street.PREFLOP ? nextActive(bigBlindIdx) : nextActive(buttonIndex);
+        if (street == Street.PREFLOP) {
+            int lastBlindIdx = straddleIdx >= 0 ? straddleIdx : bigBlindIdx;
+            return nextActive(lastBlindIdx);
+        }
+        return nextActive(buttonIndex);
+    }
+
+    /**
+     * 次のハンドでUTGになるプレイヤーのインデックスを返す。
+     * ストラドル選択UIの表示用。3人未満の場合は -1 を返す。
+     */
+    public int computeNextUtgIdx() {
+        int eligible = 0;
+        for (Player p : players) {
+            if (p.getStack() > 0 && !p.isSittingOut()) eligible++;
+        }
+        if (eligible <= 2) return -1;
+        int nextButton = nextActiveByStack(buttonIndex);
+        int nextSB = nextActiveByStack(nextButton);
+        int nextBB = nextActiveByStack(nextSB);
+        return nextActiveByStack(nextBB);
+    }
+
+    private int nextActiveByStack(int from) {
+        int n = players.size();
+        for (int i = 1; i <= n; i++) {
+            int idx = (from + i) % n;
+            Player p = players.get(idx);
+            if (p.getStack() <= 0) continue;
+            if (p.isSittingOut()) continue;
+            return idx;
+        }
+        return from;
     }
 
     private int nextToAct(int from) {
@@ -688,4 +768,10 @@ public class GameState {
     public void setLastShowdown(ShowdownResult lastShowdown) { this.lastShowdown = lastShowdown; }
     public int getAnte() { return ante; }
     public void setAnte(int ante) { this.ante = ante; }
+    public boolean isStraddleEnabled() { return straddleEnabled; }
+    public void setStraddleEnabled(boolean straddleEnabled) { this.straddleEnabled = straddleEnabled; }
+    public int getStraddleIdx() { return straddleIdx; }
+    public void setStraddleIdx(int straddleIdx) { this.straddleIdx = straddleIdx; }
+    public boolean isNextHandStraddle() { return nextHandStraddle; }
+    public void setNextHandStraddle(boolean nextHandStraddle) { this.nextHandStraddle = nextHandStraddle; }
 }

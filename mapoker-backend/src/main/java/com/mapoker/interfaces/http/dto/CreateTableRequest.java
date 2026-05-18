@@ -20,6 +20,7 @@ import java.util.List;
  * @param visibility 公開設定
  * @param flags テーブル属性の一覧
  * @param ante アンティ額（省略時は bigBlind / 10）
+ * @param straddleEnabled ストラドル機能を有効にするか（省略時は false）
  */
 public record CreateTableRequest(
         @JsonProperty("table_name") @Size(max = 100) String tableName,
@@ -28,7 +29,8 @@ public record CreateTableRequest(
         @JsonProperty("big_blind") @Positive int bigBlind,
         @Pattern(regexp = "(?i)public|private", message = "must be public or private") String visibility,
         @Size(max = 8) List<@Pattern(regexp = "[a-z_]+", message = "must use lowercase snake_case") String> flags,
-        @Min(0) @Nullable Integer ante
+        @Min(0) @Nullable Integer ante,
+        @JsonProperty("straddle_enabled") @Nullable Boolean straddleEnabled
 ) {
     public CreateTableRequest {
         if (smallBlind == null) {
@@ -36,6 +38,9 @@ public record CreateTableRequest(
         }
         if (ante == null) {
             ante = bigBlind / 10;
+        }
+        if (straddleEnabled == null) {
+            straddleEnabled = false;
         }
     }
 }

@@ -112,7 +112,12 @@ public class GameController {
      */
     @PostMapping("/{id}/start")
     public GameResponse startHand(@PathVariable String id, @Valid @RequestBody StartHandRequest req) {
-        return GameResponse.from(tableService.startHand(id, req.bigBlind()), null, false, seatedCount(id));
+        return GameResponse.from(tableService.startHand(id, req.bigBlind(), req.doStraddle()), null, false, seatedCount(id));
+    }
+
+    @PostMapping("/{id}/straddle-intent")
+    public void setStraddleIntent(@PathVariable String id, @RequestBody StraddleIntentRequest req) {
+        tableService.setStraddleIntent(id, req.straddle());
     }
 
     /**

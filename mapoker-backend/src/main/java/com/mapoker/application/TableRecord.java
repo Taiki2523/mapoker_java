@@ -38,7 +38,8 @@ public record TableRecord(
         String gameId,
         Instant createdAt,
         boolean everSeated,
-        int ante
+        int ante,
+        boolean straddleEnabled
 ) {
     public TableRecord {
         if (name == null || name.isBlank()) {

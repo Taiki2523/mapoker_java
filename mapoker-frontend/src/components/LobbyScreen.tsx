@@ -143,7 +143,7 @@ export function LobbyScreen({ currentUser, onOpenMyPage, onJoinRoom, onCreateTab
                 </span>
               </div>
               <div className="lobby-browser-meta">
-                <span>{t('stakeLabel')} {table.stake.small_blind}/{table.stake.big_blind}{table.stake.ante > 0 ? ` / ${t('ante')} ${table.stake.ante}` : ''}</span>
+                <span>{t('stakeLabel')} {table.stake.small_blind}/{table.stake.big_blind}{table.stake.ante > 0 ? ` / ${t('ante')} ${table.stake.ante}` : ''}{table.stake.straddle_enabled ? ` / ${t('straddle')}` : ''}</span>
                 <span>{t('membersLabel')} {table.member_count}/{table.max_players}</span>
                 <span>{t('status')} {statusLabel(table.status)}</span>
               </div>

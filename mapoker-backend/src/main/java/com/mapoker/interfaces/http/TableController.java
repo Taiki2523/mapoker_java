@@ -48,7 +48,8 @@ public class TableController {
                 request.bigBlind(),
                 request.visibility(),
                 request.flags(),
-                request.ante()
+                request.ante(),
+                request.straddleEnabled()
         ));
         return TableResponse.from(result.table(), tableService.getMembers(result.table().id()), GameResponse.from(result.game(), null, false));
     }

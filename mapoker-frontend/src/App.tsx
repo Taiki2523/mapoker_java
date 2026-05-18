@@ -45,6 +45,7 @@ function App() {
   const rebuyShownForHandRef = useRef(false)
   const [myName, setMyName] = useState('')
   const [mySeatIndex, setMySeatIndex] = useState<number | null>(null)
+  const [doStraddle, setDoStraddle] = useState(false)
   const [leavePending, setLeavePending] = useState(false)
   const [roster, setRoster] = useState<RoomMember[]>([])
   const [showMyPage, setShowMyPage] = useState(false)
@@ -565,6 +566,7 @@ function App() {
         small_blind: config.smallBlind,
         big_blind: config.bigBlind,
         ante: config.ante,
+        straddle_enabled: config.straddleEnabled,
         visibility: config.visibility,
         flags: config.flags,
       }
@@ -744,9 +746,11 @@ function App() {
     prevIsMyTurn.current = false
     try {
       const bb = bigBlindOverride ?? game?.big_blind ?? 10
+      const straddle = doStraddle
+      setDoStraddle(false)
       await fetchJSON(`/v1/games/${id}/start`, {
         method: 'POST',
-        body: JSON.stringify({ big_blind: bb }),
+        body: JSON.stringify({ big_blind: bb, straddle }),
       })
       await refreshGame(id)
     } catch (err) {
@@ -877,6 +881,16 @@ function App() {
           onOpenMyPage={() => void openMyPage()}
           onLeaveRoom={leaveRoom}
           onSendAction={(type, amount) => void sendAction(type, amount)}
+          doStraddle={doStraddle}
+          onToggleStraddle={(v) => {
+            setDoStraddle(v)
+            if (gameId) {
+              void fetchJSON(`/v1/games/${gameId}/straddle-intent`, {
+                method: 'POST',
+                body: JSON.stringify({ straddle: v }),
+              }).catch(() => {})
+            }
+          }}
         />
       )}
       {buyInContext && (
