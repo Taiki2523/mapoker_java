@@ -2,24 +2,21 @@ import { useEffect, useMemo, useState } from 'react'
 import { clearSession, readSession, writeSession } from '../api'
 import type { RoomMember, StoredSession } from '../types'
 
-export function useTableSession(roster: RoomMember[]) {
-  const [gameId, setGameId] = useState('')
+/**
+ * テーブルセッション管理 hook。
+ * gameId は React Router の useParams から受け取る（URLが正規表現）。
+ */
+export function useTableSession(gameId: string, roster: RoomMember[]) {
   const [myName, setMyName] = useState('')
   const [mySeatIndex, setMySeatIndex] = useState<number | null>(null)
 
-  // URL パラメータから gameId を初期化（mount 時のみ）
-  const [initialGameId] = useState(() => {
-    const params = new URLSearchParams(window.location.search)
-    return params.get('tableId') ?? params.get('gameId') ?? ''
-  })
-
-  useEffect(() => {
-    if (initialGameId) setGameId(initialGameId)
-  }, [initialGameId])
-
   // gameId が変わったら localStorage からセッションを復元
   useEffect(() => {
-    if (!gameId) return
+    if (!gameId) {
+      setMyName('')
+      setMySeatIndex(null)
+      return
+    }
     const data = readSession(gameId)
     if (data) {
       setMyName(data.name)
@@ -60,19 +57,15 @@ export function useTableSession(roster: RoomMember[]) {
     writeSession(tableId, session)
   }
 
-  const clearGameSession = (tableId: string) => {
-    clearSession(tableId)
-    window.history.replaceState(null, '', window.location.pathname)
-    setGameId('')
+  const clearGameSession = () => {
+    if (gameId) clearSession(gameId)
     setMySeatIndex(null)
   }
 
   return {
-    gameId, setGameId,
     myName, setMyName,
     mySeatIndex, setMySeatIndex,
     mySeat, inferredSeatIndex,
-    initialGameId,
     persistSession, clearGameSession,
   }
 }
