@@ -1,7 +1,9 @@
 package com.mapoker.application;
 
 import com.mapoker.application.game.ActionRecord;
-import com.mapoker.application.game.GameService;
+import com.mapoker.application.game.GameActionService;
+import com.mapoker.application.game.GameLifecycleService;
+import com.mapoker.application.game.GameReadService;
 import com.mapoker.application.history.HandHistoryService;
 import com.mapoker.application.history.UserTableHistoryService;
 import com.mapoker.application.table.TableLifecycleService;
@@ -45,12 +47,14 @@ class GameServiceTest {
     @Mock ObjectProvider<TableQueryService> tableQueryProvider;
     @Mock ObjectProvider<GameEventPublisher> publisherProvider;
 
-    private GameService gameService;
+    private GameReadService gameRead;
+    private GameLifecycleService gameLifecycle;
+    private GameActionService gameAction;
     private InMemoryGameRepository gameRepo;
 
-    private static final List<GameService.PlayerInput> TWO_PLAYERS = List.of(
-            new GameService.PlayerInput("alice", 1000),
-            new GameService.PlayerInput("bob", 1000)
+    private static final List<GameLifecycleService.PlayerInput> TWO_PLAYERS = List.of(
+            new GameLifecycleService.PlayerInput("alice", 1000),
+            new GameLifecycleService.PlayerInput("bob", 1000)
     );
 
     @BeforeEach
@@ -65,7 +69,9 @@ class GameServiceTest {
         var userTableHistoryService = new UserTableHistoryService(userTableHistoryRepo);
         var handHistoryService = new HandHistoryService(historyRepo, userTableHistoryService);
 
-        gameService = new GameService(gameRepo, handHistoryService, tableMembershipProvider, tableQueryProvider, publisherProvider);
+        gameRead = new GameReadService(gameRepo);
+        gameLifecycle = new GameLifecycleService(gameRepo, gameRead, publisherProvider);
+        gameAction = new GameActionService(gameRepo, gameRead, handHistoryService, tableMembershipProvider, tableQueryProvider, publisherProvider);
     }
 
     // -----------------------------------------------------------------------
@@ -74,7 +80,7 @@ class GameServiceTest {
 
     @Test
     void createGameReturnsStateWithCorrectPlayers() {
-        GameState state = gameService.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
+        GameState state = gameLifecycle.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
         assertThat(state.getPlayers()).hasSize(2);
         assertThat(state.getPlayers().get(0).getId()).isEqualTo("alice");
         assertThat(state.getPlayers().get(1).getId()).isEqualTo("bob");
@@ -82,14 +88,14 @@ class GameServiceTest {
 
     @Test
     void createGamePersistsToRepository() {
-        GameState state = gameService.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
+        GameState state = gameLifecycle.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
         assertThat(gameRepo.findById(state.getId())).isPresent();
     }
 
     @Test
     void createGameWithSeedIsReproducible() {
-        GameState s1 = gameService.createGame(TWO_PLAYERS, 0, 10, 42L, OddChipRule.LOW_INDEX);
-        GameState s2 = gameService.createGame(TWO_PLAYERS, 0, 10, 42L, OddChipRule.LOW_INDEX);
+        GameState s1 = gameLifecycle.createGame(TWO_PLAYERS, 0, 10, 42L, OddChipRule.LOW_INDEX);
+        GameState s2 = gameLifecycle.createGame(TWO_PLAYERS, 0, 10, 42L, OddChipRule.LOW_INDEX);
         assertThat(s1.getId()).isNotEqualTo(s2.getId());
     }
 
@@ -99,14 +105,14 @@ class GameServiceTest {
 
     @Test
     void getGameReturnsPersistedState() {
-        GameState created = gameService.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
-        GameState fetched = gameService.getGame(created.getId());
+        GameState created = gameLifecycle.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
+        GameState fetched = gameRead.getGame(created.getId());
         assertThat(fetched.getId()).isEqualTo(created.getId());
     }
 
     @Test
     void getGameThrowsForUnknownId() {
-        assertThatThrownBy(() -> gameService.getGame("nonexistent"))
+        assertThatThrownBy(() -> gameRead.getGame("nonexistent"))
                 .isInstanceOf(NoSuchElementException.class)
                 .hasMessageContaining("nonexistent");
     }
@@ -117,14 +123,14 @@ class GameServiceTest {
 
     @Test
     void listGamesReturnsAllCreatedGames() {
-        gameService.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
-        gameService.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
-        assertThat(gameService.listGames()).hasSize(2);
+        gameLifecycle.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
+        gameLifecycle.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
+        assertThat(gameRead.listGames()).hasSize(2);
     }
 
     @Test
     void listGamesReturnsEmptyWhenNoGames() {
-        assertThat(gameService.listGames()).isEmpty();
+        assertThat(gameRead.listGames()).isEmpty();
     }
 
     // -----------------------------------------------------------------------
@@ -133,13 +139,13 @@ class GameServiceTest {
 
     @Test
     void createRingGameStatusIsFinished() {
-        GameState state = gameService.createRingGame(TWO_PLAYERS, 10, OddChipRule.LOW_INDEX);
+        GameState state = gameLifecycle.createRingGame(TWO_PLAYERS, 10, OddChipRule.LOW_INDEX);
         assertThat(state.getStatus()).isEqualTo(GameStatus.FINISHED);
     }
 
     @Test
     void createRingGameIsPersisted() {
-        GameState state = gameService.createRingGame(TWO_PLAYERS, 10, OddChipRule.LOW_INDEX);
+        GameState state = gameLifecycle.createRingGame(TWO_PLAYERS, 10, OddChipRule.LOW_INDEX);
         assertThat(gameRepo.findById(state.getId())).isPresent();
     }
 
@@ -149,19 +155,19 @@ class GameServiceTest {
 
     @Test
     void startHandChangesStatusToInProgress() {
-        GameState created = gameService.createRingGame(TWO_PLAYERS, 10, OddChipRule.LOW_INDEX);
-        gameService.setSeatStack(created.getId(), 0, 1000);
-        gameService.setSeatStack(created.getId(), 1, 1000);
-        GameState started = gameService.startHand(created.getId(), 10);
+        GameState created = gameLifecycle.createRingGame(TWO_PLAYERS, 10, OddChipRule.LOW_INDEX);
+        gameLifecycle.setSeatStack(created.getId(), 0, 1000);
+        gameLifecycle.setSeatStack(created.getId(), 1, 1000);
+        GameState started = gameLifecycle.startHand(created.getId(), 10);
         assertThat(started.getStatus()).isEqualTo(GameStatus.IN_PROGRESS);
     }
 
     @Test
     void startHandDealsHoleCardsToPlayers() {
-        GameState created = gameService.createRingGame(TWO_PLAYERS, 10, OddChipRule.LOW_INDEX);
-        gameService.setSeatStack(created.getId(), 0, 1000);
-        gameService.setSeatStack(created.getId(), 1, 1000);
-        GameState started = gameService.startHand(created.getId(), 10);
+        GameState created = gameLifecycle.createRingGame(TWO_PLAYERS, 10, OddChipRule.LOW_INDEX);
+        gameLifecycle.setSeatStack(created.getId(), 0, 1000);
+        gameLifecycle.setSeatStack(created.getId(), 1, 1000);
+        GameState started = gameLifecycle.startHand(created.getId(), 10);
         assertThat(started.getPlayers().get(0).getHole()).isNotNull().hasSize(2);
         assertThat(started.getPlayers().get(1).getHole()).isNotNull().hasSize(2);
     }
@@ -172,24 +178,24 @@ class GameServiceTest {
 
     @Test
     void setButtonIndexUpdatesButtonPosition() {
-        GameState created = gameService.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
-        gameService.setButtonIndex(created.getId(), 1);
-        GameState fetched = gameService.getGame(created.getId());
+        GameState created = gameLifecycle.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
+        gameLifecycle.setButtonIndex(created.getId(), 1);
+        GameState fetched = gameRead.getGame(created.getId());
         assertThat(fetched.getButtonIndex()).isEqualTo(1);
     }
 
     @Test
     void setSeatStackUpdatesStack() {
-        GameState created = gameService.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
-        gameService.setSeatStack(created.getId(), 0, 500);
-        assertThat(gameService.getSeatStack(created.getId(), 0)).isEqualTo(500);
+        GameState created = gameLifecycle.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
+        gameLifecycle.setSeatStack(created.getId(), 0, 500);
+        assertThat(gameLifecycle.getSeatStack(created.getId(), 0)).isEqualTo(500);
     }
 
     @Test
     void setSittingOutMarksPlayerCorrectly() {
-        GameState created = gameService.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
-        gameService.setSittingOut(created.getId(), 0, true);
-        GameState fetched = gameService.getGame(created.getId());
+        GameState created = gameLifecycle.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
+        gameLifecycle.setSittingOut(created.getId(), 0, true);
+        GameState fetched = gameRead.getGame(created.getId());
         assertThat(fetched.getPlayers().get(0).isSittingOut()).isTrue();
     }
 
@@ -199,13 +205,13 @@ class GameServiceTest {
 
     @Test
     void applyActionRecordsActionHistory() {
-        GameState created = gameService.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
-        gameService.startHand(created.getId(), 10);
+        GameState created = gameLifecycle.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
+        gameLifecycle.startHand(created.getId(), 10);
 
         // startHand でボタンが0→1に移動。SB=P1, BB=P0。プリフロップ最初のアクターはP1
-        gameService.applyAction(created.getId(), 1, ActionType.CALL, 0);
+        gameAction.applyAction(created.getId(), 1, ActionType.CALL, 0);
 
-        List<ActionRecord> actions = gameService.getActions(created.getId());
+        List<ActionRecord> actions = gameRead.getActions(created.getId());
         assertThat(actions).hasSize(1);
         assertThat(actions.get(0).actionType()).isEqualTo(ActionType.CALL);
         assertThat(actions.get(0).playerIndex()).isEqualTo(1);
@@ -213,11 +219,11 @@ class GameServiceTest {
 
     @Test
     void applyActionFoldWinUpdatesStatus() {
-        GameState created = gameService.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
-        gameService.startHand(created.getId(), 10);
+        GameState created = gameLifecycle.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
+        gameLifecycle.startHand(created.getId(), 10);
 
         // P1（SB/プリフロップUTG）がフォールド → fold-win
-        GameState result = gameService.applyAction(created.getId(), 1, ActionType.FOLD, 0);
+        GameState result = gameAction.applyAction(created.getId(), 1, ActionType.FOLD, 0);
         assertThat(result.getStatus()).isEqualTo(GameStatus.FINISHED);
         assertThat(result.isFoldWin()).isTrue();
     }
@@ -228,26 +234,26 @@ class GameServiceTest {
 
     @Test
     void getActionsReturnsEmptyBeforeAnyAction() {
-        GameState created = gameService.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
-        gameService.startHand(created.getId(), 10);
-        assertThat(gameService.getActions(created.getId())).isEmpty();
+        GameState created = gameLifecycle.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
+        gameLifecycle.startHand(created.getId(), 10);
+        assertThat(gameRead.getActions(created.getId())).isEmpty();
     }
 
     @Test
     void getActionsThrowsForUnknownGame() {
-        assertThatThrownBy(() -> gameService.getActions("unknown-id"))
+        assertThatThrownBy(() -> gameRead.getActions("unknown-id"))
                 .isInstanceOf(NoSuchElementException.class);
     }
 
     @Test
     void getActionsSeqIsSequential() {
-        GameState created = gameService.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
-        gameService.startHand(created.getId(), 10);
+        GameState created = gameLifecycle.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
+        gameLifecycle.startHand(created.getId(), 10);
         // プリフロップ: P1(SB/UTG)コール → P0(BB)チェック
-        gameService.applyAction(created.getId(), 1, ActionType.CALL, 0);
-        gameService.applyAction(created.getId(), 0, ActionType.CHECK, 0);
+        gameAction.applyAction(created.getId(), 1, ActionType.CALL, 0);
+        gameAction.applyAction(created.getId(), 0, ActionType.CHECK, 0);
 
-        List<ActionRecord> actions = gameService.getActions(created.getId());
+        List<ActionRecord> actions = gameRead.getActions(created.getId());
         assertThat(actions).hasSize(2);
         assertThat(actions.get(0).seq()).isEqualTo(1);
         assertThat(actions.get(1).seq()).isEqualTo(2);
@@ -259,22 +265,22 @@ class GameServiceTest {
 
     @Test
     void resolveShowdownSetsStatusToFinished() {
-        GameState created = gameService.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
-        gameService.startHand(created.getId(), 10);
+        GameState created = gameLifecycle.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
+        gameLifecycle.startHand(created.getId(), 10);
         advanceToShowdown(created.getId());
 
-        gameService.resolveShowdown(created.getId());
-        GameState after = gameService.getGame(created.getId());
+        gameAction.resolveShowdown(created.getId());
+        GameState after = gameRead.getGame(created.getId());
         assertThat(after.getStatus()).isEqualTo(GameStatus.FINISHED);
     }
 
     @Test
     void resolveShowdownReturnsNonNullResult() {
-        GameState created = gameService.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
-        gameService.startHand(created.getId(), 10);
+        GameState created = gameLifecycle.createGame(TWO_PLAYERS, 0, 10, null, OddChipRule.LOW_INDEX);
+        gameLifecycle.startHand(created.getId(), 10);
         advanceToShowdown(created.getId());
 
-        var result = gameService.resolveShowdown(created.getId());
+        var result = gameAction.resolveShowdown(created.getId());
         assertThat(result).isNotNull();
         assertThat(result.payouts()).hasSize(2);
     }
@@ -286,13 +292,13 @@ class GameServiceTest {
      * flop/turn/river: firstToAct = nextActive(buttonIndex=1) = P0 → P1
      */
     private void advanceToShowdown(String gameId) {
-        gameService.applyAction(gameId, 1, ActionType.CALL, 0);
-        gameService.applyAction(gameId, 0, ActionType.CHECK, 0);
-        gameService.applyAction(gameId, 0, ActionType.CHECK, 0);
-        gameService.applyAction(gameId, 1, ActionType.CHECK, 0);
-        gameService.applyAction(gameId, 0, ActionType.CHECK, 0);
-        gameService.applyAction(gameId, 1, ActionType.CHECK, 0);
-        gameService.applyAction(gameId, 0, ActionType.CHECK, 0);
-        gameService.applyAction(gameId, 1, ActionType.CHECK, 0);
+        gameAction.applyAction(gameId, 1, ActionType.CALL, 0);
+        gameAction.applyAction(gameId, 0, ActionType.CHECK, 0);
+        gameAction.applyAction(gameId, 0, ActionType.CHECK, 0);
+        gameAction.applyAction(gameId, 1, ActionType.CHECK, 0);
+        gameAction.applyAction(gameId, 0, ActionType.CHECK, 0);
+        gameAction.applyAction(gameId, 1, ActionType.CHECK, 0);
+        gameAction.applyAction(gameId, 0, ActionType.CHECK, 0);
+        gameAction.applyAction(gameId, 1, ActionType.CHECK, 0);
     }
 }

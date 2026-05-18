@@ -5,7 +5,6 @@ import com.mapoker.application.history.UserTableHistoryEntry;
 import com.mapoker.application.history.HandHistoryEntry;
 import com.mapoker.application.ports.GameRepository;
 import com.mapoker.application.ports.HandHistoryRepository;
-import com.mapoker.application.game.GameService;
 import com.mapoker.application.game.ActionRecord;
 
 import org.springframework.stereotype.Service;

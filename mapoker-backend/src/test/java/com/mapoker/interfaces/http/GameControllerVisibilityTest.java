@@ -1,6 +1,8 @@
 package com.mapoker.interfaces.http;
 
-import com.mapoker.application.game.GameService;
+import com.mapoker.application.game.GameActionService;
+import com.mapoker.application.game.GameLifecycleService;
+import com.mapoker.application.game.GameReadService;
 import com.mapoker.application.table.TableLifecycleService;
 import com.mapoker.application.table.TableMembershipService;
 import com.mapoker.application.table.TableQueryService;
@@ -23,14 +25,16 @@ class GameControllerVisibilityTest {
 
     @Test
     void authenticatedUserOnlySeesOwnHoleCards() {
-        GameService gameService = mock(GameService.class);
+        GameReadService gameRead = mock(GameReadService.class);
+        GameLifecycleService gameLifecycle = mock(GameLifecycleService.class);
+        GameActionService gameAction = mock(GameActionService.class);
         TableQueryService tableQueryService = mock(TableQueryService.class);
         TableLifecycleService tableLifecycleService = mock(TableLifecycleService.class);
         UserService userService = mock(UserService.class);
-        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableQueryService, tableLifecycleService, userService);
+        GameController controller = new GameController(gameRead, gameLifecycle, gameAction, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableQueryService, tableLifecycleService, userService);
 
         GameState state = startedGame();
-        when(gameService.getGame("game-1")).thenReturn(state);
+        when(gameRead.getGame("game-1")).thenReturn(state);
         var appAlice = new com.mapoker.application.auth.User(
                 1L, "pub-alice", "alice", "0000", null, java.time.LocalDateTime.now());
         when(userService.getByPublicId("pub-alice")).thenReturn(appAlice);
@@ -49,14 +53,16 @@ class GameControllerVisibilityTest {
 
     @Test
     void authenticatedUserCannotSpoofViewerIndexWithoutSeat() {
-        GameService gameService = mock(GameService.class);
+        GameReadService gameRead = mock(GameReadService.class);
+        GameLifecycleService gameLifecycle = mock(GameLifecycleService.class);
+        GameActionService gameAction = mock(GameActionService.class);
         TableQueryService tableQueryService = mock(TableQueryService.class);
         TableLifecycleService tableLifecycleService = mock(TableLifecycleService.class);
         UserService userService = mock(UserService.class);
-        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableQueryService, tableLifecycleService, userService);
+        GameController controller = new GameController(gameRead, gameLifecycle, gameAction, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableQueryService, tableLifecycleService, userService);
 
         GameState state = startedGame();
-        when(gameService.getGame("game-1")).thenReturn(state);
+        when(gameRead.getGame("game-1")).thenReturn(state);
         var appMallory = new com.mapoker.application.auth.User(
                 2L, "pub-mallory", "mallory", "0000", null, java.time.LocalDateTime.now());
         when(userService.getByPublicId("pub-mallory")).thenReturn(appMallory);
@@ -74,13 +80,15 @@ class GameControllerVisibilityTest {
 
     @Test
     void anonymousViewerCanUseExplicitViewerIndex() {
-        GameService gameService = mock(GameService.class);
+        GameReadService gameRead = mock(GameReadService.class);
+        GameLifecycleService gameLifecycle = mock(GameLifecycleService.class);
+        GameActionService gameAction = mock(GameActionService.class);
         TableQueryService tableQueryService = mock(TableQueryService.class);
         TableLifecycleService tableLifecycleService = mock(TableLifecycleService.class);
-        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableQueryService, tableLifecycleService, mock(UserService.class));
+        GameController controller = new GameController(gameRead, gameLifecycle, gameAction, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableQueryService, tableLifecycleService, mock(UserService.class));
 
         GameState state = startedGame();
-        when(gameService.getGame("game-1")).thenReturn(state);
+        when(gameRead.getGame("game-1")).thenReturn(state);
 
         var response = controller.getGame("game-1", 0, "0", null);
 

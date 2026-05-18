@@ -1,6 +1,8 @@
 package com.mapoker.interfaces.http;
 
-import com.mapoker.application.game.GameService;
+import com.mapoker.application.game.GameActionService;
+import com.mapoker.application.game.GameLifecycleService;
+import com.mapoker.application.game.GameReadService;
 import com.mapoker.application.table.TableLifecycleService;
 import com.mapoker.application.table.TableQueryService;
 import com.mapoker.application.auth.UserService;
@@ -31,17 +33,24 @@ import java.util.List;
 @RequestMapping("/v1/games")
 public class GameController {
 
-    private final GameService gameService;
+    private final GameReadService gameRead;
+    private final GameLifecycleService gameLifecycle;
+    private final GameActionService gameAction;
     private final GameProperties gameProperties;
     private final TableQueryService tableQueryService;
     private final TableLifecycleService tableLifecycleService;
     private final UserService userService;
 
-    public GameController(GameService gameService, GameProperties gameProperties,
+    public GameController(GameReadService gameRead,
+                          GameLifecycleService gameLifecycle,
+                          GameActionService gameAction,
+                          GameProperties gameProperties,
                           TableQueryService tableQueryService,
                           TableLifecycleService tableLifecycleService,
                           UserService userService) {
-        this.gameService = gameService;
+        this.gameRead = gameRead;
+        this.gameLifecycle = gameLifecycle;
+        this.gameAction = gameAction;
         this.gameProperties = gameProperties;
         this.tableQueryService = tableQueryService;
         this.tableLifecycleService = tableLifecycleService;
@@ -60,11 +69,11 @@ public class GameController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public GameResponse createGame(@Valid @RequestBody CreateGameRequest req) {
-        List<GameService.PlayerInput> inputs = req.players().stream()
-                .map(p -> new GameService.PlayerInput(p.id(), p.stack()))
+        List<GameLifecycleService.PlayerInput> inputs = req.players().stream()
+                .map(p -> new GameLifecycleService.PlayerInput(p.id(), p.stack()))
                 .toList();
         OddChipRule oddChipRule = req.oddChipRule() != null ? req.oddChipRule() : gameProperties.defaultOddChipRule();
-        GameState state = gameService.createGame(inputs, req.buttonIndex(), req.bigBlind(), req.seed(), oddChipRule);
+        GameState state = gameLifecycle.createGame(inputs, req.buttonIndex(), req.bigBlind(), req.seed(), oddChipRule);
         return GameResponse.from(state, null, false);
     }
 
@@ -77,7 +86,7 @@ public class GameController {
      */
     @GetMapping
     public List<GameResponse> listGames() {
-        return gameService.listGames().stream()
+        return gameRead.listGames().stream()
                 .map(g -> GameResponse.from(g, null, false))
                 .toList();
     }
@@ -103,7 +112,7 @@ public class GameController {
             @AuthenticationPrincipal UserDetails principal) {
         boolean isSpectator = "1".equals(spectator) || "true".equalsIgnoreCase(spectator);
         Integer effectiveViewerIndex = resolveViewerIndex(id, viewerIndex, principal);
-        return GameResponse.from(gameService.getGame(id), effectiveViewerIndex, isSpectator, seatedCount(id));
+        return GameResponse.from(gameRead.getGame(id), effectiveViewerIndex, isSpectator, seatedCount(id));
     }
 
     /**
@@ -144,7 +153,7 @@ public class GameController {
             @Valid @RequestBody ApplyActionRequest req,
             @RequestParam(name = "viewer_index", required = false) Integer viewerIndex,
             @AuthenticationPrincipal UserDetails principal) {
-        GameState state = gameService.applyAction(id, req.playerIndex(),
+        GameState state = gameAction.applyAction(id, req.playerIndex(),
                 req.action().type(), req.action().amount());
         Integer effectiveViewerIndex = resolveViewerIndex(id, viewerIndex, principal);
         return GameResponse.from(state, effectiveViewerIndex, false, seatedCount(id));
@@ -158,7 +167,7 @@ public class GameController {
      */
     @GetMapping("/{id}/actions")
     public ActionsResponse getActions(@PathVariable String id) {
-        return ActionsResponse.from(gameService.getActions(id));
+        return ActionsResponse.from(gameRead.getActions(id));
     }
 
     /**
@@ -172,9 +181,9 @@ public class GameController {
      */
     @PostMapping("/{id}/showdown")
     public GameResponse resolveShowdown(@PathVariable String id) {
-        gameService.resolveShowdown(id);
+        gameAction.resolveShowdown(id);
         // showdown後のGameResponseにlast_showdownと全参加者のホールカードを含める
-        GameState state = gameService.getGame(id);
+        GameState state = gameRead.getGame(id);
         return GameResponse.from(state, null, false, seatedCount(id));
     }
 

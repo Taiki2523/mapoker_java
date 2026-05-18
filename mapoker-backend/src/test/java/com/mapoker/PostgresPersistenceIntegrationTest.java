@@ -1,6 +1,8 @@
 package com.mapoker;
 
-import com.mapoker.application.game.GameService;
+import com.mapoker.application.game.GameActionService;
+import com.mapoker.application.game.GameLifecycleService;
+import com.mapoker.application.game.GameReadService;
 import com.mapoker.application.table.TableLifecycleService;
 import com.mapoker.application.table.TableMembershipService;
 import com.mapoker.application.table.TableQueryService;
@@ -30,7 +32,11 @@ class PostgresPersistenceIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
-    private GameService gameService;
+    private GameReadService gameService;
+    @Autowired
+    private GameLifecycleService gameLifecycle;
+    @Autowired
+    private GameActionService gameAction;
 
     @Autowired
     private TableLifecycleService tableLifecycleService;
@@ -47,10 +53,10 @@ class PostgresPersistenceIntegrationTest {
         assertThat(user.username()).isEqualTo("alice");
         assertThat(user.publicId()).isNotBlank();
 
-        var game = gameService.createGame(
+        var game = gameLifecycle.createGame(
                 List.of(
-                        new GameService.PlayerInput("p1", 100),
-                        new GameService.PlayerInput("p2", 100)
+                        new GameLifecycleService.PlayerInput("p1", 100),
+                        new GameLifecycleService.PlayerInput("p2", 100)
                 ),
                 0,
                 10,
@@ -58,9 +64,9 @@ class PostgresPersistenceIntegrationTest {
                 OddChipRule.LOW_INDEX
         );
 
-        var started = gameService.startHand(game.getId(), 10);
+        var started = gameLifecycle.startHand(game.getId(), 10);
         int actor = started.getCurrentPlayer();
-        var nextState = gameService.applyAction(game.getId(), actor, ActionType.CALL, 0);
+        var nextState = gameAction.applyAction(game.getId(), actor, ActionType.CALL, 0);
         var reloaded = gameService.getGame(game.getId());
 
         assertThat(nextState.getStatus()).isIn(GameStatus.IN_PROGRESS, GameStatus.SHOWDOWN, GameStatus.FINISHED);
