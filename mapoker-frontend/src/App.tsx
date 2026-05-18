@@ -66,8 +66,8 @@ function App() {
   const session = useTableSession(gameId, roster)
   const { myName, setMyName, mySeatIndex, setMySeatIndex, mySeat, persistSession, clearGameSession } = session
 
-  const profile = useProfileData(showMyPage, formatErrorMessage)
-  const { wallet, walletLedger, profileTables, profileHistory, profileLoading, profileError, handleClaimDailyBonus } = profile
+  const profile = useProfileData(formatErrorMessage)
+  const { wallet, walletLedger, profileTables, profileHistory, profileLoading, profileError, refreshProfileTables, handleClaimDailyBonus } = profile
 
   // ---- 派生値 ----
   const currentPlayer = useMemo(() => game ? game.players[game.current_player] : null, [game])
@@ -335,9 +335,9 @@ function App() {
     profile.clear()
   }
 
-  const openMyPage = () => {
+  const openMyPage = async () => {
     setShowMyPage(true)
-    // showMyPage=true になると useProfileData が自動フェッチする
+    await refreshProfileTables()
   }
 
   const copyInvite = async () => {
@@ -473,7 +473,7 @@ function App() {
             {viewMode === 'room' && roomScreenMode === 'gameType' && (
               <GameTypeScreen
                 currentUser={currentUser}
-                onOpenMyPage={() => openMyPage()}
+                onOpenMyPage={() => void openMyPage()}
                 onSelectRing={() => setRoomScreenMode('lobby')}
                 appVersion={appVersion}
               />
@@ -484,7 +484,7 @@ function App() {
                 error={error}
                 onCreateGame={createGame}
                 currentUser={currentUser}
-                onOpenMyPage={() => openMyPage()}
+                onOpenMyPage={() => void openMyPage()}
                 onBack={() => setRoomScreenMode('lobby')}
                 appVersion={appVersion}
               />
@@ -492,7 +492,7 @@ function App() {
             {viewMode === 'room' && roomScreenMode === 'lobby' && (
               <LobbyScreen
                 currentUser={currentUser}
-                onOpenMyPage={() => openMyPage()}
+                onOpenMyPage={() => void openMyPage()}
                 onJoinRoom={lobbyJoinWithBuyIn}
                 onCreateTable={() => setRoomScreenMode('room')}
                 onBack={() => setRoomScreenMode('gameType')}
@@ -530,7 +530,7 @@ function App() {
           payoutLines={payoutLines}
           displayName={displayName}
           onCopyInvite={() => void copyInvite()}
-          onOpenMyPage={() => openMyPage()}
+          onOpenMyPage={() => void openMyPage()}
           onLeaveRoom={leaveRoom}
           onSendAction={(type, amount) => void actions.sendAction(type, amount)}
           doStraddle={doStraddle}
