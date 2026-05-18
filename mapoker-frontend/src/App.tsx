@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMatch, useNavigate } from 'react-router-dom'
 import './App.css'
 import {
   apiLogout, createTable, fetchMe, fetchVersion, joinTable, leaveTable,
@@ -29,6 +30,15 @@ const NEXT_HAND_DELAY_MS = 7000
 const CARD_REVEAL_MS_PER_STREET = 1500
 
 function App() {
+  // ---- ルーティング ----
+  const navigate = useNavigate()
+  const match = useMatch('/table/:tableId')
+  const gameId = match?.params.tableId ?? ''
+
+  // gameId への遷移をラップ（URL が正規表現）
+  const goToTable = (id: string) => navigate(`/table/${id}`, { replace: true })
+  const goToLobby = () => navigate('/', { replace: true })
+
   // ---- グローバル state ----
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
   const [appVersion, setAppVersion] = useState('')
@@ -53,8 +63,8 @@ function App() {
   const prevIsMyTurnRef = useRef(false)
 
   // ---- hooks ----
-  const session = useTableSession(roster)
-  const { gameId, setGameId, myName, setMyName, mySeatIndex, setMySeatIndex, mySeat, persistSession, clearGameSession } = session
+  const session = useTableSession(gameId, roster)
+  const { myName, setMyName, mySeatIndex, setMySeatIndex, mySeat, persistSession, clearGameSession } = session
 
   const profile = useProfileData(formatErrorMessage)
   const { wallet, walletLedger, profileTables, profileHistory, profileLoading, profileError, refreshProfileTables, handleClaimDailyBonus } = profile
@@ -72,7 +82,7 @@ function App() {
   }, [game?.players, roster])
 
   const isShowdown = game?.status === 'showdown' || (game?.status === 'finished' && showdown !== null)
-  const inviteUrl = gameId ? `${window.location.origin}?tableId=${gameId}` : ''
+  const inviteUrl = gameId ? `${window.location.origin}/table/${gameId}` : ''
 
   const toCall = useMemo(() => {
     if (!game || !currentPlayer) return 0
@@ -157,14 +167,14 @@ function App() {
 
   // ---- navigate to lobby ----
   const navigateToLobby = () => {
-    clearGameSession(gameId)
-    setGameId('')
+    clearGameSession()
     setGame(null)
     setMySeatIndex(null)
     setRoster([])
     setLeavePending_(false)
     setShowdown(null)
     setRoomScreenMode('lobby')
+    goToLobby()
   }
 
   // ---- leave room ----
@@ -208,14 +218,14 @@ function App() {
       .catch(() => {})
   }, [])
 
-  // URL に gameId があれば初回ロード
+  // URL に tableId があれば初回ロード
   useEffect(() => {
-    if (!session.initialGameId) return
-    void refreshGame(session.initialGameId)
-    void refreshMembers(session.initialGameId)
-    void refreshTable(session.initialGameId)
+    if (!gameId) return
+    void refreshGame(gameId)
+    void refreshMembers(gameId)
+    void refreshTable(gameId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.initialGameId])
+  }, [])  // mount 時のみ
 
   // isMyTurn 変化で actionAmount をリセット
   useEffect(() => {
@@ -313,8 +323,7 @@ function App() {
     try { await apiLogout() } catch { /* ignore */ }
     setCurrentUser(null)
     setMyName('')
-    clearGameSession(gameId)
-    setGameId('')
+    clearGameSession()
     setGame(null)
     setTable(null)
     setMySeatIndex(null)
@@ -380,10 +389,9 @@ function App() {
         setLoading(true)
         try {
           await doTableJoin(data.id, name, buyInAmount)
-          setGameId(data.id)
+          goToTable(data.id)
           setGame(data.game ?? null)
           setTable(data)
-          window.history.replaceState(null, '', `?tableId=${data.id}`)
           await refreshGame(data.id)
         } catch (err) {
           setError(formatErrorMessage(err))
@@ -414,20 +422,18 @@ function App() {
 
   const lobbyJoinWithBuyIn = async (tableId: string) => {
     setRoomScreenMode('room')
-    setGameId(tableId)
     setTable(null)
     setShowdown(null)
-    window.history.replaceState(null, '', `?tableId=${tableId}`)
+    goToTable(tableId)
     await refreshGame(tableId)
     await refreshMembers(tableId)
     const fetchedTable = await refreshTable(tableId)
     if (!myName.trim()) return
 
     const backToLobby = () => {
-      setGameId('')
       setTable(null)
       setRoomScreenMode('lobby')
-      window.history.replaceState(null, '', window.location.pathname)
+      goToLobby()
     }
 
     const doJoin = async (buyInAmount: number) => {
