@@ -20,14 +20,14 @@ export function useProfileData(
   const walletQuery = useQuery({
     queryKey: ['wallet'],
     queryFn: fetchWallet,
-    enabled: loggedIn && showMyPage,
+    enabled: showMyPage,
     staleTime: 2 * 60_000,
   })
 
   const ledgerQuery = useQuery({
     queryKey: ['wallet-ledger'],
     queryFn: fetchWalletLedger,
-    enabled: loggedIn && showMyPage,
+    enabled: showMyPage,
     staleTime: 60_000,
   })
 
