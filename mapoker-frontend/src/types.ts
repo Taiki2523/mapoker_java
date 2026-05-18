@@ -187,3 +187,13 @@ export type CreateGameConfig = {
   visibility: TableVisibility
   flags: TableFlag[]
 }
+
+export type BuyInContext = {
+  tableId: string
+  tableName: string
+  minBuyIn: number
+  maxBuyIn: number
+  bigBlind: number
+  onConfirm: (amount: number) => void
+  onCancel: () => void
+}
