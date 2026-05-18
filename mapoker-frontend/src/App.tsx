@@ -66,7 +66,7 @@ function App() {
   const session = useTableSession(gameId, roster)
   const { myName, setMyName, mySeatIndex, setMySeatIndex, mySeat, persistSession, clearGameSession } = session
 
-  const profile = useProfileData(formatErrorMessage)
+  const profile = useProfileData(showMyPage, !!currentUser, formatErrorMessage)
   const { wallet, walletLedger, profileTables, profileHistory, profileLoading, profileError, refreshProfileTables, handleClaimDailyBonus } = profile
 
   // ---- 派生値 ----
@@ -334,9 +334,9 @@ function App() {
     profile.clear()
   }
 
-  const openMyPage = async () => {
+  const openMyPage = () => {
     setShowMyPage(true)
-    await refreshProfileTables()
+    // showMyPage=true になると useProfileData が自動フェッチする
   }
 
   const copyInvite = async () => {
@@ -472,7 +472,7 @@ function App() {
             {viewMode === 'room' && roomScreenMode === 'gameType' && (
               <GameTypeScreen
                 currentUser={currentUser}
-                onOpenMyPage={() => void openMyPage()}
+                onOpenMyPage={() => openMyPage()}
                 onSelectRing={() => setRoomScreenMode('lobby')}
                 appVersion={appVersion}
               />
@@ -483,7 +483,7 @@ function App() {
                 error={error}
                 onCreateGame={createGame}
                 currentUser={currentUser}
-                onOpenMyPage={() => void openMyPage()}
+                onOpenMyPage={() => openMyPage()}
                 onBack={() => setRoomScreenMode('lobby')}
                 appVersion={appVersion}
               />
@@ -491,7 +491,7 @@ function App() {
             {viewMode === 'room' && roomScreenMode === 'lobby' && (
               <LobbyScreen
                 currentUser={currentUser}
-                onOpenMyPage={() => void openMyPage()}
+                onOpenMyPage={() => openMyPage()}
                 onJoinRoom={lobbyJoinWithBuyIn}
                 onCreateTable={() => setRoomScreenMode('room')}
                 onBack={() => setRoomScreenMode('gameType')}
@@ -529,7 +529,7 @@ function App() {
           payoutLines={payoutLines}
           displayName={displayName}
           onCopyInvite={() => void copyInvite()}
-          onOpenMyPage={() => void openMyPage()}
+          onOpenMyPage={() => openMyPage()}
           onLeaveRoom={leaveRoom}
           onSendAction={(type, amount) => void actions.sendAction(type, amount)}
           doStraddle={doStraddle}
