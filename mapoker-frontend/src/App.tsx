@@ -216,7 +216,8 @@ function App() {
     void fetchVersion()
       .then((res) => setAppVersion(res.version))
       .catch(() => {})
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // mount 時のみ実行
 
   // URL に tableId があれば初回ロード
   useEffect(() => {
@@ -282,9 +283,20 @@ function App() {
 
   // ---- helpers ----
   function formatErrorMessage(err: unknown) {
-    const message = err instanceof Error ? err.message : String(err)
-    if (message === 'insufficient funds') return t('insufficientFunds')
-    return message
+    const code = err instanceof Error ? err.message : String(err)
+    const codeMap: Record<string, string> = {
+      insufficient_funds: t('insufficientFunds'),
+      not_found:          t('errNotFound'),
+      forbidden:          t('errForbidden'),
+      invalid_action:     t('errInvalidAction'),
+      internal_error:     t('errServerError'),
+      http_400:           t('errBadRequest'),
+      http_401:           t('errUnauthorized'),
+      http_403:           t('errForbidden'),
+      http_404:           t('errNotFound'),
+      http_500:           t('errServerError'),
+    }
+    return codeMap[code] ?? t('errUnknown')
   }
 
   const refreshTable = async (id = gameId) => {

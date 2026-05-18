@@ -30,7 +30,7 @@ export async function uploadFile<T>(path: string, file: File): Promise<T> {
   const data = text ? (JSON.parse(text) as T | ApiError) : ({} as T)
   if (!res.ok) {
     const err = data as ApiError
-    throw new Error(err.error?.message ?? `Request failed: ${res.status}`)
+    throw new Error(err.error?.code ?? `http_${res.status}`)
   }
   return data as T
 }
@@ -134,7 +134,7 @@ export async function fetchJSON<T>(path: string, options: RequestInit = {}): Pro
   const data = text ? (JSON.parse(text) as T | ApiError) : ({} as T)
   if (!res.ok) {
     const err = data as ApiError
-    throw new Error(err.error?.message ?? `Request failed: ${res.status}`)
+    throw new Error(err.error?.code ?? `http_${res.status}`)
   }
   return data as T
 }

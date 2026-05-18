@@ -155,6 +155,8 @@ export function TableArea({
       setFlippingIndices(new Set())
       timers.forEach(window.clearTimeout)
     }
+    // game.players / isShowdown はアニメーション遅延計算のみに使用し意図的に省略
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [communityCount])
 
   // ショーダウン開始時点のスタックを凍結（ペイアウト前の値を保持）

@@ -232,6 +232,13 @@ const ja = {
   errSelectSeat: '有効なシートを選択してください',
   errMissingRoom: 'ルームIDがありません',
   errSelectSeatFirst: 'アクション前にシートを選択してください',
+  errServerError: 'サーバーエラーが発生しました。しばらくしてから再試行してください',
+  errNotFound: '対象が見つかりませんでした',
+  errForbidden: 'この操作は許可されていません',
+  errBadRequest: 'リクエストが正しくありません',
+  errUnauthorized: 'ログインが必要です',
+  errInvalidAction: 'この操作は現在実行できません',
+  errUnknown: 'エラーが発生しました',
 
   // --- 動的テキスト（{n} はシート番号）---
   seatN: 'シート{n}',
