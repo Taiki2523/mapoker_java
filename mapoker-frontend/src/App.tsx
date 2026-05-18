@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
-import { fetchJSON } from './api'
+import {
+  apiLogout, createTable, fetchMe, fetchVersion, joinTable, leaveTable,
+} from './api'
 import { t } from './i18n'
 import { bestHandName } from './handEval'
 import { mapMembers } from './utils'
-import { createStompClient, subscribeGame, subscribeHoleCards, subscribeMembers } from './ws'
 import type {
-  AuthUser, BetPreset, CreateGameConfig, GameState, JoinResponse, PayoutLine, Table,
-  RoomMember, RoomMemberApi, Showdown, StoredSession, UserTableHistoryEntry,
-  WalletLedgerEntry, WalletSummary,
+  AuthUser, BetPreset, CreateGameConfig, GameState, RoomMember, RoomMemberApi,
+  Showdown, Table,
 } from './types'
 import { AuthScreen } from './components/AuthScreen'
 import { BuyInPopup } from './components/BuyInPopup'
@@ -18,100 +18,61 @@ import { MyPagePanel } from './components/MyPagePanel'
 import { RoomScreen } from './components/RoomScreen'
 import { GameScreen } from './components/GameScreen'
 
+import { useBuyInFlow } from './hooks/useBuyInFlow'
+import { useGameActions } from './hooks/useGameActions'
+import { useGameConnection } from './hooks/useGameConnection'
+import { useLeaveRoom } from './hooks/useLeaveRoom'
+import { useProfileData } from './hooks/useProfileData'
+import { useTableSession } from './hooks/useTableSession'
+
 const NEXT_HAND_DELAY_MS = 7000
-// TableArea.tsx の STREET_REVEAL_INTERVAL_MS と同じ値で管理すること
 const CARD_REVEAL_MS_PER_STREET = 1500
 
 function App() {
+  // ---- グローバル state ----
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
-  const [appVersion, setAppVersion] = useState<string>('')
-  const [gameId, setGameId] = useState('')
+  const [appVersion, setAppVersion] = useState('')
+  const [roomScreenMode, setRoomScreenMode] = useState<'gameType' | 'room' | 'lobby'>('gameType')
+  const [showMyPage, setShowMyPage] = useState(false)
+
+  // ---- ゲーム state ----
   const [game, setGame] = useState<GameState | null>(null)
   const [showdown, setShowdown] = useState<Showdown | null>(null)
-  const [autoRefresh, setAutoRefresh] = useState(true)
-  const [actionAmount, setActionAmount] = useState(0)
+  const [roster, setRoster] = useState<RoomMember[]>([])
+  const [table, setTable] = useState<Table | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [inviteCopied, setInviteCopied] = useState(false)
-  const showdownInFlight = useRef(false)
-  const startHandInFlight = useRef(false)
-  const prevIsMyTurn = useRef(false)
-  // コミュニティカード公開アニメーションの終了予定時刻（ネタバレ防止用）
-  const cardRevealEndsAtRef = useRef(0)
-  const streetRevealedAtRef = useRef<number>(0)
-  const prevCommLenRef = useRef(0)
-  const stompClientRef = useRef<ReturnType<typeof createStompClient> | null>(null)
-  // リバイポップアップを同じハンドで2度出さないためのフラグ
-  const rebuyShownForHandRef = useRef(false)
-  const [myName, setMyName] = useState('')
-  const [mySeatIndex, setMySeatIndex] = useState<number | null>(null)
+  const [actionAmount, setActionAmount] = useState(0)
   const [doStraddle, setDoStraddle] = useState(false)
-  const [leavePending, setLeavePending] = useState(false)
-  const [roster, setRoster] = useState<RoomMember[]>([])
-  const [showMyPage, setShowMyPage] = useState(false)
-  const [table, setTable] = useState<Table | null>(null)
-  const [profileTables, setProfileTables] = useState<Table[]>([])
-  const [profileHistory, setProfileHistory] = useState<UserTableHistoryEntry[]>([])
-  const [wallet, setWallet] = useState<WalletSummary | null>(null)
-  const [walletLedger, setWalletLedger] = useState<WalletLedgerEntry[]>([])
-  const [profileLoading, setProfileLoading] = useState(false)
-  const [profileError, setProfileError] = useState('')
-  const [roomScreenMode, setRoomScreenMode] = useState<'gameType' | 'room' | 'lobby'>('gameType')
-  const [buyInContext, setBuyInContext] = useState<{
-    tableId: string
-    tableName: string
-    minBuyIn: number
-    maxBuyIn: number
-    bigBlind: number
-    onConfirm: (amount: number) => void
-    onCancel: () => void
-  } | null>(null)
 
-  const formatErrorMessage = (err: unknown) => {
-    const message = err instanceof Error ? err.message : String(err)
-    if (message === 'insufficient funds') return t('insufficientFunds')
-    return message
-  }
+  // ---- refs ----
+  const cardRevealEndsAtRef = useRef(0)
+  const streetRevealedAtRef = useRef(0)
+  const prevCommLenRef = useRef(0)
+  const prevIsMyTurnRef = useRef(false)
 
-  const currentPlayer = useMemo(() => {
-    if (!game) return null
-    return game.players[game.current_player]
-  }, [game])
+  // ---- hooks ----
+  const session = useTableSession(roster)
+  const { gameId, setGameId, myName, setMyName, mySeatIndex, setMySeatIndex, mySeat, persistSession, clearGameSession } = session
 
-  const inferredSeatIndex = useMemo(() => {
-    if (!myName.trim()) return null
-    const member = roster.find((m) => m.name === myName.trim())
-    return member ? member.seatIndex : null
-  }, [myName, roster])
+  const profile = useProfileData(formatErrorMessage)
+  const { wallet, walletLedger, profileTables, profileHistory, profileLoading, profileError, refreshProfileTables, handleClaimDailyBonus } = profile
 
-  const mySeat = useMemo(() => mySeatIndex ?? inferredSeatIndex, [mySeatIndex, inferredSeatIndex])
+  // ---- 派生値 ----
+  const currentPlayer = useMemo(() => game ? game.players[game.current_player] : null, [game])
+  const isSpectator = useMemo(() => {
+    if (!game || mySeat === null) return false
+    return game.players[mySeat]?.stack === 0
+  }, [game, mySeat])
 
-  const displayName = useMemo(() => {
-    return (seatIndex: number) => {
-      const member = roster.find((m) => m.seatIndex === seatIndex)
-      return member?.displayName || member?.name || game?.players?.[seatIndex]?.id || t('seatN', { n: seatIndex + 1 })
-    }
+  const displayName = useMemo(() => (seatIndex: number) => {
+    const member = roster.find((m) => m.seatIndex === seatIndex)
+    return member?.displayName || member?.name || game?.players?.[seatIndex]?.id || t('seatN', { n: seatIndex + 1 })
   }, [game?.players, roster])
 
-  const winnerNames = useMemo(() => {
-    if (!showdown) return ''
-    return (showdown.winners ?? []).map((idx) => displayName(idx)).join(', ')
-  }, [displayName, showdown])
-
-  const payoutLines = useMemo((): PayoutLine[] => {
-    if (!showdown || !game) return []
-    return (showdown.payouts ?? [])
-      .map((amount, idx) => ({ name: displayName(idx), amount }))
-      .filter((l) => l.amount > 0)
-  }, [displayName, game, showdown])
-
-  const isShowdown = game?.status === 'showdown'
-    || (game?.status === 'finished' && showdown !== null)
-
-  const inviteUrl = useMemo(() => {
-    if (!gameId) return ''
-    return `${window.location.origin}?tableId=${gameId}`
-  }, [gameId])
+  const isShowdown = game?.status === 'showdown' || (game?.status === 'finished' && showdown !== null)
+  const inviteUrl = gameId ? `${window.location.origin}?tableId=${gameId}` : ''
 
   const toCall = useMemo(() => {
     if (!game || !currentPlayer) return 0
@@ -120,8 +81,7 @@ function App() {
 
   const minRaise = useMemo(() => {
     if (!game) return 0
-    if (game.current_bet === 0) return game.big_blind
-    return game.current_bet * 2
+    return game.current_bet === 0 ? game.big_blind : game.current_bet * 2
   }, [game])
 
   const maxBet = useMemo(() => {
@@ -139,27 +99,24 @@ function App() {
         { label: 'x3', amount: clamp(game.current_bet * 3) },
         { label: 'x4', amount: clamp(game.current_bet * 4) },
         { label: 'ALL', amount: maxBet },
-      ]
-        .filter((p) => p.amount > 0 && p.amount <= maxBet)
+      ].filter((p) => p.amount > 0 && p.amount <= maxBet)
     }
     const pot = game.pot_total
     return [
       { label: t('presetMin'), amount: minRaise },
-      { label: '30%',          amount: clamp(Math.round(pot * 0.3)) },
-      { label: '50%',          amount: clamp(Math.round(pot * 0.5)) },
-      { label: '100%',         amount: clamp(pot) },
-      { label: '200%',         amount: clamp(pot * 2) },
+      { label: '30%', amount: clamp(Math.round(pot * 0.3)) },
+      { label: '50%', amount: clamp(Math.round(pot * 0.5)) },
+      { label: '100%', amount: clamp(pot) },
+      { label: '200%', amount: clamp(pot * 2) },
       { label: t('presetAll'), amount: maxBet },
-    ]
-      .filter((p) => p.amount > 0 && p.amount <= maxBet)
+    ].filter((p) => p.amount > 0 && p.amount <= maxBet)
   }, [game, minRaise, maxBet])
 
   const myHandName = useMemo(() => {
     if (mySeat === null || !game) return null
     const hole = (game.players[mySeat]?.hole ?? []).filter((c) => c && c !== '--')
     if (hole.length < 2) return null
-    const community = (game.community ?? []).filter((c) => c && c !== '--')
-    return bestHandName(hole, community)
+    return bestHandName(hole, (game.community ?? []).filter((c) => c && c !== '--'))
   }, [game, mySeat])
 
   const isMyTurn = useMemo(() => {
@@ -167,14 +124,22 @@ function App() {
     return game.current_player === mySeat
   }, [game, mySeat])
 
-  const isSpectator = useMemo(() => {
-    if (!game || mySeat === null) return false
-    return game.players[mySeat]?.stack === 0
-  }, [game, mySeat])
+  const canAct = useMemo(
+    () => isMyTurn && game?.status === 'in_progress' && !isSpectator,
+    [game?.status, isMyTurn, isSpectator]
+  )
 
-  const canAct = useMemo(() => {
-    return isMyTurn && game?.status === 'in_progress' && !isSpectator
-  }, [game?.status, isMyTurn, isSpectator])
+  const winnerNames = useMemo(() => {
+    if (!showdown) return ''
+    return (showdown.winners ?? []).map((idx) => displayName(idx)).join(', ')
+  }, [displayName, showdown])
+
+  const payoutLines = useMemo(() => {
+    if (!showdown || !game) return []
+    return (showdown.payouts ?? [])
+      .map((amount, idx) => ({ name: displayName(idx), amount }))
+      .filter((l) => l.amount > 0)
+  }, [displayName, game, showdown])
 
   const viewMode = useMemo(() => {
     if (!currentUser) return 'auth'
@@ -182,148 +147,95 @@ function App() {
     return 'game'
   }, [currentUser, game, gameId])
 
+  // ---- game connection ----
+  const connection = useGameConnection(gameId, {
+    mySeat, mySeatIndex, setMySeatIndex, isSpectator,
+    setGame, setShowdown, setRoster,
+    cardRevealEndsAtRef, streetRevealedAtRef,
+  })
+  const { autoRefresh, setAutoRefresh, refreshGame, refreshMembers } = connection
+
+  // ---- navigate to lobby ----
+  const navigateToLobby = () => {
+    clearGameSession(gameId)
+    setGameId('')
+    setGame(null)
+    setMySeatIndex(null)
+    setRoster([])
+    setLeavePending_(false)
+    setShowdown(null)
+    setRoomScreenMode('lobby')
+  }
+
+  // ---- leave room ----
+  const leaveHook = useLeaveRoom({
+    gameId, myName, mySeatIndex, roster, setRoster, navigateToLobby,
+  })
+  const { leavePending, setLeavePending: setLeavePending_, leaveRoom } = leaveHook
+
+  // ---- game actions ----
+  const actions = useGameActions({
+    gameId, mySeat, game, showdown,
+    doStraddle, setDoStraddle,
+    setGame: (g) => setGame(g),
+    setShowdown,
+    setLoading, setError, setActionAmount,
+    prevIsMyTurnRef,
+    refreshGame,
+    runShowdown: async (opts) => actions.runShowdown(opts),
+  })
+
+  // ---- buy-in flow ----
+  const buyIn = useBuyInFlow({
+    game, mySeat, myName, gameId, table, wallet,
+    cardRevealEndsAtRef,
+    onRebuyConfirm: (amount) => {
+      void doTableJoin(gameId, myName, amount)
+        .then(() => refreshGame(gameId))
+        .catch((err) => setError(formatErrorMessage(err)))
+    },
+    onRebuyCancel: () => void leaveRoom(),
+  })
+  const { buyInContext, setBuyInContext } = buyIn
+
+  // ---- 初期化 ----
   useEffect(() => {
-    fetchJSON<AuthUser>('/v1/auth/me')
+    void fetchMe()
       .then((user) => { setCurrentUser(user); setMyName(user.username) })
       .catch(() => {})
-    fetchJSON<{ version: string }>('/v1/version')
+    void fetchVersion()
       .then((res) => setAppVersion(res.version))
       .catch(() => {})
   }, [])
 
+  // URL に gameId があれば初回ロード
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const initial = params.get('tableId') ?? params.get('gameId')
-    if (initial) {
-      setGameId(initial)
-      void refreshGame(initial)
-      void refreshMembers(initial)
-      void refreshTable(initial)
-    }
+    if (!session.initialGameId) return
+    void refreshGame(session.initialGameId)
+    void refreshMembers(session.initialGameId)
+    void refreshTable(session.initialGameId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [session.initialGameId])
 
+  // isMyTurn 変化で actionAmount をリセット
   useEffect(() => {
-    if (!gameId) return
-    const raw = window.localStorage.getItem(`mapoker.session.${gameId}`)
-    if (!raw) return
-    try {
-      const data = JSON.parse(raw) as StoredSession
-      setMyName(data.name)
-      setMySeatIndex(data.seatIndex)
-    } catch {
-      // ignore
-    }
-  }, [gameId])
-
-  useEffect(() => {
-    if (!gameId || !myName.trim() || mySeatIndex !== null) return
-    const member = roster.find((m) => m.name === myName.trim())
-    if (member) {
-      setMySeatIndex(member.seatIndex)
-    }
-  }, [gameId, myName, mySeatIndex, roster])
-
-  useEffect(() => {
-    if (!autoRefresh || !gameId) return
-    const client = createStompClient()
-    stompClientRef.current = client
-
-    client.onConnect = () => {
-      subscribeGame(client, gameId, (payload) => {
-        if (payload.streetRevealedAt) {
-          streetRevealedAtRef.current = new Date(payload.streetRevealedAt).getTime()
-        }
-        const nextGame = payload.game as GameState
-        setShowdown(nextGame.last_showdown ?? null)
-        setGame((prev) => {
-          if (!prev) return nextGame
-          // broadcast は全プレイヤーのホールカードをマスク済みで送信する。
-          // 既知のカード（subscribeHoleCards 受信済み or 初回 REST で取得済み）は上書きしない。
-          const players = nextGame.players.map((p, i) => {
-            const prevHole = prev.players[i]?.hole
-            const hasKnownCards = Array.isArray(prevHole) &&
-              prevHole.some((c) => c && c !== '??' && c !== '--')
-            return hasKnownCards ? { ...p, hole: prevHole } : p
-          })
-          return { ...nextGame, players }
-        })
-      })
-      subscribeMembers(client, gameId, (payload) => {
-        setRoster(mapMembers(payload.members as RoomMemberApi[]))
-      })
-      subscribeHoleCards(client, (payload) => {
-        if (payload.tableId !== gameId) return
-        setGame((prev) => {
-          if (!prev) return prev
-          const players = prev.players.map((p, i) =>
-            i === payload.seatIndex ? { ...p, hole: payload.hole } : p
-          )
-          return { ...prev, players }
-        })
-      })
-      void refreshGame(gameId)
-      void refreshMembers(gameId)
-    }
-
-    client.activate()
-    return () => {
-      void client.deactivate()
-      stompClientRef.current = null
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoRefresh, gameId])
-
-  useEffect(() => {
-    if (!game) return
-    if (game.status === 'showdown' && !showdown) {
-      // オールインのランアウト時はコミュニティカードアニメーション完了を待ってから解決する
-      const delay = Math.max(0, cardRevealEndsAtRef.current - Date.now())
-      if (delay > 0) {
-        const timer = window.setTimeout(() => {
-          void runShowdown({ suppressError: true })
-        }, delay)
-        return () => window.clearTimeout(timer)
-      }
-      void runShowdown({ suppressError: true })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game, showdown])
-
-  useEffect(() => {
-    const isAutoStartable = game?.status === 'finished' || !game?.status
-    const activeRosterCount = roster.filter((m) => !m.pendingLeave).length
-    if (!game || !isAutoStartable || !game.can_start_hand || activeRosterCount < 2) return
-    const timer = window.setTimeout(() => {
-      void startHand(undefined, undefined, { suppressError: true })
-    }, NEXT_HAND_DELAY_MS)
-    return () => window.clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game?.status, game?.can_start_hand, gameId, roster])
-
-  useEffect(() => {
-    if (isMyTurn && !prevIsMyTurn.current) {
-      setActionAmount(minRaise)
-    }
-    prevIsMyTurn.current = isMyTurn
+    if (isMyTurn && !prevIsMyTurnRef.current) setActionAmount(minRaise)
+    prevIsMyTurnRef.current = isMyTurn
   }, [isMyTurn, minRaise])
 
-  // コミュニティカード公開アニメーションの終了時刻を追跡（強制退席・勝者表示ネタバレ防止）
+  // コミュニティカード公開アニメーション終了時刻の追跡
   useEffect(() => {
-    const current = (game?.community ?? []).filter(c => c && c !== '--').length
+    const current = (game?.community ?? []).filter((c) => c && c !== '--').length
     const prev = prevCommLenRef.current
     prevCommLenRef.current = current
-
     if (current <= prev) {
       if (current === 0) cardRevealEndsAtRef.current = 0
       return
     }
-
     let ms = 0
     if (prev < 3 && current >= 3) ms += CARD_REVEAL_MS_PER_STREET
     if (prev < 4 && current >= 4) ms += CARD_REVEAL_MS_PER_STREET
     if (prev < 5 && current >= 5) ms += CARD_REVEAL_MS_PER_STREET
-    // +1600 = TableArea の sdStep(3) 発火タイミングと揃える
     if (ms > 0) {
       const base = streetRevealedAtRef.current > 0 ? streetRevealedAtRef.current : Date.now()
       streetRevealedAtRef.current = 0
@@ -331,125 +243,45 @@ function App() {
     }
   }, [game?.community])
 
-  // 新ハンド開始でリバイフラグをリセット
+  // 自動ショーダウン
   useEffect(() => {
-    if (game?.status === 'in_progress') {
-      rebuyShownForHandRef.current = false
+    if (!game) return
+    if (game.status === 'showdown' && !showdown) {
+      const delay = Math.max(0, cardRevealEndsAtRef.current - Date.now())
+      if (delay > 0) {
+        const timer = window.setTimeout(() => void actions.runShowdown({ suppressError: true }), delay)
+        return () => window.clearTimeout(timer)
+      }
+      void actions.runShowdown({ suppressError: true })
     }
-  }, [game?.status])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game, showdown])
 
-  // 手が終了してチップが 0 になったら自動でリバイ画面を表示
-  // game.can_rebuy は viewer_index 依存のため、ローカルの players スタックを直接参照する
-  const myCurrentStack = mySeat !== null ? (game?.players?.[mySeat]?.stack ?? null) : null
+  // 自動ハンド開始
   useEffect(() => {
-    if (game?.status !== 'finished') return
-    if (myCurrentStack !== 0) return
-    if (mySeat === null || !myName.trim()) return
-    if (rebuyShownForHandRef.current) return
-
-    rebuyShownForHandRef.current = true
-
-    const minBuyIn = table?.min_buy_in ?? game.big_blind * 10
-    const maxBuyIn = table?.max_buy_in ?? game.big_blind * 100
-    const walletCap = wallet?.chip_balance ?? Infinity
-
-    // runShowdown は即座に実行されるので game.status='finished' は ~300ms で来る。
-    // カード公開アニメーション完了後にポップアップを表示するため cardRevealEndsAtRef で遅延する。
-    const waitMs = Math.max(500, cardRevealEndsAtRef.current - Date.now())
-    const timer = window.setTimeout(() => {
-      setBuyInContext({
-        tableId: gameId,
-        tableName: table?.name ?? 'Table',
-        minBuyIn,
-        maxBuyIn: Math.min(maxBuyIn, walletCap),
-        bigBlind: game.big_blind,
-        onConfirm: (amount) => {
-          setBuyInContext(null)
-          void doTableJoin(gameId, myName, amount).then(() => refreshGame(gameId)).catch(err => setError(formatErrorMessage(err)))
-        },
-        onCancel: () => {
-          setBuyInContext(null)
-          void leaveRoom()
-        },
-      })
-    }, waitMs)
-
+    const isAutoStartable = game?.status === 'finished' || !game?.status
+    const activeRosterCount = roster.filter((m) => !m.pendingLeave).length
+    if (!game || !isAutoStartable || !game.can_start_hand || activeRosterCount < 2) return
+    const timer = window.setTimeout(
+      () => void actions.startHand(undefined, undefined, { suppressError: true }),
+      NEXT_HAND_DELAY_MS
+    )
     return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game?.status, myCurrentStack, mySeat, myName])
+  }, [game?.status, game?.can_start_hand, gameId, roster])
 
-  // Bug3: 退席予約が解消されたらロビーに戻る
-  useEffect(() => {
-    if (!leavePending || !myName.trim()) return
-    const stillInRoster = roster.some((m) => m.name === myName.trim())
-    if (!stillInRoster) {
-      navigateToLobby()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roster, leavePending, myName])
-
-  // Bug4: ローカルのシート番号が他のプレイヤーと衝突していたらリセット
-  useEffect(() => {
-    if (mySeatIndex === null || !myName.trim() || !roster.length) return
-    const memberAtSeat = roster.find((m) => m.seatIndex === mySeatIndex)
-    if (memberAtSeat && memberAtSeat.name !== myName.trim()) {
-      setMySeatIndex(null)
-      if (gameId) window.localStorage.removeItem(`mapoker.session.${gameId}`)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roster])
-
-  const refreshGame = async (id = gameId) => {
-    if (!id) return
-    try {
-      let seat = mySeat
-      if (seat === null) {
-        const raw = window.localStorage.getItem(`mapoker.session.${id}`)
-        if (raw) {
-          try {
-            const data = JSON.parse(raw) as { seatIndex?: number }
-            if (typeof data.seatIndex === 'number') {
-              seat = data.seatIndex
-              setMySeatIndex(data.seatIndex)
-            }
-          } catch {
-            // ignore
-          }
-        }
-      }
-      const params = new URLSearchParams()
-      if (seat !== null) params.set('viewer_index', String(seat))
-      if (isSpectator) params.set('spectator', '1')
-      const query = params.toString()
-      const path = query ? `/v1/games/${id}?${query}` : `/v1/games/${id}`
-      const data = await fetchJSON<GameState>(path)
-      setGame(data)
-      if (data.last_showdown) {
-        setShowdown(data.last_showdown)
-      } else {
-        setShowdown(null)
-      }
-    } catch (err) {
-      setError((err as Error).message)
-    }
-  }
-
-  const refreshMembers = async (id = gameId) => {
-    if (!id) return
-    // カード公開アニメーション中はロスター更新をスキップ（強制退席のネタバレ防止）
-    if (Date.now() < cardRevealEndsAtRef.current) return
-    try {
-      const data = await fetchJSON<{ members: RoomMemberApi[] }>(`/v1/tables/${id}/members`)
-      setRoster(mapMembers(data.members))
-    } catch {
-      // ignore
-    }
+  // ---- helpers ----
+  function formatErrorMessage(err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    if (message === 'insufficient funds') return t('insufficientFunds')
+    return message
   }
 
   const refreshTable = async (id = gameId) => {
     if (!id) return null
     try {
-      const data = await fetchJSON<Table>(`/v1/tables/${id}`)
+      const { fetchTable } = await import('./api')
+      const data = await fetchTable(id)
       setTable(data)
       return data
     } catch {
@@ -458,19 +290,13 @@ function App() {
     }
   }
 
-  const refreshWallet = async () => {
-    let nextWallet: WalletSummary | null = null
-    try {
-      nextWallet = await fetchJSON<WalletSummary>('/v1/wallet')
-      setWallet(nextWallet)
-    } catch {
-      setWallet(null)
-      setWalletLedger([])
-      return
-    }
-    const ledger = await fetchJSON<WalletLedgerEntry[]>('/v1/wallet/ledger?limit=20')
-    setWallet(nextWallet)
-    setWalletLedger(ledger)
+  const doTableJoin = async (tableId: string, name: string, buyInAmount: number) => {
+    const result = await joinTable(tableId, name, buyInAmount)
+    const assignedSeatIndex = result.assigned_seat_index
+    setMySeatIndex(assignedSeatIndex)
+    setRoster(mapMembers(result.members as RoomMemberApi[]))
+    persistSession(tableId, { name, seatIndex: assignedSeatIndex })
+    return assignedSeatIndex
   }
 
   const handleAuthSuccess = (user: AuthUser) => {
@@ -479,62 +305,24 @@ function App() {
   }
 
   const handleLogout = async () => {
-    // テーブルに着席中ならログアウト前にキャッシュアウト退席する
     if (gameId && myName.trim()) {
       try {
-        await fetchJSON(`/v1/tables/${gameId}/leave`, {
-          method: 'POST',
-          body: JSON.stringify({ name: myName.trim(), seat_index: mySeatIndex }),
-        })
-      } catch {
-        // ignore — サーバー側で未処理のまま logout を続行
-      }
+        await leaveTable(gameId, myName.trim(), mySeatIndex)
+      } catch { /* ignore */ }
     }
-    try {
-      await fetchJSON('/v1/auth/logout', { method: 'POST' })
-    } catch {
-      // ignore
-    }
+    try { await apiLogout() } catch { /* ignore */ }
     setCurrentUser(null)
     setMyName('')
+    clearGameSession(gameId)
     setGameId('')
     setGame(null)
     setTable(null)
     setMySeatIndex(null)
-    setProfileHistory([])
-    setWallet(null)
-    setWalletLedger([])
-    setShowMyPage(false)
+    setShowdown(null)
     setBuyInContext(null)
+    setShowMyPage(false)
     setRoomScreenMode('gameType')
-  }
-
-  const persistSession = (tableId: string, session: Omit<StoredSession, 'updatedAt'>) => {
-    window.localStorage.setItem(
-      `mapoker.session.${tableId}`,
-      JSON.stringify({
-        ...session,
-        updatedAt: new Date().toISOString(),
-      })
-    )
-  }
-
-  const refreshProfileTables = async () => {
-    setProfileLoading(true)
-    setProfileError('')
-    try {
-      const [tables, history] = await Promise.all([
-        fetchJSON<Table[]>('/v1/tables'),
-        fetchJSON<UserTableHistoryEntry[]>('/v1/auth/history'),
-      ])
-      setProfileTables(tables)
-      setProfileHistory(history)
-      await refreshWallet()
-    } catch (err) {
-      setProfileError(formatErrorMessage(err))
-    } finally {
-      setProfileLoading(false)
-    }
+    profile.clear()
   }
 
   const openMyPage = async () => {
@@ -542,16 +330,30 @@ function App() {
     await refreshProfileTables()
   }
 
-  const doTableJoin = async (tableId: string, name: string, buyIn: number) => {
-    const result = await fetchJSON<JoinResponse>(`/v1/tables/${tableId}/join`, {
-      method: 'POST',
-      body: JSON.stringify({ name, buy_in: buyIn }),
+  const copyInvite = async () => {
+    if (!inviteUrl) return
+    try {
+      await navigator.clipboard.writeText(inviteUrl)
+      setInviteCopied(true)
+      window.setTimeout(() => setInviteCopied(false), 1500)
+    } catch { setInviteCopied(false) }
+  }
+
+  const showBuyInPopup = (
+    t_: Table, id: string,
+    onConfirm: (amount: number) => void,
+    onCancel: () => void
+  ) => {
+    const effectiveMax = wallet ? Math.min(t_.max_buy_in, wallet.chip_balance) : t_.max_buy_in
+    setBuyInContext({
+      tableId: id,
+      tableName: t_.name,
+      minBuyIn: t_.min_buy_in,
+      maxBuyIn: effectiveMax,
+      bigBlind: t_.stake.big_blind,
+      onConfirm: (amount) => { setBuyInContext(null); onConfirm(amount) },
+      onCancel: () => { setBuyInContext(null); onCancel() },
     })
-    const assignedSeatIndex = result.assigned_seat_index
-    setMySeatIndex(assignedSeatIndex)
-    setRoster(mapMembers(result.members))
-    persistSession(tableId, { name, seatIndex: assignedSeatIndex })
-    return assignedSeatIndex
   }
 
   const createGame = async (config: CreateGameConfig) => {
@@ -570,18 +372,14 @@ function App() {
         visibility: config.visibility,
         flags: config.flags,
       }
-      const data = await fetchJSON<Table>('/v1/tables', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      })
+      const data = await createTable(payload)
       if (!data.game) throw new Error('table game payload is missing')
-
       const name = myName.trim() || 'Host'
 
-      const doJoinAndNavigate = async (buyIn: number) => {
+      const doJoinAndNavigate = async (buyInAmount: number) => {
         setLoading(true)
         try {
-          await doTableJoin(data.id, name, buyIn)
+          await doTableJoin(data.id, name, buyInAmount)
           setGameId(data.id)
           setGame(data.game ?? null)
           setTable(data)
@@ -595,21 +393,15 @@ function App() {
       }
 
       if (data.min_buy_in > 0) {
-        const effectiveMax = wallet ? Math.min(data.max_buy_in, wallet.chip_balance) : data.max_buy_in
         if (wallet && wallet.chip_balance < data.min_buy_in) {
           setError(`チップが不足しています（最低バイイン: ${data.min_buy_in.toLocaleString()}）`)
           setRoomScreenMode('lobby')
           return
         }
-        setBuyInContext({
-          tableId: data.id,
-          tableName: data.name,
-          minBuyIn: data.min_buy_in,
-          maxBuyIn: effectiveMax,
-          bigBlind: data.stake.big_blind,
-          onConfirm: (amount) => { setBuyInContext(null); void doJoinAndNavigate(amount) },
-          onCancel: () => { setBuyInContext(null); setRoomScreenMode('lobby') },
-        })
+        showBuyInPopup(data, data.id,
+          (amount) => void doJoinAndNavigate(amount),
+          () => setRoomScreenMode('lobby')
+        )
       } else {
         await doJoinAndNavigate(0)
       }
@@ -620,19 +412,15 @@ function App() {
     }
   }
 
-
-
   const lobbyJoinWithBuyIn = async (tableId: string) => {
     setRoomScreenMode('room')
-    const id = tableId
-    setGameId(id)
+    setGameId(tableId)
     setTable(null)
     setShowdown(null)
-    window.history.replaceState(null, '', `?tableId=${id}`)
-    await refreshGame(id)
-    await refreshMembers(id)
-    const fetchedTable = await refreshTable(id)
-
+    window.history.replaceState(null, '', `?tableId=${tableId}`)
+    await refreshGame(tableId)
+    await refreshMembers(tableId)
+    const fetchedTable = await refreshTable(tableId)
     if (!myName.trim()) return
 
     const backToLobby = () => {
@@ -642,9 +430,9 @@ function App() {
       window.history.replaceState(null, '', window.location.pathname)
     }
 
-    const doJoin = async (buyIn: number) => {
+    const doJoin = async (buyInAmount: number) => {
       try {
-        await doTableJoin(id, myName.trim(), buyIn)
+        await doTableJoin(tableId, myName.trim(), buyInAmount)
       } catch (err) {
         setError(formatErrorMessage(err))
         backToLobby()
@@ -652,164 +440,21 @@ function App() {
     }
 
     if (fetchedTable && fetchedTable.min_buy_in > 0) {
-      const effectiveMax = wallet ? Math.min(fetchedTable.max_buy_in, wallet.chip_balance) : fetchedTable.max_buy_in
       if (wallet && wallet.chip_balance < fetchedTable.min_buy_in) {
         setError(`チップが不足しています（最低バイイン: ${fetchedTable.min_buy_in.toLocaleString()}）`)
         backToLobby()
         return
       }
-      setBuyInContext({
-        tableId: id,
-        tableName: fetchedTable.name,
-        minBuyIn: fetchedTable.min_buy_in,
-        maxBuyIn: effectiveMax,
-        bigBlind: fetchedTable.stake.big_blind,
-        onConfirm: (amount) => { setBuyInContext(null); void doJoin(amount) },
-        onCancel: () => { setBuyInContext(null); backToLobby() },
-      })
+      showBuyInPopup(fetchedTable, tableId,
+        (amount) => void doJoin(amount),
+        backToLobby
+      )
     } else {
       await doJoin(0)
     }
   }
 
-  const handleClaimDailyBonus = async () => {
-    setProfileLoading(true)
-    setProfileError('')
-    try {
-      await fetchJSON('/v1/wallet/daily-bonus', { method: 'POST' })
-      await refreshWallet()
-    } catch (err) {
-      setProfileError(formatErrorMessage(err))
-    } finally {
-      setProfileLoading(false)
-    }
-  }
-
-  const navigateToLobby = () => {
-    if (gameId) {
-      window.localStorage.removeItem(`mapoker.session.${gameId}`)
-      window.history.replaceState(null, '', window.location.pathname)
-    }
-    setGameId('')
-    setGame(null)
-    setMySeatIndex(null)
-    setRoster([])
-    setLeavePending(false)
-    setShowdown(null)
-    setRoomScreenMode('lobby')
-  }
-
-  const leaveRoom = async () => {
-    if (!gameId) return
-    try {
-      const result = await fetchJSON<{ members: RoomMemberApi[] }>(`/v1/tables/${gameId}/leave`, {
-        method: 'POST',
-        body: JSON.stringify({ name: myName, seat_index: mySeatIndex }),
-      })
-      const updatedRoster = mapMembers(result.members)
-      setRoster(updatedRoster)
-      const stillInRoster = updatedRoster.some(
-        (m) => m.name === myName.trim()
-      )
-      if (stillInRoster) {
-        setLeavePending(true)
-      } else {
-        navigateToLobby()
-      }
-    } catch {
-      navigateToLobby()
-    }
-  }
-
-  const copyInvite = async () => {
-    if (!inviteUrl) return
-    try {
-      await navigator.clipboard.writeText(inviteUrl)
-      setInviteCopied(true)
-      window.setTimeout(() => setInviteCopied(false), 1500)
-    } catch {
-      setInviteCopied(false)
-    }
-  }
-
-  const startHand = async (
-    id = gameId,
-    bigBlindOverride?: number,
-    options?: { suppressError?: boolean }
-  ) => {
-    if (!id || startHandInFlight.current) return
-    startHandInFlight.current = true
-    setLoading(true)
-    setError('')
-    setShowdown(null)
-    setActionAmount(0)
-    prevIsMyTurn.current = false
-    try {
-      const bb = bigBlindOverride ?? game?.big_blind ?? 10
-      const straddle = doStraddle
-      setDoStraddle(false)
-      await fetchJSON(`/v1/games/${id}/start`, {
-        method: 'POST',
-        body: JSON.stringify({ big_blind: bb, straddle }),
-      })
-      await refreshGame(id)
-    } catch (err) {
-      if (!options?.suppressError) {
-        setError((err as Error).message)
-      }
-    } finally {
-      startHandInFlight.current = false
-      setLoading(false)
-    }
-  }
-
-  const sendAction = async (type: string, amount: number) => {
-    const seat = mySeat
-    if (!gameId || seat === null) { setError(t('errSelectSeatFirst')); return }
-    setLoading(true)
-    setError('')
-    try {
-      const data = await fetchJSON<GameState>(`/v1/games/${gameId}/actions`, {
-        method: 'POST',
-        body: JSON.stringify({ player_index: seat, action: { type, amount } }),
-      })
-      setGame(data)
-      if (data.last_showdown) {
-        setShowdown(data.last_showdown)
-      } else {
-        setShowdown(null)
-      }
-      if (data.status === 'showdown' && !showdown) {
-        void runShowdown({ suppressError: true })
-      } else {
-        await refreshGame(gameId)
-      }
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const runShowdown = async (options?: { suppressError?: boolean }) => {
-    if (!gameId || showdownInFlight.current) return
-    showdownInFlight.current = true
-    setLoading(true)
-    setError('')
-    try {
-      const data = await fetchJSON<Showdown>(`/v1/games/${gameId}/showdown`, { method: 'POST' })
-      setShowdown(data)
-      await refreshGame(gameId)
-    } catch (err) {
-      if (!options?.suppressError) {
-        setError((err as Error).message)
-      }
-    } finally {
-      showdownInFlight.current = false
-      setLoading(false)
-    }
-  }
-
+  // ---- render ----
   return (
     <div className="app">
       {viewMode !== 'game' && (
@@ -880,17 +525,9 @@ function App() {
           onCopyInvite={() => void copyInvite()}
           onOpenMyPage={() => void openMyPage()}
           onLeaveRoom={leaveRoom}
-          onSendAction={(type, amount) => void sendAction(type, amount)}
+          onSendAction={(type, amount) => void actions.sendAction(type, amount)}
           doStraddle={doStraddle}
-          onToggleStraddle={(v) => {
-            setDoStraddle(v)
-            if (gameId) {
-              void fetchJSON(`/v1/games/${gameId}/straddle-intent`, {
-                method: 'POST',
-                body: JSON.stringify({ straddle: v }),
-              }).catch(() => {})
-            }
-          }}
+          onToggleStraddle={actions.toggleStraddle}
         />
       )}
       {buyInContext && (
