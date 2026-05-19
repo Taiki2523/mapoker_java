@@ -104,7 +104,8 @@ public class TableQueryService {
                 existing != null ? existing.createdAt() : Instant.now(),
                 existing != null ? existing.everSeated() : false,
                 existing != null ? existing.ante() : game.getAnte(),
-                existing != null ? existing.straddleEnabled() : game.isStraddleEnabled()
+                existing != null ? existing.straddleEnabled() : game.isStraddleEnabled(),
+                existing != null ? existing.inviteCode() : null
         );
     }
 

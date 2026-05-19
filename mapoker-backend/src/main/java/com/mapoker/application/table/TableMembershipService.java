@@ -138,7 +138,8 @@ public class TableMembershipService {
                     table.id(), table.roomId(), table.name(), table.gameType(),
                     table.smallBlind(), table.bigBlind(), table.minBuyIn(), table.maxBuyIn(),
                     table.maxPlayers(), table.flags(), table.visibility(), table.status(),
-                    table.gameId(), table.createdAt(), true, table.ante(), table.straddleEnabled()));
+                    table.gameId(), table.createdAt(), true, table.ante(), table.straddleEnabled(),
+                    table.inviteCode()));
 
             members.add(new TableMemberRecord(name, seatIndex, Instant.now().toString(),
                     displayName != null ? displayName : name, avatarUrl, publicId));

@@ -377,7 +377,7 @@ function App() {
     })
   }
 
-  const createGame = async (config: CreateGameConfig) => {
+  const createGame = async (config: CreateGameConfig): Promise<string | undefined> => {
     setLoading(true)
     setError('')
     setShowdown(null)
@@ -392,9 +392,17 @@ function App() {
         straddle_enabled: config.straddleEnabled,
         visibility: config.visibility,
         flags: config.flags,
+        game_type: config.gameType,
       }
       const data = await createTable(payload)
       if (!data.game) throw new Error('table game payload is missing')
+
+      if (config.gameType === 'offline') {
+        setTable(data)
+        setGame(data.game ?? null)
+        return data.invite_code ?? undefined
+      }
+
       const name = myName.trim() || 'Host'
 
       const doJoinAndNavigate = async (buyInAmount: number) => {

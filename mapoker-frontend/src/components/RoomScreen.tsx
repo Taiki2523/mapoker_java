@@ -7,7 +7,7 @@ import { UserHeader } from './UserHeader'
 type Props = {
   loading: boolean
   error: string
-  onCreateGame: (config: CreateGameConfig) => Promise<void>
+  onCreateGame: (config: CreateGameConfig) => Promise<string | undefined>
   currentUser: AuthUser | null
   onOpenMyPage: () => void
   onBack: () => void
@@ -33,6 +33,8 @@ export function RoomScreen({
   const [straddleEnabled, setStraddleEnabled] = useState(false)
   const [visibility, setVisibility] = useState<TableVisibility>('public')
   const [flags, setFlags] = useState<TableFlag[]>(['casual'])
+  const [isOffline, setIsOffline] = useState(false)
+  const [createdInviteCode, setCreatedInviteCode] = useState<string | null>(null)
 
   const toggleFlag = (flag: TableFlag) => {
     setFlags((prev) => (
@@ -126,6 +128,20 @@ export function RoomScreen({
             {t('straddle')}
           </label>
         </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={isOffline}
+              onChange={(e) => setIsOffline(e.target.checked)}
+            />
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
+            <span>
+              <span className={`game-type-dot ${isOffline ? 'offline' : 'online'}`} style={{ marginRight: '0.4rem' }} />
+              {isOffline ? 'オフライン（物理カード）' : 'オンライン'}
+            </span>
+          </label>
+        </div>
       </div>
       <label>
         {t('visibility')}
@@ -137,39 +153,53 @@ export function RoomScreen({
           <option value="private">{t('privateTable')}</option>
         </select>
       </label>
-      <div>
-        <div className="label" style={{ marginBottom: '0.45rem' }}>{t('tableFlags')}</div>
-        <div className="button-row" style={{ justifyContent: 'flex-start' }}>
-          <button type="button" className={flags.includes('casual') ? 'primary' : 'secondary'} onClick={() => toggleFlag('casual')}>
-            {t('flagCasual')}
-          </button>
-          <button type="button" className={flags.includes('serious') ? 'primary' : 'secondary'} onClick={() => toggleFlag('serious')}>
-            {t('flagSerious')}
-          </button>
-          <button type="button" className={flags.includes('newbie') ? 'primary' : 'secondary'} onClick={() => toggleFlag('newbie')}>
-            {t('flagNewbie')}
-          </button>
-          <button type="button" className={flags.includes('short_handed') ? 'primary' : 'secondary'} onClick={() => toggleFlag('short_handed')}>
-            {t('flagShortHanded')}
-          </button>
+      {!isOffline && (
+        <div>
+          <div className="label" style={{ marginBottom: '0.45rem' }}>{t('tableFlags')}</div>
+          <div className="button-row" style={{ justifyContent: 'flex-start' }}>
+            <button type="button" className={flags.includes('casual') ? 'primary' : 'secondary'} onClick={() => toggleFlag('casual')}>
+              {t('flagCasual')}
+            </button>
+            <button type="button" className={flags.includes('serious') ? 'primary' : 'secondary'} onClick={() => toggleFlag('serious')}>
+              {t('flagSerious')}
+            </button>
+            <button type="button" className={flags.includes('newbie') ? 'primary' : 'secondary'} onClick={() => toggleFlag('newbie')}>
+              {t('flagNewbie')}
+            </button>
+            <button type="button" className={flags.includes('short_handed') ? 'primary' : 'secondary'} onClick={() => toggleFlag('short_handed')}>
+              {t('flagShortHanded')}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+      {createdInviteCode && (
+        <div className="offline-invite-code-box">
+          <div className="offline-invite-code-label">招待コード（卓のメンバーに伝えてください）</div>
+          <div className="offline-invite-code">{createdInviteCode}</div>
+        </div>
+      )}
       <div className="button-row">
         <button className="ghost" onClick={onBack}>
           {t('backToLobby')}
         </button>
         <button
           className="primary"
-          onClick={() => void onCreateGame({
-            tableName,
-            playerCount,
-            smallBlind: selectedFormat.smallBlind,
-            bigBlind: selectedFormat.bigBlind,
-            ante: anteEnabled ? ante : 0,
-            straddleEnabled,
-            visibility,
-            flags,
-          })}
+          onClick={() => {
+            setCreatedInviteCode(null)
+            void onCreateGame({
+              tableName,
+              playerCount,
+              smallBlind: selectedFormat.smallBlind,
+              bigBlind: selectedFormat.bigBlind,
+              ante: anteEnabled ? ante : 0,
+              straddleEnabled,
+              visibility,
+              flags,
+              gameType: isOffline ? 'offline' : 'ring',
+            }).then((code) => {
+              if (code) setCreatedInviteCode(code)
+            })
+          }}
           disabled={loading}
         >
           {t('createGame')}

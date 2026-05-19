@@ -32,7 +32,7 @@ public class OfflineController {
     public Map<String, Object> seatPlayer(
             @PathVariable String id,
             @Valid @RequestBody OfflineSeatRequest req) {
-        SeatResult result = offlineSession.seatPlayer(id, req.seatIndex(), req.name(), req.buyIn());
+        SeatResult result = offlineSession.seatPlayer(id, req.seatIndex(), req.name(), req.buyIn(), req.inviteCode());
         return Map.of(
                 "seat_index", result.seatIndex(),
                 "members", result.members().stream()

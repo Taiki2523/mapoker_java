@@ -39,7 +39,8 @@ public record TableRecord(
         Instant createdAt,
         boolean everSeated,
         int ante,
-        boolean straddleEnabled
+        boolean straddleEnabled,
+        String inviteCode
 ) {
     public TableRecord {
         if (name == null || name.isBlank()) {

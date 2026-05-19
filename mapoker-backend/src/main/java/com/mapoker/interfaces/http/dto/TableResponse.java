@@ -42,7 +42,8 @@ public record TableResponse(
         @JsonProperty("created_at") String createdAt,
         @JsonProperty("member_count") int memberCount,
         List<MemberDto> members,
-        GameResponse game
+        GameResponse game,
+        @JsonProperty("invite_code") String inviteCode
 ) {
     /**
      * ブラインド情報 DTO です。
@@ -106,7 +107,8 @@ public record TableResponse(
                 table.createdAt().toString(),
                 memberDtos.size(),
                 memberDtos,
-                game
+                game,
+                table.inviteCode()
         );
     }
 }

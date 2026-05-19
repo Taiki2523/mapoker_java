@@ -1170,6 +1170,28 @@ button.icon-btn[data-label]:hover::after {
   flex-shrink: 0;
 }
 
+.offline-invite-code-box {
+  background: var(--bg-elevated, #1e1e2e);
+  border: 2px solid #f44336;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  text-align: center;
+}
+
+.offline-invite-code-label {
+  font-size: 0.8rem;
+  color: var(--text-muted, #888);
+  margin-bottom: 0.5rem;
+}
+
+.offline-invite-code {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  color: #f44336;
+  font-family: monospace;
+}
+
 .game-type-dot.online {
   background-color: #4caf50;
   box-shadow: 0 0 4px #4caf5088;

@@ -55,7 +55,8 @@ public class TableController {
             result = tableLifecycleService.createOfflineTable(
                     new TableLifecycleService.CreateOfflineTableInput(
                             request.tableName(), request.playerCount(),
-                            request.bigBlind(), request.visibility()));
+                            request.bigBlind(), request.visibility(),
+                            request.ante(), request.straddleEnabled()));
         } else {
             result = tableLifecycleService.createRingTable(
                     new TableLifecycleService.CreateRingTableInput(

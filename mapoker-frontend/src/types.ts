@@ -133,6 +133,7 @@ export type Table = {
   member_count: number
   members: RoomMemberApi[]
   game?: GameState | null
+  invite_code?: string | null
 }
 
 export type ApiError = {
@@ -186,6 +187,7 @@ export type CreateGameConfig = {
   straddleEnabled: boolean
   visibility: TableVisibility
   flags: TableFlag[]
+  gameType: 'ring' | 'offline'
 }
 
 export type BuyInContext = {

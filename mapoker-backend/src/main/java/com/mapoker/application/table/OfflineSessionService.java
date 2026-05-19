@@ -49,11 +49,14 @@ public class OfflineSessionService {
      * 指定席にプレイヤーを着席させ、バイイン額を記録する。
      * 既存プレイヤーの場合は cumulative（リバイ）として加算する。
      */
-    public SeatResult seatPlayer(String tableId, int seatIndex, String name, int buyIn) {
+    public SeatResult seatPlayer(String tableId, int seatIndex, String name, int buyIn, String inviteCode) {
         synchronized (store.lock(tableId)) {
             TableRecord table = queryService.getTable(tableId);
             if (!"offline".equals(table.gameType())) {
                 throw new IllegalStateException("seatPlayer is only available for offline tables");
+            }
+            if (table.inviteCode() != null && !table.inviteCode().equalsIgnoreCase(inviteCode)) {
+                throw new IllegalArgumentException("invalid invite code");
             }
 
             List<TableMemberRecord> members = new ArrayList<>(store.getOrInitMembers(table.id()));
@@ -76,7 +79,8 @@ public class OfflineSessionService {
                         table.id(), table.roomId(), table.name(), table.gameType(),
                         table.smallBlind(), table.bigBlind(), table.minBuyIn(), table.maxBuyIn(),
                         table.maxPlayers(), table.flags(), table.visibility(), table.status(),
-                        table.gameId(), table.createdAt(), true, table.ante(), table.straddleEnabled()));
+                        table.gameId(), table.createdAt(), true, table.ante(), table.straddleEnabled(),
+                        table.inviteCode()));
             }
 
             int currentStack = gameLifecycle.getSeatStack(table.gameId(), seatIndex);
