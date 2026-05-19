@@ -1162,6 +1162,24 @@ button.icon-btn[data-label]:hover::after {
   gap: 0.75rem;
 }
 
+.game-type-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.game-type-dot.online {
+  background-color: #4caf50;
+  box-shadow: 0 0 4px #4caf5088;
+}
+
+.game-type-dot.offline {
+  background-color: #f44336;
+  box-shadow: 0 0 4px #f4433688;
+}
+
 .lobby-browser-title-row strong {
   color: var(--text-base);
   font-size: 1rem;

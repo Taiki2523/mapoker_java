@@ -137,6 +137,7 @@ export function LobbyScreen({ currentUser, onOpenMyPage, onJoinRoom, onCreateTab
           <article key={table.id} className="lobby-browser-row">
             <div className="lobby-browser-main">
               <div className="lobby-browser-title-row">
+                <span className={table.game_type === 'offline' ? 'game-type-dot offline' : 'game-type-dot online'} title={table.game_type === 'offline' ? 'オフライン' : 'オンライン'} />
                 <strong>{table.name}</strong>
                 <span className={table.visibility === 'public' ? 'table-visibility public' : 'table-visibility private'}>
                   {table.visibility === 'public' ? t('publicTable') : t('privateTable')}
