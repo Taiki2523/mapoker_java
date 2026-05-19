@@ -50,12 +50,20 @@ public class TableController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public TableResponse createTable(@Valid @RequestBody CreateTableRequest request) {
-        TableLifecycleService.CreateTableResult result = tableLifecycleService.createRingTable(
-                new TableLifecycleService.CreateRingTableInput(
-                        request.tableName(), request.playerCount(),
-                        request.smallBlind(), request.bigBlind(),
-                        request.visibility(), request.flags(),
-                        request.ante(), request.straddleEnabled()));
+        TableLifecycleService.CreateTableResult result;
+        if ("offline".equals(request.gameType())) {
+            result = tableLifecycleService.createOfflineTable(
+                    new TableLifecycleService.CreateOfflineTableInput(
+                            request.tableName(), request.playerCount(),
+                            request.bigBlind(), request.visibility()));
+        } else {
+            result = tableLifecycleService.createRingTable(
+                    new TableLifecycleService.CreateRingTableInput(
+                            request.tableName(), request.playerCount(),
+                            request.smallBlind(), request.bigBlind(),
+                            request.visibility(), request.flags(),
+                            request.ante(), request.straddleEnabled()));
+        }
         return TableResponse.from(result.table(),
                 tableQueryService.getMembers(result.table().id()),
                 GameResponse.from(result.game(), null, false));

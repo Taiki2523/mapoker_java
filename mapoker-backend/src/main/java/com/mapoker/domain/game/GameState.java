@@ -182,6 +182,14 @@ public class GameState {
      * @throws IllegalStateException ショーダウンが未解決の場合、またはチップ保有者が2人未満の場合
      */
     public void startHand(int bigBlind, boolean doStraddle) {
+        startHand(bigBlind, doStraddle, false);
+    }
+
+    /**
+     * 新しいハンドを開始する。{@code skipCardDeal=true} の場合、デッキシャッフルとホールカード配布をスキップする。
+     * オフラインモード（物理カード運用）向け。
+     */
+    public void startHand(int bigBlind, boolean doStraddle, boolean skipCardDeal) {
         if (status == GameStatus.SHOWDOWN)
             throw new IllegalStateException("cannot start hand: showdown not resolved");
         status = GameStatus.IN_PROGRESS;
@@ -218,9 +226,10 @@ public class GameState {
 
         buttonIndex = nextActive(buttonIndex);
 
-        // Shuffle fresh deck for new hand
-        deck = Deck.newDeck();
-        Deck.shuffle(deck, null);
+        if (!skipCardDeal) {
+            deck = Deck.newDeck();
+            Deck.shuffle(deck, null);
+        }
 
         if (activePlayers == 2) {
             smallBlindIdx = buttonIndex;
@@ -245,11 +254,13 @@ public class GameState {
             }
         }
 
-        for (int i = 0; i < 2; i++) {
-            for (Player p : players) {
-                if (p.isFolded()) continue;
-                Card[] hole = p.getHole();
-                hole[i] = draw();
+        if (!skipCardDeal) {
+            for (int i = 0; i < 2; i++) {
+                for (Player p : players) {
+                    if (p.isFolded()) continue;
+                    Card[] hole = p.getHole();
+                    hole[i] = draw();
+                }
             }
         }
 
@@ -274,6 +285,21 @@ public class GameState {
         }
 
         currentPlayer = firstToAct();
+    }
+
+    /**
+     * オフラインモード向けショーダウン解決。カード評価を行わず、宣言された勝者にポットを分配する。
+     * {@code splitPots} のサイドポット計算（totalContrib ベース）は流用する。
+     */
+    public ShowdownResult resolveShowdownManual(List<Integer> declaredWinners) {
+        if (status != GameStatus.SHOWDOWN)
+            throw new IllegalStateException("showdown not available in status " + status);
+        if (declaredWinners == null || declaredWinners.isEmpty())
+            throw new IllegalArgumentException("declared winners must not be empty");
+        List<Integer> payouts = splitPots(declaredWinners);
+        ShowdownResult result = new ShowdownResult(List.copyOf(declaredWinners), null, payouts);
+        lastShowdown = result;
+        return result;
     }
 
     public void applyAction(int playerIndex, Action action) {

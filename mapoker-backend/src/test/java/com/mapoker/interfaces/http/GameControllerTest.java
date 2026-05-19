@@ -270,7 +270,7 @@ class GameControllerTest {
         when(gameAction.resolveShowdown("g1")).thenReturn(null);
         when(gameService.getGame("g1")).thenReturn(finished);
 
-        var response = controller.resolveShowdown("g1");
+        var response = controller.resolveShowdown("g1", null);
 
         verify(gameAction).resolveShowdown("g1");
         assertThat(response.status()).isEqualTo(GameStatus.FINISHED);
@@ -282,7 +282,7 @@ class GameControllerTest {
         when(gameAction.resolveShowdown("g1")).thenReturn(null);
         when(gameService.getGame("g1")).thenReturn(finished);
 
-        var response = controller.resolveShowdown("g1");
+        var response = controller.resolveShowdown("g1", null);
 
         // FINISHED かつ非foldWin → showAll=true → 全員のホールカードが見える
         response.players().forEach(p -> assertThat(p.hole()).isNotNull().hasSize(2));

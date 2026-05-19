@@ -73,6 +73,38 @@ public class GameActionService {
         return state;
     }
 
+    public ShowdownResult resolveOfflineShowdown(String id, List<Integer> declaredWinners) {
+        GameState state = readService.getGame(id);
+        ShowdownResult result = state.resolveShowdownManual(declaredWinners);
+        state.applyPayouts(result.payouts());
+        gameRepository.update(id, state);
+
+        List<ActionRecord> existing = gameRepository.findActionsByGameId(id);
+        boolean alreadyRecorded = existing.stream()
+                .anyMatch(a -> a.actionType() == ActionType.SHOWDOWN || a.actionType() == ActionType.PAYOUT);
+        if (!alreadyRecorded) {
+            int nextSeq = existing.size() + 1;
+            for (int winnerIdx : result.winnerIndexes()) {
+                gameRepository.appendAction(id, new ActionRecord(nextSeq++, winnerIdx,
+                        ActionType.SHOWDOWN, 0, "manual"));
+            }
+            List<Integer> payouts = result.payouts();
+            for (int i = 0; i < payouts.size(); i++) {
+                if (payouts.get(i) > 0) {
+                    gameRepository.appendAction(id, new ActionRecord(nextSeq++, i,
+                            ActionType.PAYOUT, payouts.get(i), null));
+                }
+            }
+        }
+
+        TableMembershipService membership = tableMembershipProvider.getIfAvailable();
+        if (membership != null) {
+            membership.processPendingLeaves(id);
+        }
+        publishGame(id, readService.getGame(id), null);
+        return result;
+    }
+
     public ShowdownResult resolveShowdown(String id) {
         GameState state = readService.getGame(id);
         ShowdownResult result = state.resolveShowdown();

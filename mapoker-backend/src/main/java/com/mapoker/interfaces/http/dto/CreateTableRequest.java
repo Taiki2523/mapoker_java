@@ -30,7 +30,8 @@ public record CreateTableRequest(
         @Pattern(regexp = "(?i)public|private", message = "must be public or private") String visibility,
         @Size(max = 8) List<@Pattern(regexp = "[a-z_]+", message = "must use lowercase snake_case") String> flags,
         @Min(0) @Nullable Integer ante,
-        @JsonProperty("straddle_enabled") @Nullable Boolean straddleEnabled
+        @JsonProperty("straddle_enabled") @Nullable Boolean straddleEnabled,
+        @JsonProperty("game_type") @Nullable String gameType
 ) {
     public CreateTableRequest {
         if (smallBlind == null) {
@@ -41,6 +42,12 @@ public record CreateTableRequest(
         }
         if (straddleEnabled == null) {
             straddleEnabled = false;
+        }
+        if (gameType == null || gameType.isBlank()) {
+            gameType = "ring";
+        }
+        if (!"ring".equals(gameType) && !"offline".equals(gameType)) {
+            throw new IllegalArgumentException("game_type must be 'ring' or 'offline'");
         }
     }
 }

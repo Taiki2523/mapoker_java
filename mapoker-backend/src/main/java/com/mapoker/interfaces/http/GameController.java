@@ -180,9 +180,14 @@ public class GameController {
      * @return ショーダウン解決後のゲームの {@link GameResponse}
      */
     @PostMapping("/{id}/showdown")
-    public GameResponse resolveShowdown(@PathVariable String id) {
-        gameAction.resolveShowdown(id);
-        // showdown後のGameResponseにlast_showdownと全参加者のホールカードを含める
+    public GameResponse resolveShowdown(
+            @PathVariable String id,
+            @RequestBody(required = false) OfflineShowdownRequest req) {
+        if (req != null && req.declaredWinners() != null && !req.declaredWinners().isEmpty()) {
+            gameAction.resolveOfflineShowdown(id, req.declaredWinners());
+        } else {
+            gameAction.resolveShowdown(id);
+        }
         GameState state = gameRead.getGame(id);
         return GameResponse.from(state, null, false, seatedCount(id));
     }

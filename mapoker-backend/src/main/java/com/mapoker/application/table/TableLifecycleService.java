@@ -80,6 +80,44 @@ public class TableLifecycleService {
         return new CreateTableResult(table, game);
     }
 
+    public CreateTableResult createOfflineTable(CreateOfflineTableInput input) {
+        if (input.playerCount() < 2 || input.playerCount() > 9)
+            throw new IllegalArgumentException("player count must be between 2 and 9");
+        if (input.bigBlind() <= 0)
+            throw new IllegalArgumentException("big blind must be positive");
+
+        List<GameLifecycleService.PlayerInput> players = new ArrayList<>();
+        for (int i = 0; i < input.playerCount(); i++) {
+            players.add(new GameLifecycleService.PlayerInput("p" + (i + 1), 0));
+        }
+
+        OddChipRule oddChipRule = gameProperties.defaultOddChipRule();
+        GameState game = gameService.createRingGame(players, input.bigBlind(), oddChipRule, 0, false);
+
+        int minBuyIn = input.bigBlind() * walletProperties.minBuyinBbMultiplier();
+        int maxBuyIn = input.bigBlind() * walletProperties.maxBuyinBbMultiplier();
+
+        TableRecord table = new TableRecord(
+                game.getId(), game.getId(),
+                normalizeTableName(input.tableName(), game.getId()),
+                "offline",
+                Math.max(1, input.bigBlind() / 2), input.bigBlind(),
+                minBuyIn, maxBuyIn, input.playerCount(),
+                normalizeFlags(null),
+                normalizeVisibility(input.visibility()),
+                "inactive",
+                game.getId(),
+                Instant.now(),
+                false,
+                0,
+                false);
+
+        store.tables.put(table.id(), table);
+        store.tableMembers.putIfAbsent(table.id(), new ArrayList<>());
+        store.lastEmptiedAt.put(table.id(), Instant.now());
+        return new CreateTableResult(table, game);
+    }
+
     public GameState startHand(String tableId, int bigBlind) {
         return startHand(tableId, bigBlind, false);
     }
@@ -96,7 +134,8 @@ public class TableLifecycleService {
             if (activeRosterCount < com.mapoker.domain.PokerConstants.MIN_PLAYERS) {
                 throw new IllegalStateException("not enough players at the table");
             }
-            return gameService.startHand(tableId, bigBlind, doStraddle);
+            boolean isOffline = "offline".equals(queryService.getTable(tableId).gameType());
+            return gameService.startHand(tableId, bigBlind, doStraddle, isOffline);
         }
     }
 
@@ -189,4 +228,12 @@ public class TableLifecycleService {
 
     /** テーブル作成結果。 */
     public record CreateTableResult(TableRecord table, GameState game) {}
+
+    /** オフラインテーブル作成時の入力値。 */
+    public record CreateOfflineTableInput(
+            String tableName,
+            int playerCount,
+            int bigBlind,
+            String visibility
+    ) {}
 }
