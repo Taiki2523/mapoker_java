@@ -73,6 +73,45 @@ public class GameActionService {
         return state;
     }
 
+    /**
+     * オフラインショーダウン宣言を記録し、全員宣言済みなら自動解決する。
+     * @return 全員宣言済みで解決した場合 true、まだ待機中の場合 false
+     */
+    public boolean declareOfflineResult(String id, int playerIndex, boolean win) {
+        GameState state = readService.getGame(id);
+        boolean allDeclared = state.declareOfflineResult(playerIndex, win);
+        if (allDeclared) {
+            List<Integer> winners = state.getDeclaredWinners();
+            ShowdownResult result = state.resolveShowdownManual(winners);
+            state.applyPayouts(result.payouts());
+            gameRepository.update(id, state);
+            List<ActionRecord> existing = gameRepository.findActionsByGameId(id);
+            boolean alreadyRecorded = existing.stream()
+                    .anyMatch(a -> a.actionType() == com.mapoker.domain.rules.ActionType.SHOWDOWN
+                            || a.actionType() == com.mapoker.domain.rules.ActionType.PAYOUT);
+            if (!alreadyRecorded) {
+                int nextSeq = existing.size() + 1;
+                for (int winnerIdx : result.winnerIndexes()) {
+                    gameRepository.appendAction(id, new ActionRecord(
+                            nextSeq++, winnerIdx, com.mapoker.domain.rules.ActionType.SHOWDOWN, 0, "manual"));
+                }
+                List<Integer> payouts = result.payouts();
+                for (int i = 0; i < payouts.size(); i++) {
+                    if (payouts.get(i) > 0) {
+                        gameRepository.appendAction(id, new ActionRecord(
+                                nextSeq++, i, com.mapoker.domain.rules.ActionType.PAYOUT, payouts.get(i), null));
+                    }
+                }
+            }
+            TableMembershipService membership = tableMembershipProvider.getIfAvailable();
+            if (membership != null) membership.processPendingLeaves(id);
+        } else {
+            gameRepository.update(id, state);
+        }
+        publishGame(id, readService.getGame(id), null);
+        return allDeclared;
+    }
+
     public ShowdownResult resolveOfflineShowdown(String id, List<Integer> declaredWinners) {
         GameState state = readService.getGame(id);
         ShowdownResult result = state.resolveShowdownManual(declaredWinners);

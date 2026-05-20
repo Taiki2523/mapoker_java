@@ -64,8 +64,9 @@ public class GameEventPublisher {
                         : Arrays.stream(holeCards)
                         .filter(Objects::nonNull)
                         .toList();
+                if (member.publicId() == null) continue;
                 messaging.convertAndSendToUser(
-                        member.name(),
+                        member.publicId(),
                         "/queue/hole-cards",
                         new HoleCardsPayload(tableId, member.seatIndex(), hole)
                 );

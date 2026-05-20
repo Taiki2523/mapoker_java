@@ -30,6 +30,7 @@ export type GameState = {
   viewer_membership_active: boolean
   can_rebuy: boolean
   last_showdown?: Showdown
+  showdown_declarations?: Record<string, boolean> | null
 }
 
 export type ActionLogEntry = {

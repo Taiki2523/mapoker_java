@@ -194,3 +194,59 @@ ALTER TABLE players ADD COLUMN cashout_at TIMESTAMP;    -- NULL=未確定、NOT 
 
 - テーブル機能（`tables`）— V7 で実装済み
 - リングゲームの安定動作
+
+---
+
+## バグ修正メモ（feature/offline-mode）
+
+### テーブル作成画面
+
+1. **作成者が自動参加しない**
+   - 旧: `createGame` が `invite_code` を返して RoomScreen で表示するだけ（着席しない）
+   - 修正: オフライン作成後も `setOfflineSeatTable(data)` を呼んで OfflineSeatPopup を表示する。招待コードを `defaultInviteCode` として pre-fill する。
+
+2. **オンライントグルのドットが縦ずれ**
+   - `game-type-dot` span に `verticalAlign: 'middle'` を追加。
+
+### オフライン着席ポップアップ（OfflineSeatPopup）
+
+- **名前フィールドは不要**: `defaultName` prop の値を API に渡すが UI には出さない
+- **バイインフィールドは不要**: 着席後に通常の BuyInPopup を使う（リングと同一フロー）
+- **シート番号**: テーブル図のボタンで選択
+- **招待コード**: 引き続き必須。`prefilledCode` prop で招待リンクからの場合は自動入力
+
+### 着席後のバイインフロー
+
+```
+OfflineSeatPopup 確定
+  → showBuyInPopup を表示（offlineSeatTable の min/max_buy_in を使用）
+  → バイイン確定 → seatOffline(tableId, { seat_index, name, buy_in, invite_code })
+  → goToTable → 通常のリングと同じゲーム画面へ
+```
+
+### テーブル画面の招待コード表示
+
+- `App.tsx` から `GameScreen` に `table` prop を追加
+- `TopBar.tsx` で `table.game_type === 'offline'` かつ `table.invite_code` がある場合に表示
+
+### リバイ時の inviteCode バリデーションエラー
+
+- `OfflineSeatRequest.inviteCode` に `@NotBlank` があり、リバイ時に空文字を送ると 400 エラーが発生していた
+- 修正: `@NotBlank` を削除。招待コード検証はサービス層（`OfflineSessionService.seatPlayer`）がリバイをスキップする設計なので DTO での強制は不要
+
+### 退席後にシートが空かない
+
+- 認証済みユーザーが退席すると `TableMembershipService.leave` が `publicId` でメンバーを検索するが、オフラインメンバーは `publicId = null` で登録されるためヒットせず退席処理がスキップされた
+- 修正: `publicId` 検索失敗時に `name` ベースのフォールバック検索を追加（詳細は DECISIONS.md）
+
+### 招待リンク OTP 自動入力
+
+- 招待 URL に `?code={inviteCode}` を付与
+- `OfflineSeatPopup` の `prefilledCode` prop に渡し、OTP 入力欄に自動セット
+- OTP 生成文字セットを数字のみ（6 桁）に変更（`"0123456789"`）
+
+### 自分のハンドチップ増減表示
+
+- `OfflineGameScreen` が `finished` 遷移ごとに直前スタックとの差分を記録
+- `offline-payout-list` 領域に増（緑）/減（赤）で表示
+- 初回ハンドは基準なしのため非表示

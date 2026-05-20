@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMatch, useNavigate } from 'react-router-dom'
 import './App.css'
 import {
-  apiLogout, createTable, fetchMe, fetchVersion, joinTable, leaveTable,
+  apiLogout, apiDeclareShowdown, createTable, fetchMe, fetchVersion, joinTable, leaveTable, seatOffline,
 } from './api'
 import { t } from './i18n'
 import { bestHandName } from './handEval'
@@ -13,6 +13,7 @@ import type {
 } from './types'
 import { AuthScreen } from './components/AuthScreen'
 import { BuyInPopup } from './components/BuyInPopup'
+import { OfflineSeatPopup } from './components/OfflineSeatPopup'
 import { GameTypeScreen } from './components/GameTypeScreen'
 import { LobbyScreen } from './components/LobbyScreen'
 import { MyPagePanel } from './components/MyPagePanel'
@@ -50,6 +51,7 @@ function App() {
   const [showdown, setShowdown] = useState<Showdown | null>(null)
   const [roster, setRoster] = useState<RoomMember[]>([])
   const [table, setTable] = useState<Table | null>(null)
+  const [offlineSeatTable, setOfflineSeatTable] = useState<Table | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [inviteCopied, setInviteCopied] = useState(false)
@@ -82,7 +84,10 @@ function App() {
   }, [game?.players, roster])
 
   const isShowdown = game?.status === 'showdown' || (game?.status === 'finished' && showdown !== null)
-  const inviteUrl = gameId ? `${window.location.origin}/table/${gameId}` : ''
+  const inviteUrl = gameId
+    ? `${window.location.origin}/table/${gameId}${table?.invite_code ? `?code=${table.invite_code}` : ''}`
+    : ''
+  const urlInviteCode = new URLSearchParams(window.location.search).get('code') ?? null
 
   const toCall = useMemo(() => {
     if (!game || !currentPlayer) return 0
@@ -169,6 +174,7 @@ function App() {
   const navigateToLobby = () => {
     clearGameSession()
     setGame(null)
+    setTable(null)
     setMySeatIndex(null)
     setRoster([])
     setLeavePending_(false)
@@ -180,6 +186,7 @@ function App() {
   // ---- leave room ----
   const leaveHook = useLeaveRoom({
     gameId, myName, mySeatIndex, roster, setRoster, navigateToLobby,
+    gameStatus: game?.status,
   })
   const { leavePending, setLeavePending: setLeavePending_, leaveRoom } = leaveHook
 
@@ -200,9 +207,21 @@ function App() {
     game, mySeat, myName, gameId, table, wallet,
     cardRevealEndsAtRef,
     onRebuyConfirm: (amount) => {
-      void doTableJoin(gameId, myName, amount)
-        .then(() => refreshGame(gameId))
-        .catch((err) => setError(formatErrorMessage(err)))
+      if (table?.game_type === 'offline' && mySeat !== null) {
+        // オフラインリバイ: joinTable（満席チェックあり）ではなく seatOffline を使う
+        void seatOffline(gameId, {
+          seat_index: mySeat,
+          name: myName.trim() || 'Player',
+          buy_in: amount,
+          invite_code: '',  // リバイ時はバックエンドで招待コードチェックをスキップ
+        })
+          .then(() => refreshGame(gameId))
+          .catch((err) => setError(formatErrorMessage(err)))
+      } else {
+        void doTableJoin(gameId, myName, amount)
+          .then(() => refreshGame(gameId))
+          .catch((err) => setError(formatErrorMessage(err)))
+      }
     },
     onRebuyCancel: () => void leaveRoom(),
   })
@@ -254,9 +273,10 @@ function App() {
     }
   }, [game?.community])
 
-  // 自動ショーダウン
+  // 自動ショーダウン（オフラインは手動宣言のためスキップ）
   useEffect(() => {
     if (!game) return
+    if (table?.game_type === 'offline') return
     if (game.status === 'showdown' && !showdown) {
       const delay = Math.max(0, cardRevealEndsAtRef.current - Date.now())
       if (delay > 0) {
@@ -266,7 +286,7 @@ function App() {
       void actions.runShowdown({ suppressError: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game, showdown])
+  }, [game, showdown, table?.game_type])
 
   // 自動ハンド開始
   useEffect(() => {
@@ -324,6 +344,9 @@ function App() {
   const handleAuthSuccess = (user: AuthUser) => {
     setCurrentUser(user)
     setMyName(user.username)
+    if (gameId) {
+      void lobbyJoinWithBuyIn(gameId, table?.game_type ?? 'ring', user.username)
+    }
   }
 
   const handleLogout = async () => {
@@ -377,7 +400,7 @@ function App() {
     })
   }
 
-  const createGame = async (config: CreateGameConfig): Promise<string | undefined> => {
+  const createGame = async (config: CreateGameConfig): Promise<void> => {
     setLoading(true)
     setError('')
     setShowdown(null)
@@ -398,9 +421,36 @@ function App() {
       if (!data.game) throw new Error('table game payload is missing')
 
       if (config.gameType === 'offline') {
-        setTable(data)
-        setGame(data.game ?? null)
-        return data.invite_code ?? undefined
+        const tableSnapshot = data
+        const hostName = myName.trim() || 'Host'
+        showBuyInPopup(
+          tableSnapshot, data.id,
+          async (buyInAmount) => {
+            setLoading(true)
+            setError('')
+            try {
+              const result = await seatOffline(data.id, {
+                seat_index: 0,
+                name: hostName,
+                buy_in: buyInAmount,
+                invite_code: data.invite_code ?? '',
+              })
+              setMySeatIndex(result.seat_index)
+              persistSession(data.id, { name: hostName, seatIndex: result.seat_index })
+              setRoomScreenMode('room')
+              goToTable(data.id)
+              await refreshGame(data.id)
+              await refreshMembers(data.id)
+              await refreshTable(data.id)
+            } catch (err) {
+              setError(formatErrorMessage(err))
+            } finally {
+              setLoading(false)
+            }
+          },
+          () => { setRoomScreenMode('lobby'); goToLobby() }
+        )
+        return
       }
 
       const name = myName.trim() || 'Host'
@@ -440,7 +490,20 @@ function App() {
     }
   }
 
-  const lobbyJoinWithBuyIn = async (tableId: string) => {
+  const lobbyJoinWithBuyIn = async (tableId: string, gameType = 'ring', nameOverride?: string) => {
+    if (gameType === 'offline') {
+      setLoading(true)
+      try {
+        const fetchedTable = await refreshTable(tableId)
+        if (fetchedTable) setOfflineSeatTable(fetchedTable)
+      } catch (err) {
+        setError(formatErrorMessage(err))
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
     setRoomScreenMode('room')
     setTable(null)
     setShowdown(null)
@@ -448,7 +511,8 @@ function App() {
     await refreshGame(tableId)
     await refreshMembers(tableId)
     const fetchedTable = await refreshTable(tableId)
-    if (!myName.trim()) return
+    const effectiveName = nameOverride?.trim() || myName.trim() || currentUser?.username?.trim() || ''
+    if (!effectiveName) return
 
     const backToLobby = () => {
       setTable(null)
@@ -458,7 +522,7 @@ function App() {
 
     const doJoin = async (buyInAmount: number) => {
       try {
-        await doTableJoin(tableId, myName.trim(), buyInAmount)
+        await doTableJoin(tableId, effectiveName, buyInAmount)
       } catch (err) {
         setError(formatErrorMessage(err))
         backToLobby()
@@ -477,6 +541,60 @@ function App() {
       )
     } else {
       await doJoin(0)
+    }
+  }
+
+  const handleOfflineSeat = (seatIndex: number, inviteCode: string) => {
+    if (!offlineSeatTable) return
+    const tableId = offlineSeatTable.id
+    const name = myName.trim() || 'Player'
+    const tableSnapshot = offlineSeatTable
+
+    setOfflineSeatTable(null)
+
+    showBuyInPopup(
+      tableSnapshot, tableId,
+      async (buyInAmount) => {
+        setLoading(true)
+        setError('')
+        try {
+          const result = await seatOffline(tableId, {
+            seat_index: seatIndex,
+            name,
+            buy_in: buyInAmount,
+            invite_code: inviteCode,
+          })
+          setMySeatIndex(result.seat_index)
+          persistSession(tableId, { name, seatIndex: result.seat_index })
+          setRoomScreenMode('room')
+          goToTable(tableId)
+          await refreshGame(tableId)
+          await refreshMembers(tableId)
+          await refreshTable(tableId)
+        } catch (err) {
+          setError(formatErrorMessage(err))
+        } finally {
+          setLoading(false)
+        }
+      },
+      () => {
+        setRoomScreenMode('lobby')
+        goToLobby()
+      }
+    )
+  }
+
+  const handleOfflineDeclare = async (win: boolean) => {
+    if (!gameId || mySeat === null) return
+    setLoading(true)
+    setError('')
+    try {
+      await apiDeclareShowdown(gameId, mySeat, win)
+      await refreshGame(gameId)
+    } catch (err) {
+      setError(formatErrorMessage(err))
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -512,7 +630,7 @@ function App() {
               <LobbyScreen
                 currentUser={currentUser}
                 onOpenMyPage={() => void openMyPage()}
-                onJoinRoom={lobbyJoinWithBuyIn}
+                onJoinRoom={(id, gt) => lobbyJoinWithBuyIn(id, gt)}
                 onCreateTable={() => setRoomScreenMode('room')}
                 onBack={() => setRoomScreenMode('gameType')}
                 appVersion={appVersion}
@@ -554,6 +672,17 @@ function App() {
           onSendAction={(type, amount) => void actions.sendAction(type, amount)}
           doStraddle={doStraddle}
           onToggleStraddle={actions.toggleStraddle}
+          table={table}
+          onOfflineWin={(win) => void handleOfflineDeclare(win)}
+        />
+      )}
+      {offlineSeatTable && (
+        <OfflineSeatPopup
+          table={offlineSeatTable}
+          defaultName={myName}
+          prefilledCode={urlInviteCode}
+          onConfirm={(seatIndex, inviteCode) => handleOfflineSeat(seatIndex, inviteCode)}
+          onCancel={() => setOfflineSeatTable(null)}
         />
       )}
       {buyInContext && (

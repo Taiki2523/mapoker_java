@@ -55,10 +55,6 @@ public class OfflineSessionService {
             if (!"offline".equals(table.gameType())) {
                 throw new IllegalStateException("seatPlayer is only available for offline tables");
             }
-            if (table.inviteCode() != null && !table.inviteCode().equalsIgnoreCase(inviteCode)) {
-                throw new IllegalArgumentException("invalid invite code");
-            }
-
             List<TableMemberRecord> members = new ArrayList<>(store.getOrInitMembers(table.id()));
 
             boolean seatTaken = members.stream()
@@ -69,6 +65,11 @@ public class OfflineSessionService {
 
             boolean isRebuy = members.stream()
                     .anyMatch(m -> m.name().equals(name) && m.seatIndex() == seatIndex);
+
+            // 招待コードチェック: 新規着席のみ（リバイは既に検証済みのためスキップ）
+            if (!isRebuy && table.inviteCode() != null && !table.inviteCode().equalsIgnoreCase(inviteCode)) {
+                throw new IllegalArgumentException("invalid invite code");
+            }
 
             if (!isRebuy) {
                 members.add(new TableMemberRecord(name, seatIndex, Instant.now().toString(),

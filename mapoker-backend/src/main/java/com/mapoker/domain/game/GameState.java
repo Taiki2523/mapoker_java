@@ -70,6 +70,8 @@ public class GameState {
     private boolean straddleEnabled = false;
     private int straddleIdx = -1;
     private boolean nextHandStraddle = false;
+    /** オフラインショーダウン宣言 (playerIndex → isWin)。全員宣言で自動解決。 */
+    private java.util.Map<Integer, Boolean> showdownDeclarations = new java.util.HashMap<>();
 
     private GameState() {}
 
@@ -195,6 +197,7 @@ public class GameState {
         status = GameStatus.IN_PROGRESS;
         foldWin = false;
         lastShowdown = null;
+        showdownDeclarations.clear();
         community.clear();
         deckPos = 0;
         pot = 0;
@@ -288,6 +291,38 @@ public class GameState {
     }
 
     /**
+     * オフラインショーダウン宣言を記録する。
+     * @param playerIndex 宣言プレイヤー
+     * @param win true=勝利, false=敗北
+     * @return 全員が宣言完了したかどうか
+     */
+    public boolean declareOfflineResult(int playerIndex, boolean win) {
+        if (status != GameStatus.SHOWDOWN)
+            throw new IllegalStateException("showdown not available in status " + status);
+        if (playerIndex < 0 || playerIndex >= players.size())
+            throw new IllegalArgumentException("invalid player index: " + playerIndex);
+        if (players.get(playerIndex).isFolded())
+            throw new IllegalArgumentException("folded player cannot declare: " + playerIndex);
+        showdownDeclarations.put(playerIndex, win);
+        return isAllDeclared();
+    }
+
+    /** 非フォールドプレイヤー全員が宣言済みかどうかを返す。 */
+    public boolean isAllDeclared() {
+        for (int i = 0; i < players.size(); i++) {
+            if (!players.get(i).isFolded() && !showdownDeclarations.containsKey(i)) return false;
+        }
+        return true;
+    }
+
+    /** 宣言済み勝者インデックスのリストを返す（isWin=true のもの）。 */
+    public List<Integer> getDeclaredWinners() {
+        List<Integer> winners = new ArrayList<>();
+        showdownDeclarations.forEach((idx, win) -> { if (win) winners.add(idx); });
+        return winners;
+    }
+
+    /**
      * オフラインモード向けショーダウン解決。カード評価を行わず、宣言された勝者にポットを分配する。
      * {@code splitPots} のサイドポット計算（totalContrib ベース）は流用する。
      */
@@ -296,6 +331,12 @@ public class GameState {
             throw new IllegalStateException("showdown not available in status " + status);
         if (declaredWinners == null || declaredWinners.isEmpty())
             throw new IllegalArgumentException("declared winners must not be empty");
+        for (int idx : declaredWinners) {
+            if (idx < 0 || idx >= players.size())
+                throw new IllegalArgumentException("invalid player index: " + idx);
+            if (players.get(idx).isFolded())
+                throw new IllegalArgumentException("player " + idx + " has folded and cannot be declared winner");
+        }
         List<Integer> payouts = splitPots(declaredWinners);
         ShowdownResult result = new ShowdownResult(List.copyOf(declaredWinners), null, payouts);
         lastShowdown = result;
@@ -460,11 +501,14 @@ public class GameState {
         currentBet = 0;
         lastRaiseSize = bigBlindSize;
         raiseOpen = true;
-        burn();
-        switch (street) {
-            case FLOP -> { community.add(draw()); community.add(draw()); community.add(draw()); }
-            case TURN, RIVER -> community.add(draw());
-            default -> {}
+        // deck == null はオフラインモード（物理カード使用）。カード操作をスキップする。
+        if (deck != null) {
+            burn();
+            switch (street) {
+                case FLOP -> { community.add(draw()); community.add(draw()); community.add(draw()); }
+                case TURN, RIVER -> community.add(draw());
+                default -> {}
+            }
         }
         currentPlayer = firstToAct();
     }
@@ -800,4 +844,6 @@ public class GameState {
     public void setStraddleIdx(int straddleIdx) { this.straddleIdx = straddleIdx; }
     public boolean isNextHandStraddle() { return nextHandStraddle; }
     public void setNextHandStraddle(boolean nextHandStraddle) { this.nextHandStraddle = nextHandStraddle; }
+    public java.util.Map<Integer, Boolean> getShowdownDeclarations() { return showdownDeclarations; }
+    public void setShowdownDeclarations(java.util.Map<Integer, Boolean> d) { this.showdownDeclarations = d != null ? d : new java.util.HashMap<>(); }
 }

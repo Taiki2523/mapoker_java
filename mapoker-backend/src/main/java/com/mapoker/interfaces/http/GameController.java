@@ -192,6 +192,16 @@ public class GameController {
         return GameResponse.from(state, null, false, seatedCount(id));
     }
 
+    /** オフラインショーダウン: プレイヤー個別の win/lose 宣言。全員宣言で自動解決。 */
+    @PostMapping("/{id}/showdown/declare")
+    public GameResponse declareShowdown(
+            @PathVariable String id,
+            @RequestBody DeclareShowdownRequest req) {
+        gameAction.declareOfflineResult(id, req.playerIndex(), req.win());
+        GameState state = gameRead.getGame(id);
+        return GameResponse.from(state, null, false, seatedCount(id));
+    }
+
     /**
      * 有効な {@code viewerIndex} を解決する内部ヘルパー。
      *
@@ -220,7 +230,9 @@ public class GameController {
         }
         try {
             String username = userService.getByPublicId(principal.getUsername()).username();
-            return tableQueryService.findSeatIndex(id, username);
+            Integer resolved = tableQueryService.findSeatIndex(id, username);
+            // members store にない場合（サーバー再起動等）はクライアント送信値を使う
+            return resolved != null ? resolved : requestedViewerIndex;
         } catch (Exception ignored) {
             return requestedViewerIndex;
         }

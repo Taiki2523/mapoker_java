@@ -169,8 +169,15 @@ public class TableController {
 
     private List<TableResponse.MemberDto> toMembers(List<TableMemberRecord> members) {
         return members.stream()
-                .map(member -> new TableResponse.MemberDto(member.name(), member.seatIndex(), member.joinedAt(),
-                        member.pendingLeave(), member.displayName(), member.avatarUrl()))
+                .map(member -> {
+                    String avatarUrl = member.avatarUrl();
+                    if (avatarUrl == null && member.publicId() != null) {
+                        try { avatarUrl = userService.getByPublicId(member.publicId()).avatarUrl(); }
+                        catch (Exception ignored) {}
+                    }
+                    return new TableResponse.MemberDto(member.name(), member.seatIndex(), member.joinedAt(),
+                            member.pendingLeave(), member.displayName(), avatarUrl);
+                })
                 .toList();
     }
 

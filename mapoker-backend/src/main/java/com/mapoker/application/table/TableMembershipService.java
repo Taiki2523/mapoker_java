@@ -162,9 +162,11 @@ public class TableMembershipService {
         synchronized (store.lock(id)) {
             TableRecord table = queryService.getTable(id);
             List<TableMemberRecord> members = new ArrayList<>(store.getOrInitMembers(table.id()));
-            TableMemberRecord member = (publicId != null && !publicId.isBlank())
+            TableMemberRecord byPublicId = (publicId != null && !publicId.isBlank())
                     ? members.stream().filter(m -> publicId.equals(m.publicId())).findFirst().orElse(null)
-                    : findMember(members, name, seatIndex);
+                    : null;
+            // publicId で見つからない場合（オフラインメンバーは publicId=null）は名前で検索
+            final TableMemberRecord member = byPublicId != null ? byPublicId : findMember(members, name, seatIndex);
 
             if (member == null) {
                 List<TableMemberRecord> result = List.copyOf(members);
@@ -234,6 +236,34 @@ public class TableMembershipService {
             List<TableMemberRecord> result = List.copyOf(remaining);
             store.trackEmptyTable(tableId, result);
             eventPublisher.publishMembers(tableId, result);
+        }
+    }
+
+    /**
+     * アバター更新時に、該当ユーザーが参加中の全テーブルの TableMemberRecord を更新して WS push する。
+     */
+    public void refreshAvatarUrl(String publicId, String newAvatarUrl) {
+        for (String tableId : List.copyOf(store.tableMembers.keySet())) {
+            synchronized (store.lock(tableId)) {
+                List<TableMemberRecord> members = store.tableMembers.get(tableId);
+                if (members == null) continue;
+                boolean changed = false;
+                List<TableMemberRecord> updated = new ArrayList<>(members);
+                for (int i = 0; i < updated.size(); i++) {
+                    TableMemberRecord m = updated.get(i);
+                    if (publicId.equals(m.publicId())) {
+                        updated.set(i, new TableMemberRecord(
+                                m.name(), m.seatIndex(), m.joinedAt(),
+                                m.pendingLeave(), m.displayName(),
+                                newAvatarUrl, m.publicId()));
+                        changed = true;
+                    }
+                }
+                if (changed) {
+                    store.tableMembers.put(tableId, updated);
+                    eventPublisher.publishMembers(tableId, List.copyOf(updated));
+                }
+            }
         }
     }
 

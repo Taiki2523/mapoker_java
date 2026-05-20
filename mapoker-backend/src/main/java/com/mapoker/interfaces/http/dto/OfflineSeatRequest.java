@@ -8,5 +8,5 @@ public record OfflineSeatRequest(
         @JsonProperty("seat_index") @Min(0) int seatIndex,
         @NotBlank String name,
         @JsonProperty("buy_in") @Min(1) int buyIn,
-        @JsonProperty("invite_code") @NotBlank String inviteCode
+        @JsonProperty("invite_code") String inviteCode
 ) {}

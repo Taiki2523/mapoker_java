@@ -7,7 +7,7 @@ import { UserHeader } from './UserHeader'
 type Props = {
   currentUser: AuthUser | null
   onOpenMyPage: () => void
-  onJoinRoom: (tableId: string) => Promise<void>
+  onJoinRoom: (tableId: string, gameType: string) => Promise<void>
   onCreateTable: () => void
   onBack: () => void
   appVersion?: string
@@ -160,7 +160,7 @@ export function LobbyScreen({ currentUser, onOpenMyPage, onJoinRoom, onCreateTab
               ) : null}
             </div>
             <div className="lobby-browser-actions">
-              <button className="primary" onClick={() => void onJoinRoom(table.id)} disabled={loading}>
+              <button className="primary" onClick={() => void onJoinRoom(table.id, table.game_type)} disabled={loading}>
                 {t('joinTable')}
               </button>
             </div>

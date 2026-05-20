@@ -10,12 +10,22 @@ type Callbacks = {
   roster: RoomMember[]
   setRoster: (r: RoomMember[]) => void
   navigateToLobby: () => void
+  gameStatus?: string
 }
 
 export function useLeaveRoom(cb: Callbacks) {
   const [leavePending, setLeavePending] = useState(false)
 
-  // 退席予約が解消されたらロビーへ
+  // ハンド終了時に退席予約を実行
+  useEffect(() => {
+    if (!leavePending) return
+    if (cb.gameStatus === 'finished') {
+      cb.navigateToLobby()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cb.gameStatus, leavePending])
+
+  // ロスターから除外された場合もロビーへ（サーバー側で即時離席した場合）
   useEffect(() => {
     if (!leavePending || !cb.myName.trim()) return
     const stillInRoster = cb.roster.some((m) => m.name === cb.myName.trim())

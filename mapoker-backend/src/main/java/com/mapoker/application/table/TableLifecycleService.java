@@ -24,7 +24,7 @@ import java.util.Set;
 @Service
 public class TableLifecycleService {
 
-    private static final String CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    private static final String CODE_CHARS = "0123456789";
     private static final int CODE_LENGTH = 6;
     private static final SecureRandom SECURE_RNG = new SecureRandom();
 

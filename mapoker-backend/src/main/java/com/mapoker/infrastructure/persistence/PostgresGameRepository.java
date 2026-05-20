@@ -156,12 +156,12 @@ public class PostgresGameRepository implements GameRepository {
                   id, status, street, button_index, small_blind_idx, big_blind_idx,
                   current_player, current_bet, last_raise_size, big_blind, pot_total,
                   odd_chip_rule, deck, deck_pos, community, acted, raise_open, fold_win, last_showdown,
-                  ante, straddle_enabled, next_hand_straddle
+                  ante, straddle_enabled, next_hand_straddle, showdown_declarations
                 ) VALUES (
                   ?, CAST(? AS game_status), CAST(? AS game_street), ?, ?, ?, ?, ?, ?, ?, ?,
                   CAST(? AS odd_chip_rule),
                   CAST(? AS jsonb), ?, CAST(? AS jsonb), CAST(? AS jsonb), ?, ?, CAST(? AS jsonb),
-                  ?, ?, ?
+                  ?, ?, ?, CAST(? AS jsonb)
                 )
                 """,
                 id,
@@ -185,7 +185,8 @@ public class PostgresGameRepository implements GameRepository {
                 s.getLastShowdown() != null ? toJson(s.getLastShowdown()) : null,
                 s.getAnte(),
                 s.isStraddleEnabled(),
-                s.isNextHandStraddle());
+                s.isNextHandStraddle(),
+                !s.getShowdownDeclarations().isEmpty() ? toJson(s.getShowdownDeclarations()) : null);
     }
 
     private void updateGame(String id, GameState s) {
@@ -212,6 +213,7 @@ public class PostgresGameRepository implements GameRepository {
                   ante            = ?,
                   straddle_enabled = ?,
                   next_hand_straddle = ?,
+                  showdown_declarations = CAST(? AS jsonb),
                   updated_at      = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
@@ -236,6 +238,7 @@ public class PostgresGameRepository implements GameRepository {
                 s.getAnte(),
                 s.isStraddleEnabled(),
                 s.isNextHandStraddle(),
+                !s.getShowdownDeclarations().isEmpty() ? toJson(s.getShowdownDeclarations()) : null,
                 id);
     }
 
@@ -329,6 +332,15 @@ public class PostgresGameRepository implements GameRepository {
         Object nextStraddleRaw = row.get("next_hand_straddle");
         if (nextStraddleRaw != null) {
             s.setNextHandStraddle((Boolean) nextStraddleRaw);
+        }
+        Object declRaw = row.get("showdown_declarations");
+        if (declRaw != null) {
+            var rawMap = fromJson(str(declRaw), new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String, Boolean>>() {});
+            if (rawMap != null) {
+                java.util.Map<Integer, Boolean> decl = new java.util.HashMap<>();
+                rawMap.forEach((k, v) -> decl.put(Integer.parseInt(k), v));
+                s.setShowdownDeclarations(decl);
+            }
         }
 
         List<Player> players = new ArrayList<>();

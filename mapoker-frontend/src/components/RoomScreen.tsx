@@ -7,7 +7,7 @@ import { UserHeader } from './UserHeader'
 type Props = {
   loading: boolean
   error: string
-  onCreateGame: (config: CreateGameConfig) => Promise<string | undefined>
+  onCreateGame: (config: CreateGameConfig) => Promise<void>
   currentUser: AuthUser | null
   onOpenMyPage: () => void
   onBack: () => void
@@ -34,7 +34,6 @@ export function RoomScreen({
   const [visibility, setVisibility] = useState<TableVisibility>('public')
   const [flags, setFlags] = useState<TableFlag[]>(['casual'])
   const [isOffline, setIsOffline] = useState(false)
-  const [createdInviteCode, setCreatedInviteCode] = useState<string | null>(null)
 
   const toggleFlag = (flag: TableFlag) => {
     setFlags((prev) => (
@@ -137,7 +136,7 @@ export function RoomScreen({
             />
             <span className="toggle-track"><span className="toggle-thumb" /></span>
             <span>
-              <span className={`game-type-dot ${isOffline ? 'offline' : 'online'}`} style={{ marginRight: '0.4rem' }} />
+              <span className={`game-type-dot ${isOffline ? 'offline' : 'online'}`} style={{ marginRight: '0.4rem', verticalAlign: 'middle' }} />
               {isOffline ? 'オフライン（物理カード）' : 'オンライン'}
             </span>
           </label>
@@ -153,31 +152,23 @@ export function RoomScreen({
           <option value="private">{t('privateTable')}</option>
         </select>
       </label>
-      {!isOffline && (
-        <div>
-          <div className="label" style={{ marginBottom: '0.45rem' }}>{t('tableFlags')}</div>
-          <div className="button-row" style={{ justifyContent: 'flex-start' }}>
-            <button type="button" className={flags.includes('casual') ? 'primary' : 'secondary'} onClick={() => toggleFlag('casual')}>
-              {t('flagCasual')}
-            </button>
-            <button type="button" className={flags.includes('serious') ? 'primary' : 'secondary'} onClick={() => toggleFlag('serious')}>
-              {t('flagSerious')}
-            </button>
-            <button type="button" className={flags.includes('newbie') ? 'primary' : 'secondary'} onClick={() => toggleFlag('newbie')}>
-              {t('flagNewbie')}
-            </button>
-            <button type="button" className={flags.includes('short_handed') ? 'primary' : 'secondary'} onClick={() => toggleFlag('short_handed')}>
-              {t('flagShortHanded')}
-            </button>
-          </div>
+      <div style={{ visibility: isOffline ? 'hidden' : 'visible' }}>
+        <div className="label" style={{ marginBottom: '0.45rem' }}>{t('tableFlags')}</div>
+        <div className="button-row" style={{ justifyContent: 'flex-start' }}>
+          <button type="button" className={flags.includes('casual') ? 'primary' : 'secondary'} onClick={() => toggleFlag('casual')}>
+            {t('flagCasual')}
+          </button>
+          <button type="button" className={flags.includes('serious') ? 'primary' : 'secondary'} onClick={() => toggleFlag('serious')}>
+            {t('flagSerious')}
+          </button>
+          <button type="button" className={flags.includes('newbie') ? 'primary' : 'secondary'} onClick={() => toggleFlag('newbie')}>
+            {t('flagNewbie')}
+          </button>
+          <button type="button" className={flags.includes('short_handed') ? 'primary' : 'secondary'} onClick={() => toggleFlag('short_handed')}>
+            {t('flagShortHanded')}
+          </button>
         </div>
-      )}
-      {createdInviteCode && (
-        <div className="offline-invite-code-box">
-          <div className="offline-invite-code-label">招待コード（卓のメンバーに伝えてください）</div>
-          <div className="offline-invite-code">{createdInviteCode}</div>
-        </div>
-      )}
+      </div>
       <div className="button-row">
         <button className="ghost" onClick={onBack}>
           {t('backToLobby')}
@@ -185,7 +176,6 @@ export function RoomScreen({
         <button
           className="primary"
           onClick={() => {
-            setCreatedInviteCode(null)
             void onCreateGame({
               tableName,
               playerCount,
@@ -196,8 +186,6 @@ export function RoomScreen({
               visibility,
               flags,
               gameType: isOffline ? 'offline' : 'ring',
-            }).then((code) => {
-              if (code) setCreatedInviteCode(code)
             })
           }}
           disabled={loading}
