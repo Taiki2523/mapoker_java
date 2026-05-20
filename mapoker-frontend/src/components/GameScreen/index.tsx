@@ -78,7 +78,6 @@ export function GameScreen({
         mySeat={mySeat}
         mySeatIndex={mySeatIndex}
         table={table}
-        roster={roster}
         autoRefresh={autoRefresh}
         setAutoRefresh={setAutoRefresh}
         loading={loading}
