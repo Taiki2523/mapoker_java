@@ -27,7 +27,8 @@ export async function uploadFile<T>(path: string, file: File): Promise<T> {
     credentials: 'include',
   })
   const text = await res.text()
-  const data = text ? (JSON.parse(text) as T | ApiError) : ({} as T)
+  let data: T | ApiError = {} as T
+  try { if (text) data = JSON.parse(text) as T | ApiError } catch { /* non-JSON response */ }
   if (!res.ok) {
     const err = data as ApiError
     throw new Error(err.error?.code ?? `http_${res.status}`)
@@ -146,13 +147,15 @@ export async function fetchJSON<T>(path: string, options: RequestInit = {}): Pro
   const res = await fetch(`${API_BASE}${path}`, {
     headers: {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
       ...(options.headers ?? {}),
     },
     credentials: 'include',
     ...options,
   })
   const text = await res.text()
-  const data = text ? (JSON.parse(text) as T | ApiError) : ({} as T)
+  let data: T | ApiError = {} as T
+  try { if (text) data = JSON.parse(text) as T | ApiError } catch { /* non-JSON response */ }
   if (!res.ok) {
     const err = data as ApiError
     throw new Error(err.error?.code ?? `http_${res.status}`)
