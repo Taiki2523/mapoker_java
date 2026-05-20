@@ -175,6 +175,7 @@ DB にはメールアドレスを保存しない（`sub` claim のみ使用）�
 
 - `small_blind` 省略時は `big_blind / 2`
 - `ante` 省略時は `big_blind / 10`（0 でアンティなし）
+- `game_type`: `ring`（デフォルト）または `offline`
 - `visibility`: `public` または `private`
 - `flags`: 小文字スネークケース、最大 8 件
 
@@ -196,9 +197,13 @@ DB にはメールアドレスを保存しない（`sub` claim のみ使用）�
   "visibility": "public",
   "status": "waiting",
   "flags": ["casual", "newbie"],
+  "invite_code": "857691",
   "members": [],
   "game": { ...GameResponse... }
 }
+```
+
+- `invite_code`: オフラインテーブルのみ。数字 6 桁。リングゲームは `null`
 ```
 
 ### テーブル一覧
@@ -371,6 +376,109 @@ DB にはメールアドレスを保存しない（`sub` claim のみ使用）�
 
 `POST /v1/games/{id}/showdown`
 
+- **リングゲーム**: body なし → サーバーがホールカードを評価して勝者を決定
+- **オフライン（手動宣言済み）**: `{ "declared_winners": [0, 2] }` を渡すと `HandEvaluator` をスキップしてそのまま分配
+
+リクエスト（オフライン用、省略可）:
+```json
+{ "declared_winners": [0, 2] }
+```
+
+### オフラインショーダウン個別宣言
+
+`POST /v1/games/{id}/showdown/declare`
+
+オフラインモード専用。プレイヤーが自分の手の勝敗を個別に宣言する。全員宣言完了で自動的にポットを分配する。
+
+リクエスト:
+```json
+{ "player_index": 1, "win": true }
+```
+
+レスポンス: GameResponse（`showdown_declarations` フィールドに現在の宣言状態が含まれる）
+
+---
+
+## オフラインセッション API — `/v1/games/{id}`（オフライン専用）
+
+`game_type: "offline"` のゲームのみ有効。物理カードを使ったポーカーのチップ管理を補助する。
+
+### オフライン着席
+
+`POST /v1/games/{id}/seat`
+
+指定席にプレイヤーを着席させ、バイイン額を記録する。リバイの場合は累積加算。招待コードが設定されたテーブルでは一致チェックを行う（リバイはスキップ）。
+
+リクエスト:
+```json
+{
+  "seat_index": 2,
+  "name": "Alice",
+  "buy_in": 3000,
+  "invite_code": "123456"
+}
+```
+
+レスポンス:
+```json
+{
+  "seat_index": 2,
+  "members": [
+    { "name": "Alice", "seat_index": 2 }
+  ]
+}
+```
+
+### 利確（キャッシュアウト）
+
+`POST /v1/games/{id}/cashout`
+
+プレイヤーを利確させ、現在のスタックを `offline_cash_out` として記録する。スタックは 0 にリセットされ着席リストから除外される。
+
+リクエスト:
+```json
+{ "seat_index": 2 }
+```
+
+レスポンス:
+```json
+{ "seat_index": 2, "cash_out": 5200 }
+```
+
+### セッションクローズ
+
+`POST /v1/games/{id}/close-session`
+
+ホストがセッションを手動クローズする。全員退席済み扱いにする。
+
+レスポンス: `204 No Content`
+
+### 収支サマリー
+
+`GET /v1/games/{id}/session-summary`
+
+セッション全体の収支一覧を返す。
+
+レスポンス:
+```json
+{
+  "game_id": "uuid",
+  "players": [
+    {
+      "seat_index": 0,
+      "name": "Alice",
+      "buy_in": 3000,
+      "cash_out": 5200,
+      "profit": 2200,
+      "settled": true
+    }
+  ]
+}
+```
+
+- `settled`: `cashout_at IS NOT NULL`（利確確定済み）
+- `profit` は `cash_out - buy_in`（API が計算して返す派生値）
+
 ---
 
 ## GameResponse 構造
@@ -411,7 +519,8 @@ DB にはメールアドレスを保存しない（`sub` claim のみ使用）�
     "winners": [0],
     "best_hand": { "rank": "Flush", "kickers": [14, 10, 8, 5, 3] },
     "payouts": [200, 0]
-  }
+  },
+  "showdown_declarations": { "0": true, "1": false }
 }
 ```
 
@@ -423,6 +532,7 @@ DB にはメールアドレスを保存しない（`sub` claim のみ使用）�
 - `can_start_hand`: 次のハンドを開始できる状態かどうか
 - `can_rebuy`: 閲覧者のスタックが 0 でリバイ可能かどうか（スタック 0 かつ着席中の場合 `true`）
 - `viewer_membership_active`: 閲覧者がテーブルに着席中かどうか
+- `showdown_declarations`: オフラインショーダウン中の宣言状態。`{ "playerIndex": true/false }`。全員宣言完了前は未宣言プレイヤーのキーが存在しない。ショーダウン外は `null`
 
 ---
 
