@@ -3,8 +3,8 @@ package com.mapoker.infrastructure.persistence;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mapoker.application.HandHistoryEntry;
-import com.mapoker.application.HandHistoryRepository;
+import com.mapoker.application.history.HandHistoryEntry;
+import com.mapoker.application.ports.HandHistoryRepository;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -16,6 +16,9 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 
+/**
+ * Spring の {@code @Repository} として PostgreSQL へハンド履歴を保存する実装です。
+ */
 @Repository
 @Profile("postgresql")
 public class PostgresHandHistoryRepository implements HandHistoryRepository {
@@ -31,6 +34,11 @@ public class PostgresHandHistoryRepository implements HandHistoryRepository {
         this.mapper = mapper;
     }
 
+    /**
+     * ハンド履歴を保存します。
+     *
+     * @param entry 保存するハンド履歴
+     */
     @Override
     public void save(HandHistoryEntry entry) {
         jdbc.update("""
@@ -46,6 +54,13 @@ public class PostgresHandHistoryRepository implements HandHistoryRepository {
                 Timestamp.from(entry.finishedAt()));
     }
 
+    /**
+     * 指定テーブル群の直近ハンド履歴を取得します。
+     *
+     * @param tableIds 対象テーブル ID の一覧
+     * @param limit 取得件数の上限
+     * @return 直近ハンド履歴一覧
+     */
     @Override
     public List<HandHistoryEntry> findRecentByTableIds(List<String> tableIds, int limit) {
         if (tableIds == null || tableIds.isEmpty()) {

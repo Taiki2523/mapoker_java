@@ -14,11 +14,36 @@ import com.mapoker.domain.rules.Street;
 import com.mapoker.domain.rules.TableState;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
+/**
+ * Texas Hold'em 1ゲームの進行状態をすべて保持するドメインオブジェクト。
+ *
+ * <p>このクラスはゲームのコアロジック（ブラインド投下・アクション適用・ストリート進行・
+ * サイドポット分配・ショーダウン解決）を担う。Spring 非依存の純粋 Java クラス。
+ *
+ * <h2>ライフサイクル</h2>
+ * <ol>
+ *   <li>{@link #newGame} でゲームインスタンスを生成する</li>
+ *   <li>{@link #startHand} で各ハンドを開始（ブラインド投下・カード配布）する</li>
+ *   <li>{@link #applyAction} でプレイヤーのアクションを適用する（バリデーション含む）</li>
+ *   <li>ストリートが進み {@code status == SHOWDOWN} になったら {@link #resolveShowdown} を呼ぶ</li>
+ *   <li>{@link #applyPayouts} でポットを配分し、ステータスが {@code FINISHED} になる</li>
+ * </ol>
+ *
+ * <h2>制約</h2>
+ * <ul>
+ *   <li>{@code bet}/{@code raise} の {@code amount} は増分ではなく合計額（raise-to total）</li>
+ *   <li>最小レイズ = {@code max(bigBlind, lastRaiseSize)}。サブミニオールインは許容するが
+ *       {@code raiseOpen=false} にしてベッティングを再オープンしない</li>
+ *   <li>奇数チップの端数配分は {@link OddChipRule} で制御する</li>
+ * </ul>
+ */
 public class GameState {
 
     private String id;
@@ -41,14 +66,73 @@ public class GameState {
     private boolean raiseOpen;
     private ShowdownResult lastShowdown;
     private boolean foldWin = false;
+    private int ante = 0;
+    private boolean straddleEnabled = false;
+    private int straddleIdx = -1;
+    private boolean nextHandStraddle = false;
+    /** オフラインショーダウン宣言 (playerIndex → isWin)。全員宣言で自動解決。 */
+    private java.util.Map<Integer, Boolean> showdownDeclarations = new java.util.HashMap<>();
 
     private GameState() {}
 
+    /**
+     * 永続化からの復元専用の空インスタンスを生成する。
+     * リポジトリ実装がデシリアライズ後に各フィールドをセッターで埋める用途に限定する。
+     *
+     * @return フィールド未設定の空 {@link GameState}
+     */
     public static GameState empty() {
         return new GameState();
     }
 
+    /**
+     * 新しいゲームインスタンスを生成する。プレイヤーリストはディープコピーされる。
+     *
+     * <p>このメソッドはデッキの生成とシャッフルのみを行い、ブラインド投下やカード配布は
+     * 行わない。ハンドを開始するには別途 {@link #startHand} を呼ぶこと。
+     *
+     * @param players     参加プレイヤーのリスト（2〜9人）
+     * @param buttonIndex ボタン位置（プレイヤーリストの 0-based インデックス）
+     * @param bigBlind    ビッグブラインド額（正の値）
+     * @param rng         シャッフル用乱数生成器。{@code null} の場合はデフォルト {@link Random}
+     * @param oddChipRule 奇数チップの配分ルール。{@code null} の場合は {@link OddChipRule#LOW_INDEX}
+     * @return 初期化済みの {@link GameState}（アンティなし）
+     * @throws IllegalArgumentException プレイヤー数・ビッグブラインド額・ボタン位置が不正な場合
+     */
     public static GameState newGame(List<Player> players, int buttonIndex, int bigBlind, Random rng, OddChipRule oddChipRule) {
+        return newGame(players, buttonIndex, bigBlind, rng, oddChipRule, 0);
+    }
+
+    /**
+     * アンティ付きで新しいゲームインスタンスを生成する。プレイヤーリストはディープコピーされる。
+     *
+     * @param players     参加プレイヤーのリスト（2〜9人）
+     * @param buttonIndex ボタン位置（プレイヤーリストの 0-based インデックス）
+     * @param bigBlind    ビッグブラインド額（正の値）
+     * @param rng         シャッフル用乱数生成器。{@code null} の場合はデフォルト {@link Random}
+     * @param oddChipRule 奇数チップの配分ルール。{@code null} の場合は {@link OddChipRule#LOW_INDEX}
+     * @param ante        アンティ額（0 でアンティなし）
+     * @return 初期化済みの {@link GameState}
+     * @throws IllegalArgumentException プレイヤー数・ビッグブラインド額・ボタン位置が不正な場合
+     */
+    public static GameState newGame(List<Player> players, int buttonIndex, int bigBlind, Random rng, OddChipRule oddChipRule, int ante) {
+        return newGame(players, buttonIndex, bigBlind, rng, oddChipRule, ante, false);
+    }
+
+    /**
+     * アンティ・ストラドル設定付きで新しいゲームインスタンスを生成する。
+     *
+     * @param players         参加プレイヤーのリスト（2〜9人）
+     * @param buttonIndex     ボタン位置（プレイヤーリストの 0-based インデックス）
+     * @param bigBlind        ビッグブラインド額（正の値）
+     * @param rng             シャッフル用乱数生成器。{@code null} の場合はデフォルト {@link Random}
+     * @param oddChipRule     奇数チップの配分ルール。{@code null} の場合は {@link OddChipRule#LOW_INDEX}
+     * @param ante            アンティ額（0 でアンティなし）
+     * @param straddleEnabled ストラドル機能を有効にするか
+     * @return 初期化済みの {@link GameState}
+     * @throws IllegalArgumentException プレイヤー数・ビッグブラインド額・ボタン位置が不正な場合
+     */
+    public static GameState newGame(List<Player> players, int buttonIndex, int bigBlind, Random rng, OddChipRule oddChipRule, int ante, boolean straddleEnabled) {
         if (players.size() < PokerConstants.MIN_PLAYERS || players.size() > PokerConstants.MAX_PLAYERS)
             throw new IllegalArgumentException("players must be 2-9");
         if (bigBlind <= 0)
@@ -71,15 +155,49 @@ public class GameState {
         Deck.shuffle(g.deck, rng);
         g.acted = new boolean[players.size()];
         g.community = new ArrayList<>();
+        g.ante = Math.max(0, ante);
+        g.straddleEnabled = straddleEnabled;
         return g;
     }
 
+    /**
+     * 新しいハンドを開始する（ストラドルなし）。
+     *
+     * @param bigBlind ビッグブラインド額
+     * @throws IllegalStateException ショーダウンが未解決の場合、またはチップ保有者が2人未満の場合
+     */
     public void startHand(int bigBlind) {
+        startHand(bigBlind, false);
+    }
+
+    /**
+     * 新しいハンドを開始する。ボタンを次のアクティブプレイヤーに進め、ブラインドを投下し、
+     * 各プレイヤーにホールカードを2枚配布する。
+     *
+     * <p>チップが0のプレイヤーは自動的にフォールド扱いになる。
+     * ヘッズアップ（2人）のときはボタン = スモールブラインドとなる（ポーカールール準拠）。
+     * {@code straddleEnabled} かつ {@code doStraddle} かつ3人以上のとき、UTGがストラドルをポストする。
+     * UTGのスタックがストラドル額未満の場合はストラドルをスキップする。
+     *
+     * @param bigBlind   ビッグブラインド額
+     * @param doStraddle このハンドでストラドルするか（{@code straddleEnabled} が false のときは無視される）
+     * @throws IllegalStateException ショーダウンが未解決の場合、またはチップ保有者が2人未満の場合
+     */
+    public void startHand(int bigBlind, boolean doStraddle) {
+        startHand(bigBlind, doStraddle, false);
+    }
+
+    /**
+     * 新しいハンドを開始する。{@code skipCardDeal=true} の場合、デッキシャッフルとホールカード配布をスキップする。
+     * オフラインモード（物理カード運用）向け。
+     */
+    public void startHand(int bigBlind, boolean doStraddle, boolean skipCardDeal) {
         if (status == GameStatus.SHOWDOWN)
             throw new IllegalStateException("cannot start hand: showdown not resolved");
         status = GameStatus.IN_PROGRESS;
         foldWin = false;
         lastShowdown = null;
+        showdownDeclarations.clear();
         community.clear();
         deckPos = 0;
         pot = 0;
@@ -111,9 +229,10 @@ public class GameState {
 
         buttonIndex = nextActive(buttonIndex);
 
-        // Shuffle fresh deck for new hand
-        deck = Deck.newDeck();
-        Deck.shuffle(deck, null);
+        if (!skipCardDeal) {
+            deck = Deck.newDeck();
+            Deck.shuffle(deck, null);
+        }
 
         if (activePlayers == 2) {
             smallBlindIdx = buttonIndex;
@@ -121,6 +240,12 @@ public class GameState {
         } else {
             smallBlindIdx = nextActive(buttonIndex);
             bigBlindIdx = nextActive(smallBlindIdx);
+        }
+
+        if (ante > 0) {
+            for (int i = 0; i < players.size(); i++) {
+                postAnte(i, ante);
+            }
         }
 
         postBlind(smallBlindIdx, bigBlind / PokerConstants.SMALL_BLIND_DIVISOR);
@@ -132,21 +257,90 @@ public class GameState {
             }
         }
 
-        for (int i = 0; i < 2; i++) {
-            for (Player p : players) {
-                if (p.isFolded()) continue;
-                Card[] hole = p.getHole();
-                hole[i] = draw();
+        if (!skipCardDeal) {
+            for (int i = 0; i < 2; i++) {
+                for (Player p : players) {
+                    if (p.isFolded()) continue;
+                    Card[] hole = p.getHole();
+                    hole[i] = draw();
+                }
             }
         }
 
         currentBet = players.get(bigBlindIdx).getContributed();
         lastRaiseSize = bigBlind;
         bigBlindSize = bigBlind;
-        resetActed();
         raiseOpen = true;
         acted = new boolean[players.size()];
+
+        straddleIdx = -1;
+        boolean effectiveStraddle = doStraddle || nextHandStraddle;
+        nextHandStraddle = false;
+        if (straddleEnabled && effectiveStraddle && activePlayers > 2) {
+            int candidate = nextActive(bigBlindIdx);
+            int straddleAmount = bigBlind * 2;
+            if (players.get(candidate).getStack() >= straddleAmount) {
+                straddleIdx = candidate;
+                postBlind(straddleIdx, straddleAmount);
+                currentBet = straddleAmount;
+                lastRaiseSize = straddleAmount;
+            }
+        }
+
         currentPlayer = firstToAct();
+    }
+
+    /**
+     * オフラインショーダウン宣言を記録する。
+     * @param playerIndex 宣言プレイヤー
+     * @param win true=勝利, false=敗北
+     * @return 全員が宣言完了したかどうか
+     */
+    public boolean declareOfflineResult(int playerIndex, boolean win) {
+        if (status != GameStatus.SHOWDOWN)
+            throw new IllegalStateException("showdown not available in status " + status);
+        if (playerIndex < 0 || playerIndex >= players.size())
+            throw new IllegalArgumentException("invalid player index: " + playerIndex);
+        if (players.get(playerIndex).isFolded())
+            throw new IllegalArgumentException("folded player cannot declare: " + playerIndex);
+        showdownDeclarations.put(playerIndex, win);
+        return isAllDeclared();
+    }
+
+    /** 非フォールドプレイヤー全員が宣言済みかどうかを返す。 */
+    public boolean isAllDeclared() {
+        for (int i = 0; i < players.size(); i++) {
+            if (!players.get(i).isFolded() && !showdownDeclarations.containsKey(i)) return false;
+        }
+        return true;
+    }
+
+    /** 宣言済み勝者インデックスのリストを返す（isWin=true のもの）。 */
+    public List<Integer> getDeclaredWinners() {
+        List<Integer> winners = new ArrayList<>();
+        showdownDeclarations.forEach((idx, win) -> { if (win) winners.add(idx); });
+        return winners;
+    }
+
+    /**
+     * オフラインモード向けショーダウン解決。カード評価を行わず、宣言された勝者にポットを分配する。
+     * {@code splitPots} のサイドポット計算（totalContrib ベース）は流用する。
+     */
+    public ShowdownResult resolveShowdownManual(List<Integer> declaredWinners) {
+        if (status != GameStatus.SHOWDOWN)
+            throw new IllegalStateException("showdown not available in status " + status);
+        if (declaredWinners == null || declaredWinners.isEmpty())
+            throw new IllegalArgumentException("declared winners must not be empty");
+        for (int idx : declaredWinners) {
+            if (idx < 0 || idx >= players.size())
+                throw new IllegalArgumentException("invalid player index: " + idx);
+            if (players.get(idx).isFolded())
+                throw new IllegalArgumentException("player " + idx + " has folded and cannot be declared winner");
+        }
+        List<Integer> payouts = splitPots(declaredWinners);
+        ShowdownResult result = new ShowdownResult(List.copyOf(declaredWinners), null, payouts);
+        lastShowdown = result;
+        return result;
     }
 
     public void applyAction(int playerIndex, Action action) {
@@ -194,9 +388,9 @@ public class GameState {
                 commitBet(playerIndex, target);
                 if (target > currentBet) {
                     int raiseSize = target - currentBet;
-                    int previousRaise = lastRaiseSize;
+                    int previousBet = currentBet;
                     currentBet = target;
-                    if (raiseSize >= minRaiseSize(bigBlindSize, previousRaise)) {
+                    if (raiseSize >= minRaiseSize(bigBlindSize, previousBet)) {
                         lastRaiseSize = raiseSize;
                         raiseOpen = true;
                         resetActedExcept(playerIndex);
@@ -247,6 +441,7 @@ public class GameState {
         if (community.size() < PokerConstants.COMMUNITY_CARDS)
             throw new IllegalStateException("community cards incomplete");
 
+        Map<Integer, HandValue> handValues = new HashMap<>();
         HandValue best = new HandValue(HandRank.HIGH_CARD, List.of(Rank.TWO));
         List<Integer> winners = new ArrayList<>();
 
@@ -256,6 +451,7 @@ public class GameState {
             if (p.isSittingOut()) continue;
             Card[] seven = buildSeven(p.getHole(), community);
             HandValue val = HandEvaluator.eval7(seven);
+            handValues.put(i, val);
             int cmp = val.compareTo(best);
             if (cmp > 0) {
                 best = val;
@@ -268,7 +464,7 @@ public class GameState {
         if (winners.isEmpty())
             throw new IllegalStateException("no active players at showdown");
 
-        List<Integer> payouts = splitPots(winners);
+        List<Integer> payouts = splitPots(handValues);
         ShowdownResult result = new ShowdownResult(List.copyOf(winners), best, payouts);
         lastShowdown = result;
         return result;
@@ -305,13 +501,28 @@ public class GameState {
         currentBet = 0;
         lastRaiseSize = bigBlindSize;
         raiseOpen = true;
-        burn();
-        switch (street) {
-            case FLOP -> { community.add(draw()); community.add(draw()); community.add(draw()); }
-            case TURN, RIVER -> community.add(draw());
-            default -> {}
+        // deck == null はオフラインモード（物理カード使用）。カード操作をスキップする。
+        if (deck != null) {
+            burn();
+            switch (street) {
+                case FLOP -> { community.add(draw()); community.add(draw()); community.add(draw()); }
+                case TURN, RIVER -> community.add(draw());
+                default -> {}
+            }
         }
         currentPlayer = firstToAct();
+    }
+
+    private void postAnte(int playerIndex, int amount) {
+        if (amount <= 0) return;
+        Player p = players.get(playerIndex);
+        if (p.isFolded() || p.isSittingOut()) return;
+        int actual = Math.min(amount, p.getStack());
+        if (actual == 0) return;
+        p.setStack(p.getStack() - actual);
+        p.setTotalContrib(p.getTotalContrib() + actual);
+        if (p.getStack() == 0) p.setAllIn(true);
+        pot += actual;
     }
 
     private void postBlind(int playerIndex, int amount) {
@@ -405,7 +616,39 @@ public class GameState {
     }
 
     private int firstToAct() {
-        return street == Street.PREFLOP ? nextActive(bigBlindIdx) : nextActive(buttonIndex);
+        if (street == Street.PREFLOP) {
+            int lastBlindIdx = straddleIdx >= 0 ? straddleIdx : bigBlindIdx;
+            return nextActive(lastBlindIdx);
+        }
+        return nextActive(buttonIndex);
+    }
+
+    /**
+     * 次のハンドでUTGになるプレイヤーのインデックスを返す。
+     * ストラドル選択UIの表示用。3人未満の場合は -1 を返す。
+     */
+    public int computeNextUtgIdx() {
+        int eligible = 0;
+        for (Player p : players) {
+            if (p.getStack() > 0 && !p.isSittingOut()) eligible++;
+        }
+        if (eligible <= 2) return -1;
+        int nextButton = nextActiveByStack(buttonIndex);
+        int nextSB = nextActiveByStack(nextButton);
+        int nextBB = nextActiveByStack(nextSB);
+        return nextActiveByStack(nextBB);
+    }
+
+    private int nextActiveByStack(int from) {
+        int n = players.size();
+        for (int i = 1; i <= n; i++) {
+            int idx = (from + i) % n;
+            Player p = players.get(idx);
+            if (p.getStack() <= 0) continue;
+            if (p.isSittingOut()) continue;
+            return idx;
+        }
+        return from;
     }
 
     private int nextToAct(int from) {
@@ -435,6 +678,7 @@ public class GameState {
         return out;
     }
 
+    // フォールドウィン用：勝者リストを直接渡す
     private List<Integer> splitPots(List<Integer> winners) {
         int[] payouts = new int[players.size()];
         List<SidePot> pots = buildSidePots();
@@ -449,6 +693,40 @@ public class GameState {
         List<Integer> result = new ArrayList<>(players.size());
         for (int v : payouts) result.add(v);
         return result;
+    }
+
+    // ショーダウン用：サイドポットごとに eligible 内の最強ハンドを再評価する
+    private List<Integer> splitPots(Map<Integer, HandValue> handValues) {
+        int[] payouts = new int[players.size()];
+        List<SidePot> pots = buildSidePots();
+        for (SidePot sp : pots) {
+            List<Integer> potWinners = findPotWinners(sp.eligible(), handValues);
+            if (potWinners.isEmpty()) continue;
+            int base = sp.amount() / potWinners.size();
+            int rem = sp.amount() % potWinners.size();
+            for (int idx : potWinners) payouts[idx] += base;
+            distributeRemainder(payouts, potWinners, rem);
+        }
+        List<Integer> result = new ArrayList<>(players.size());
+        for (int v : payouts) result.add(v);
+        return result;
+    }
+
+    private List<Integer> findPotWinners(List<Integer> eligible, Map<Integer, HandValue> handValues) {
+        HandValue best = null;
+        List<Integer> winners = new ArrayList<>();
+        for (int idx : eligible) {
+            HandValue val = handValues.get(idx);
+            if (val == null) continue;
+            if (best == null || val.compareTo(best) > 0) {
+                best = val;
+                winners.clear();
+                winners.add(idx);
+            } else if (val.compareTo(best) == 0) {
+                winners.add(idx);
+            }
+        }
+        return winners;
     }
 
     private record SidePot(int amount, List<Integer> eligible) {}
@@ -558,4 +836,14 @@ public class GameState {
     public void setRaiseOpen(boolean raiseOpen) { this.raiseOpen = raiseOpen; }
     public void setFoldWin(boolean foldWin) { this.foldWin = foldWin; }
     public void setLastShowdown(ShowdownResult lastShowdown) { this.lastShowdown = lastShowdown; }
+    public int getAnte() { return ante; }
+    public void setAnte(int ante) { this.ante = ante; }
+    public boolean isStraddleEnabled() { return straddleEnabled; }
+    public void setStraddleEnabled(boolean straddleEnabled) { this.straddleEnabled = straddleEnabled; }
+    public int getStraddleIdx() { return straddleIdx; }
+    public void setStraddleIdx(int straddleIdx) { this.straddleIdx = straddleIdx; }
+    public boolean isNextHandStraddle() { return nextHandStraddle; }
+    public void setNextHandStraddle(boolean nextHandStraddle) { this.nextHandStraddle = nextHandStraddle; }
+    public java.util.Map<Integer, Boolean> getShowdownDeclarations() { return showdownDeclarations; }
+    public void setShowdownDeclarations(java.util.Map<Integer, Boolean> d) { this.showdownDeclarations = d != null ? d : new java.util.HashMap<>(); }
 }

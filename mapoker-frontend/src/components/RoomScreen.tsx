@@ -10,8 +10,8 @@ type Props = {
   onCreateGame: (config: CreateGameConfig) => Promise<void>
   currentUser: AuthUser | null
   onOpenMyPage: () => void
-  onLogout: () => void
   onBack: () => void
+  appVersion?: string
 }
 
 export function RoomScreen({
@@ -20,14 +20,20 @@ export function RoomScreen({
   onCreateGame,
   currentUser,
   onOpenMyPage,
-  onLogout,
   onBack,
+  appVersion,
 }: Props) {
+  const defaultAnte = (bigBlind: number) => Math.max(1, Math.floor(bigBlind / 10))
+
   const [tableName, setTableName] = useState('Cash Orbit')
   const [playerCount, setPlayerCount] = useState(2)
   const [selectedFormat, setSelectedFormat] = useState(BLIND_FORMATS[0])
+  const [anteEnabled, setAnteEnabled] = useState(false)
+  const [ante, setAnte] = useState(() => defaultAnte(BLIND_FORMATS[0].bigBlind))
+  const [straddleEnabled, setStraddleEnabled] = useState(false)
   const [visibility, setVisibility] = useState<TableVisibility>('public')
   const [flags, setFlags] = useState<TableFlag[]>(['casual'])
+  const [isOffline, setIsOffline] = useState(false)
 
   const toggleFlag = (flag: TableFlag) => {
     setFlags((prev) => (
@@ -39,7 +45,7 @@ export function RoomScreen({
 
   return (
     <>
-      <UserHeader username={currentUser?.username ?? ''} onOpenMyPage={onOpenMyPage} onLogout={onLogout} />
+      <UserHeader username={currentUser?.username ?? ''} onOpenMyPage={onOpenMyPage} appVersion={appVersion} />
       <div>
         <h2>{t('createRoomTitle')}</h2>
         <p>{t('createRoomDesc')}</p>
@@ -60,53 +66,107 @@ export function RoomScreen({
             onChange={(e) => setPlayerCount(Number(e.target.value))}
           />
         </label>
-        <label>
-          {t('stakeLabel')}
-          <select
-            value={`${selectedFormat.smallBlind}/${selectedFormat.bigBlind}`}
-            onChange={(e) => {
-              const nextFormat = BLIND_FORMATS.find(
-                (format) => `${format.smallBlind}/${format.bigBlind}` === e.target.value
-              )
-              if (nextFormat) {
-                setSelectedFormat(nextFormat)
-              }
-            }}
-          >
-            {BLIND_FORMAT_CATEGORIES.map((category) => (
-              <optgroup key={category} label={category}>
-                {BLIND_FORMATS
-                  .filter((format) => format.category === category)
-                  .map((format) => (
-                    <option
-                      key={format.label}
-                      value={`${format.smallBlind}/${format.bigBlind}`}
-                    >
-                      {format.label}
-                    </option>
-                  ))}
-              </optgroup>
-            ))}
-          </select>
-        </label>
-        <label>
-          {t('visibility')}
-          <select
-            value={visibility}
-            onChange={(e) => setVisibility(e.target.value as TableVisibility)}
-          >
-            <option value="public">{t('publicTable')}</option>
-            <option value="private">{t('privateTable')}</option>
-          </select>
-        </label>
       </div>
-      <div>
+      <label>
+        {t('stakeLabel')}
+        <select
+          value={`${selectedFormat.smallBlind}/${selectedFormat.bigBlind}`}
+          onChange={(e) => {
+            const nextFormat = BLIND_FORMATS.find(
+              (format) => `${format.smallBlind}/${format.bigBlind}` === e.target.value
+            )
+            if (nextFormat) {
+              setSelectedFormat(nextFormat)
+              setAnte(defaultAnte(nextFormat.bigBlind))
+            }
+          }}
+        >
+          {BLIND_FORMAT_CATEGORIES.map((category) => (
+            <optgroup key={category} label={category}>
+              {BLIND_FORMATS
+                .filter((format) => format.category === category)
+                .map((format) => (
+                  <option
+                    key={format.label}
+                    value={`${format.smallBlind}/${format.bigBlind}`}
+                  >
+                    {format.label}
+                  </option>
+                ))}
+            </optgroup>
+          ))}
+        </select>
+      </label>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={anteEnabled}
+              onChange={(e) => setAnteEnabled(e.target.checked)}
+            />
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
+            {t('ante')}
+          </label>
+          {anteEnabled && (
+            <input
+              type="number" min={1} value={ante}
+              onChange={(e) => setAnte(Math.max(1, Number(e.target.value)))}
+              style={{ width: '7rem' }}
+            />
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={straddleEnabled}
+              onChange={(e) => setStraddleEnabled(e.target.checked)}
+            />
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
+            {t('straddle')}
+          </label>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={isOffline}
+              onChange={(e) => setIsOffline(e.target.checked)}
+            />
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
+            <span>
+              <span className={`game-type-dot ${isOffline ? 'offline' : 'online'}`} style={{ marginRight: '0.4rem', verticalAlign: 'middle' }} />
+              {isOffline ? 'オフライン（物理カード）' : 'オンライン'}
+            </span>
+          </label>
+        </div>
+      </div>
+      <label>
+        {t('visibility')}
+        <select
+          value={visibility}
+          onChange={(e) => setVisibility(e.target.value as TableVisibility)}
+        >
+          <option value="public">{t('publicTable')}</option>
+          <option value="private">{t('privateTable')}</option>
+        </select>
+      </label>
+      <div style={{ visibility: isOffline ? 'hidden' : 'visible' }}>
         <div className="label" style={{ marginBottom: '0.45rem' }}>{t('tableFlags')}</div>
         <div className="button-row" style={{ justifyContent: 'flex-start' }}>
-          <button type="button" className={flags.includes('casual') ? 'primary' : 'secondary'} onClick={() => toggleFlag('casual')}>{t('flagCasual')}</button>
-          <button type="button" className={flags.includes('serious') ? 'primary' : 'secondary'} onClick={() => toggleFlag('serious')}>{t('flagSerious')}</button>
-          <button type="button" className={flags.includes('newbie') ? 'primary' : 'secondary'} onClick={() => toggleFlag('newbie')}>{t('flagNewbie')}</button>
-          <button type="button" className={flags.includes('short_handed') ? 'primary' : 'secondary'} onClick={() => toggleFlag('short_handed')}>{t('flagShortHanded')}</button>
+          <button type="button" className={flags.includes('casual') ? 'primary' : 'secondary'} onClick={() => toggleFlag('casual')}>
+            {t('flagCasual')}
+          </button>
+          <button type="button" className={flags.includes('serious') ? 'primary' : 'secondary'} onClick={() => toggleFlag('serious')}>
+            {t('flagSerious')}
+          </button>
+          <button type="button" className={flags.includes('newbie') ? 'primary' : 'secondary'} onClick={() => toggleFlag('newbie')}>
+            {t('flagNewbie')}
+          </button>
+          <button type="button" className={flags.includes('short_handed') ? 'primary' : 'secondary'} onClick={() => toggleFlag('short_handed')}>
+            {t('flagShortHanded')}
+          </button>
         </div>
       </div>
       <div className="button-row">
@@ -115,14 +175,19 @@ export function RoomScreen({
         </button>
         <button
           className="primary"
-          onClick={() => void onCreateGame({
-            tableName,
-            playerCount,
-            smallBlind: selectedFormat.smallBlind,
-            bigBlind: selectedFormat.bigBlind,
-            visibility,
-            flags,
-          })}
+          onClick={() => {
+            void onCreateGame({
+              tableName,
+              playerCount,
+              smallBlind: selectedFormat.smallBlind,
+              bigBlind: selectedFormat.bigBlind,
+              ante: anteEnabled ? ante : 0,
+              straddleEnabled,
+              visibility,
+              flags,
+              gameType: isOffline ? 'offline' : 'ring',
+            })
+          }}
           disabled={loading}
         >
           {t('createGame')}

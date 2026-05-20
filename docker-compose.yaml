@@ -27,6 +27,7 @@ services:
 
   # Backend (Spring Boot)
   backend:
+    image: ghcr.io/taiki2523/mapoker-backend:${APP_VERSION:-latest}
     build:
       context: ./mapoker-backend
       dockerfile: Dockerfile
@@ -57,12 +58,19 @@ services:
 
       # CORS settings
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
-      CORS_ALLOWED_METHODS: ${CORS_ALLOWED_METHODS:-GET,POST,PUT,DELETE,OPTIONS}
+      CORS_ALLOWED_METHODS: ${CORS_ALLOWED_METHODS:-GET,POST,PUT,PATCH,DELETE,OPTIONS}
       CORS_ALLOW_CREDENTIALS: ${CORS_ALLOW_CREDENTIALS:-true}
 
       # Google OAuth (if using production auth)
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      # Avatar storage
+      AVATAR_STORAGE_PATH: /data/uploads/avatars
+      # Logging
+      LOGS_LOCATION: /data/logs
+    volumes:
+      - ${UPLOADS_LOCATION:-/srv/mapoker/data/uploads}/avatars:/data/uploads/avatars
+      - ${LOGS_LOCATION:-/srv/mapoker/data/logs}:/data/logs
     ports:
       - "8080:8080"
     healthcheck:
@@ -76,13 +84,15 @@ services:
 
   # Frontend (React/Vite + nginx)
   frontend:
+    image: ghcr.io/taiki2523/mapoker-frontend:${APP_VERSION:-latest}
     build:
       context: ./mapoker-frontend
       dockerfile: Dockerfile
-      args:
-        APPLICATION_URL: ${APPLICATION_URL:-http://localhost:3000}
-        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
-        VITE_APP_ENV: ${VITE_APP_ENV:-production}
+    environment:
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      LOGS_LOCATION: /data/logs
+    volumes:
+      - ${LOGS_LOCATION:-/srv/mapoker/data/logs}:/data/logs
     container_name: mapoker-frontend
     restart: unless-stopped
     depends_on:

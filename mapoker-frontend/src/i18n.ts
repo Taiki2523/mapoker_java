@@ -41,6 +41,9 @@ const ja = {
   flagNewbie: '初心者歓迎',
   flagShortHanded: 'ショートハンド',
   players: 'プレイヤー数',
+  ante: 'アンティ',
+  straddle: 'ストラドル',
+  straddleNext: '次のハンドでストラドル',
   stack: 'スタック',
   bigBlind: 'ビッグブラインド',
   buttonIndex: 'ボタンポジション',
@@ -131,6 +134,8 @@ const ja = {
 
   // --- 認証 ---
   signIn: 'サインイン',
+  signInWithGoogle: 'Google でサインイン',
+  signInFailed: 'サインインに失敗しました',
   signUp: 'サインアップ',
   usernameLabel: 'ユーザー名',
   passwordLabel: 'パスワード',
@@ -188,7 +193,6 @@ const ja = {
   streetRiver: 'リバー',
   chipBalance: '所持チップ',
   claimDailyBonus: 'デイリーボーナス',
-  claimRecovery: '回復チップ',
   walletLedger: '増減履歴',
   noWalletLedger: 'まだ増減履歴はありません',
   REGISTER_BONUS: '新規登録ボーナス',
@@ -197,6 +201,7 @@ const ja = {
   RECOVERY_BONUS: '回復チップ',
   ADMIN_GRANT: '管理者付与',
   TABLE_BUY_IN: 'バイイン',
+  TABLE_REBUY: 'リバイ',
   TABLE_CASH_OUT: 'キャッシュアウト',
   cooldownUntil: '次回: {time}',
   insufficientFunds: 'チップが不足しています',
@@ -214,6 +219,12 @@ const ja = {
   cancel: 'キャンセル',
   youHaveBeenRemovedFromTable: 'テーブルから退席しました',
   rebuy: 'リバイ',
+  presetMin: '最小',
+  presetHalf: '½P',
+  presetPot: 'Pot',
+  presetAll: 'ALL',
+  showdown: 'ショーダウン',
+  finished: '終了',
 
   // --- エラーメッセージ ---
   errEnterName: '名前を入力してください',
@@ -221,6 +232,13 @@ const ja = {
   errSelectSeat: '有効なシートを選択してください',
   errMissingRoom: 'ルームIDがありません',
   errSelectSeatFirst: 'アクション前にシートを選択してください',
+  errServerError: 'サーバーエラーが発生しました。しばらくしてから再試行してください',
+  errNotFound: '対象が見つかりませんでした',
+  errForbidden: 'この操作は許可されていません',
+  errBadRequest: 'リクエストが正しくありません',
+  errUnauthorized: 'ログインが必要です',
+  errInvalidAction: 'この操作は現在実行できません',
+  errUnknown: 'エラーが発生しました',
 
   // --- 動的テキスト（{n} はシート番号）---
   seatN: 'シート{n}',

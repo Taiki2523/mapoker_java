@@ -81,3 +81,7 @@ coverage/
 *.bak
 *.backup
 dump.sql
+
+# Upload data (generated at runtime)
+data/
+package-lock.json

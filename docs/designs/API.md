@@ -1,0 +1,694 @@
+# API リファレンス
+
+Texas Hold'em ポーカー HTTP API の仕様。
+
+## 基本方針
+
+- ベース URL: `http://localhost:8080`（本番: `https://mapoker.marciadesign.org/api`）
+- リクエスト / レスポンスは JSON
+- HTTP はステートレス。ゲーム状態は `game_id` / `table_id` で読み込む
+- 認証は Spring Security セッション Cookie（`JSESSIONID`）
+
+## エラー形式
+
+```json
+{
+  "error": {
+    "code": "invalid_action",
+    "message": "cannot raise: betting not reopened"
+  }
+}
+```
+
+---
+
+## 認証 API — `/v1/auth`
+
+セッション Cookie ベース。ローカルプロファイルでは認証が無効化される（`SPRING_PROFILES_ACTIVE=local`）。
+認証は Google ID Token のみ。username/password 認証は廃止済み。
+
+### Google ログイン
+
+`POST /v1/auth/google`
+
+Google ID Token をバックエンドで検証してセッションを確立する。
+DB にはメールアドレスを保存しない（`sub` claim のみ使用）。
+
+リクエスト:
+```json
+{ "id_token": "xxxxx.yyyyy.zzzzz" }
+```
+
+レスポンス `200 OK` + `Set-Cookie: JSESSIONID=...`:
+```json
+{
+  "public_id": "8f6f0e3a-...",
+  "username": "alice",
+  "discriminator": "1234",
+  "display_name": "alice#1234",
+  "avatar_url": "https://example.com/avatar.png"
+}
+```
+
+### 現在ユーザー取得
+
+`GET /v1/auth/me`
+
+レスポンス `200 OK` / `401 Unauthorized`:
+```json
+{
+  "public_id": "8f6f0e3a-...",
+  "username": "alice",
+  "discriminator": "1234",
+  "display_name": "alice#1234",
+  "avatar_url": "https://example.com/avatar.png"
+}
+```
+
+### ユーザー名変更
+
+`PATCH /v1/auth/me/username`
+
+認証必須。`username + discriminator` の組み合わせが既に存在する場合は `409 Conflict`。
+
+リクエスト:
+```json
+{ "new_username": "alice2" }
+```
+
+レスポンス `200 OK`:
+```json
+{
+  "public_id": "8f6f0e3a-...",
+  "username": "alice2",
+  "discriminator": "1234",
+  "display_name": "alice2#1234",
+  "avatar_url": "https://example.com/avatar.png"
+}
+```
+
+### アバター変更
+
+`POST /v1/auth/me/avatar`
+
+`multipart/form-data` で画像ファイルを送信する。認証必須。
+
+レスポンス `200 OK`:
+```json
+{
+  "public_id": "8f6f0e3a-...",
+  "username": "alice",
+  "discriminator": "1234",
+  "display_name": "alice#1234",
+  "avatar_url": "/uploads/avatars/8f6f0e3a-....jpg"
+}
+```
+
+### テーブル参加履歴
+
+`GET /v1/auth/history`
+
+直近のテーブル参加記録を返す。レスポンス `200 OK` / `401 Unauthorized`:
+```json
+[
+  {
+    "table_id": "550e8400-...",
+    "table_name": "Cash Orbit Tokyo",
+    "seat_index": 1,
+    "visibility": "public",
+    "status": "active",
+    "flags": ["casual"],
+    "joined_at": "2026-04-21T03:00:00Z",
+    "left_at": null,
+    "active": true
+  }
+]
+```
+
+### ハンド履歴
+
+`GET /v1/auth/hand-history?limit=20`
+
+直近のハンド履歴を返す。レスポンス `200 OK` / `401 Unauthorized`:
+```json
+[
+  {
+    "hand_id": "uuid",
+    "table_id": "uuid",
+    "pot": 200,
+    "street": "river",
+    "winners": [0],
+    "players": [...],
+    "finished_at": "2026-04-21T04:00:00Z"
+  }
+]
+```
+
+### ログアウト
+
+`POST /v1/auth/logout`
+
+セッションを破棄する。レスポンス `204 No Content`。
+
+---
+
+## テーブル API — `/v1/tables`
+
+テーブル作成・一覧・参加・退室を管理する。
+
+### テーブル作成
+
+`POST /v1/tables`
+
+リクエスト:
+```json
+{
+  "table_name": "Cash Orbit Tokyo",
+  "player_count": 6,
+  "small_blind": 5,
+  "big_blind": 10,
+  "ante": 1,
+  "visibility": "public",
+  "flags": ["casual", "newbie"]
+}
+```
+
+- `small_blind` 省略時は `big_blind / 2`
+- `ante` 省略時は `big_blind / 10`（0 でアンティなし）
+- `game_type`: `ring`（デフォルト）または `offline`
+- `visibility`: `public` または `private`
+- `flags`: 小文字スネークケース、最大 8 件
+
+レスポンス `201 Created`:
+```json
+{
+  "id": "uuid",
+  "room_id": "uuid",
+  "name": "Cash Orbit Tokyo",
+  "game_type": "ring",
+  "stake": {
+    "small_blind": 5,
+    "big_blind": 10,
+    "ante": 1
+  },
+  "min_buy_in": 200,
+  "max_buy_in": 1000,
+  "max_players": 6,
+  "visibility": "public",
+  "status": "waiting",
+  "flags": ["casual", "newbie"],
+  "invite_code": "857691",
+  "members": [],
+  "game": { ...GameResponse... }
+}
+```
+
+- `invite_code`: オフラインテーブルのみ。数字 6 桁。リングゲームは `null`
+```
+
+### テーブル一覧
+
+`GET /v1/tables?visibility=public&flags=casual`
+
+### テーブル取得
+
+`GET /v1/tables/{id}`
+
+### テーブル参加者一覧
+
+`GET /v1/tables/{id}/members`
+
+### テーブル参加 / リバイ
+
+`POST /v1/tables/{id}/join`
+
+リクエスト（認証済みの場合 `name` はサーバー側で解決）:
+```json
+{ "name": "alice", "buy_in": 200 }
+```
+
+レスポンス:
+```json
+{
+  "assigned_seat_index": 1,
+  "members": [
+    { "name": "alice", "seat_index": 1, "joined_at": "...", "pending_leave": false }
+  ]
+}
+```
+
+**リバイ（再バイイン）**:
+同名プレイヤーが既にテーブルに着席していて `stack == 0` かつ `buy_in > 0` の場合、リバイとして処理される。
+新しいシートは割り当てられず、既存シートのスタックに `buy_in` が追加される。
+ウォレットがある場合は通常参加と同様に `buy_in` がウォレットから差し引かれる。
+
+### テーブル退室（キャッシュアウト）
+
+`POST /v1/tables/{id}/leave`
+
+リクエスト（認証済みの場合 `name` 省略可）:
+```json
+{ "name": "alice" }
+```
+
+ハンド進行中に呼び出すと `pending_leave: true` がセットされ、ハンド終了後に自動退室する。
+退室時にスタックがある場合はウォレットへ返却される（キャッシュアウト）。
+
+チップが 0 になったプレイヤーはリバイするまでテーブルに残留する（自動退席しない）。
+リバイせずにロビーに戻る場合はこのエンドポイントを呼び出す。
+
+---
+
+## ルーム API — `/v1/rooms`
+
+テーブルと同じ `id` を使う参加者管理 API。認証フローなしに名前ベースで参加できる簡易エイリアス。
+
+### 参加者一覧
+
+`GET /v1/rooms/{id}/members`
+
+### 参加
+
+`POST /v1/rooms/{id}/join`
+
+リクエスト:
+```json
+{ "name": "alice", "buy_in": 200 }
+```
+
+### 退室
+
+`POST /v1/rooms/{id}/leave`
+
+リクエスト:
+```json
+{ "name": "alice" }
+```
+
+---
+
+## ゲーム API — `/v1/games`
+
+ゲームの作成・操作。テーブルを介さない直接ゲーム操作も可能（デバッグ / curl 検証用）。
+
+### ゲーム作成
+
+`POST /v1/games`
+
+リクエスト:
+```json
+{
+  "players": [
+    { "id": "p1", "stack": 100 },
+    { "id": "p2", "stack": 100 }
+  ],
+  "button_index": 0,
+  "big_blind": 10,
+  "seed": 42,
+  "odd_chip_rule": "low_index"
+}
+```
+
+レスポンス `201 Created`: → GameResponse
+
+### ゲーム一覧
+
+`GET /v1/games`
+
+### ゲーム取得
+
+`GET /v1/games/{id}?viewer_index=0&spectator=0`
+
+- `viewer_index`: 表示するプレイヤーのインデックス（認証済み時は自動解決）
+- `spectator=1` / `spectator=true`: ホールカードを一切含まない観戦モード
+
+### ハンド開始
+
+`POST /v1/games/{id}/start`
+
+リクエスト:
+```json
+{ "big_blind": 10, "straddle": false }
+```
+
+- `straddle` は省略可（デフォルト `false`）。ただし **サーバー側の `next_hand_straddle` が優先**されるため、通常は送信不要。
+
+### ストラドル意思の保存
+
+`POST /v1/games/{id}/straddle-intent`
+
+リクエスト:
+```json
+{ "straddle": true }
+```
+
+- `next_utg_idx` プレイヤーがトグルを変更するたびに呼び出す
+- 値はサーバーの `next_hand_straddle` に保存され、次の `startHand` 時に消費・リセットされる
+- `status: in_progress` 中でも呼び出し可
+
+### アクション適用
+
+`POST /v1/games/{id}/actions?viewer_index=0`
+
+リクエスト:
+```json
+{
+  "player_index": 2,
+  "action": { "type": "raise", "amount": 40 }
+}
+```
+
+`bet` / `raise` の `amount` は raise-to 合計額。`call` は `amount=0` で auto-call。
+
+### アクション一覧
+
+`GET /v1/games/{id}/actions`
+
+```json
+{
+  "actions": [
+    { "seq": 1, "player_index": 0, "type": "call", "amount": 10 }
+  ]
+}
+```
+
+### ショーダウン実行
+
+`POST /v1/games/{id}/showdown`
+
+- **リングゲーム**: body なし → サーバーがホールカードを評価して勝者を決定
+- **オフライン（手動宣言済み）**: `{ "declared_winners": [0, 2] }` を渡すと `HandEvaluator` をスキップしてそのまま分配
+
+リクエスト（オフライン用、省略可）:
+```json
+{ "declared_winners": [0, 2] }
+```
+
+### オフラインショーダウン個別宣言
+
+`POST /v1/games/{id}/showdown/declare`
+
+オフラインモード専用。プレイヤーが自分の手の勝敗を個別に宣言する。全員宣言完了で自動的にポットを分配する。
+
+リクエスト:
+```json
+{ "player_index": 1, "win": true }
+```
+
+レスポンス: GameResponse（`showdown_declarations` フィールドに現在の宣言状態が含まれる）
+
+---
+
+## オフラインセッション API — `/v1/games/{id}`（オフライン専用）
+
+`game_type: "offline"` のゲームのみ有効。物理カードを使ったポーカーのチップ管理を補助する。
+
+### オフライン着席
+
+`POST /v1/games/{id}/seat`
+
+指定席にプレイヤーを着席させ、バイイン額を記録する。リバイの場合は累積加算。招待コードが設定されたテーブルでは一致チェックを行う（リバイはスキップ）。
+
+リクエスト:
+```json
+{
+  "seat_index": 2,
+  "name": "Alice",
+  "buy_in": 3000,
+  "invite_code": "123456"
+}
+```
+
+レスポンス:
+```json
+{
+  "seat_index": 2,
+  "members": [
+    { "name": "Alice", "seat_index": 2 }
+  ]
+}
+```
+
+### 利確（キャッシュアウト）
+
+`POST /v1/games/{id}/cashout`
+
+プレイヤーを利確させ、現在のスタックを `offline_cash_out` として記録する。スタックは 0 にリセットされ着席リストから除外される。
+
+リクエスト:
+```json
+{ "seat_index": 2 }
+```
+
+レスポンス:
+```json
+{ "seat_index": 2, "cash_out": 5200 }
+```
+
+### セッションクローズ
+
+`POST /v1/games/{id}/close-session`
+
+ホストがセッションを手動クローズする。全員退席済み扱いにする。
+
+レスポンス: `204 No Content`
+
+### 収支サマリー
+
+`GET /v1/games/{id}/session-summary`
+
+セッション全体の収支一覧を返す。
+
+レスポンス:
+```json
+{
+  "game_id": "uuid",
+  "players": [
+    {
+      "seat_index": 0,
+      "name": "Alice",
+      "buy_in": 3000,
+      "cash_out": 5200,
+      "profit": 2200,
+      "settled": true
+    }
+  ]
+}
+```
+
+- `settled`: `cashout_at IS NOT NULL`（利確確定済み）
+- `profit` は `cash_out - buy_in`（API が計算して返す派生値）
+
+---
+
+## GameResponse 構造
+
+```json
+{
+  "id": "uuid",
+  "status": "in_progress",
+  "street": "preflop",
+  "button_index": 0,
+  "small_blind_idx": 1,
+  "big_blind_idx": 2,
+  "current_player": 3,
+  "current_bet": 20,
+  "last_raise_size": 10,
+  "big_blind": 10,
+  "ante": 1,
+  "straddle_enabled": true,
+  "straddle_idx": 3,
+  "next_utg_idx": 4,
+  "pot_total": 30,
+  "odd_chip_rule": "low_index",
+  "can_start_hand": false,
+  "viewer_membership_active": true,
+  "can_rebuy": false,
+  "players": [
+    {
+      "id": "p1",
+      "stack": 80,
+      "contributed": 20,
+      "folded": false,
+      "all_in": false,
+      "hole": ["AS", "KH"]
+    }
+  ],
+  "community": ["2S", "3S", "4S"],
+  "last_showdown": {
+    "winners": [0],
+    "best_hand": { "rank": "Flush", "kickers": [14, 10, 8, 5, 3] },
+    "payouts": [200, 0]
+  },
+  "showdown_declarations": { "0": true, "1": false }
+}
+```
+
+- `hole` はリクエストした閲覧者に見せてよい場合のみ含む
+- ショーダウン / フィニッシュ（フォールドウィン以外）では全プレイヤーのホールカードを公開
+- `straddle_enabled`: テーブルでストラドルが有効かどうか
+- `straddle_idx`: 現ハンドのストラドラーのインデックス（ストラドルなし = `-1`）
+- `next_utg_idx`: 次のハンドで UTG になるプレイヤーのインデックス（3人未満 = `-1`）
+- `can_start_hand`: 次のハンドを開始できる状態かどうか
+- `can_rebuy`: 閲覧者のスタックが 0 でリバイ可能かどうか（スタック 0 かつ着席中の場合 `true`）
+- `viewer_membership_active`: 閲覧者がテーブルに着席中かどうか
+- `showdown_declarations`: オフラインショーダウン中の宣言状態。`{ "playerIndex": true/false }`。全員宣言完了前は未宣言プレイヤーのキーが存在しない。ショーダウン外は `null`
+
+---
+
+## バージョン API
+
+### バージョン取得
+
+`GET /v1/version`
+
+認証不要。
+
+レスポンス `200 OK`:
+```json
+{ "version": "1.0.2" }
+```
+
+バージョンは `spring.application.version` プロパティから取得する（Docker ビルド時に git タグで注入）。
+
+---
+
+## ウォレット API — `/v1/wallet`（postgresql プロファイルのみ）
+
+### ウォレット残高取得
+
+`GET /v1/wallet`
+
+```json
+{
+  "chip_balance": 9500,
+  "next_daily_bonus_at": "2026-04-22T03:00:00Z"
+}
+```
+
+### 台帳履歴
+
+`GET /v1/wallet/ledger?limit=20`
+
+### デイリーボーナス
+
+`POST /v1/wallet/daily-bonus`
+
+クールダウン: 24 時間（`wallet.daily-bonus-cooldown-hours`）。
+
+---
+
+## 管理者 API — `/v1/admin`（postgresql プロファイルのみ）
+
+### チップ付与
+
+`POST /v1/admin/wallet/grants`
+
+`wallet.admin-usernames` に登録されたユーザーのみ実行可能。
+
+リクエスト:
+```json
+{ "target_username": "alice", "amount": 5000 }
+```
+
+---
+
+## 型定義
+
+### アクション種別
+
+`fold | check | call | bet | raise | all_in`
+
+### Status
+
+`in_progress | showdown | finished`
+
+### Street
+
+`preflop | flop | turn | river`
+
+### OddChipRule
+
+`low_index | button_left`
+
+---
+
+## ホールカード可視性ルール
+
+- ハンド進行中: `viewer_index` に対応するプレイヤーのカードのみ返す
+- ショーダウン / フィニッシュ（フォールドウィン以外）: 折りたたんでいない全プレイヤーのカードを返す
+- 観戦モード（`spectator=1`）: 全カードを非表示
+- 認証済みユーザー: テーブルシートインデックスを自動解決して適切なカードを返す
+
+---
+
+## WebSocket API
+
+REST API とは別に、サーバー側からのリアルタイム push に WebSocket（STOMP over SockJS）を使用する。
+アクション送信は引き続き REST POST を使う。WebSocket はサーバー → クライアントの push 専用。
+
+### 接続エンドポイント
+
+```
+/ws  （SockJS エンドポイント）
+```
+
+フロントエンドは `@stomp/stompjs` の `Client` を使用し、`brokerURL` に `wss://{host}/ws/websocket` を指定する。
+
+### トピック
+
+| トピック | 対象 | 内容 |
+|---|---|---|
+| `/topic/tables/{tableId}/game` | 全員（broadcast） | ゲーム状態変化（ホールカードは全マスク） |
+| `/topic/tables/{tableId}/members` | 全員（broadcast） | ロスター変化 |
+| `/user/queue/hole-cards` | 本人のみ（個別 push） | 自分のホールカード |
+
+### ペイロード
+
+**GameBroadcastPayload** (`/topic/tables/{tableId}/game`):
+```json
+{
+  "game": { ...GameResponse... },
+  "streetRevealedAt": "2026-05-01T12:00:00.000Z"
+}
+```
+
+- `streetRevealedAt`: ストリート変化が発生したサーバー側の `Instant`。フロントエンドはこのタイムスタンプを基準にアニメーション開始時刻を計算することで全クライアントの演出を同期する。ストリート変化がない場合は `null`。
+
+**MembersBroadcastPayload** (`/topic/tables/{tableId}/members`):
+```json
+{
+  "tableId": "uuid",
+  "members": [
+    { "name": "alice", "seatIndex": 1, "joinedAt": "...", "pendingLeave": false }
+  ]
+}
+```
+
+**HoleCardsPayload** (`/user/queue/hole-cards`):
+```json
+{
+  "tableId": "uuid",
+  "seatIndex": 1,
+  "hole": ["AS", "KH"]
+}
+```
+
+### セキュリティ
+
+- `local` プロファイル: 全 STOMP メッセージを許可
+- `!local` プロファイル: CONNECT / SUBSCRIBE / MESSAGE すべてに認証必須（`WebSocketSecurityConfigProd` で設定）
+- HTTP ハンドシェイク時に Spring Security セッションの `Principal` が WebSocket セッションへ自動引き継ぎされる
+
+### フロントエンド実装
+
+`mapoker-frontend/src/ws.ts` に以下の関数を公開している。
+
+```typescript
+createStompClient(): Client
+subscribeGame(client, tableId, onMessage)
+subscribeMembers(client, tableId, onMessage)
+subscribeHoleCards(client, onMessage)
+```
+
+初回ロード・再接続時は REST GET で状態復元する（WebSocket はポーリングの代替であり REST エンドポイントは維持）。

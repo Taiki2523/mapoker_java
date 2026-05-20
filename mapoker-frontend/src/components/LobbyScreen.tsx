@@ -7,10 +7,10 @@ import { UserHeader } from './UserHeader'
 type Props = {
   currentUser: AuthUser | null
   onOpenMyPage: () => void
-  onLogout: () => void
-  onJoinRoom: (tableId: string) => Promise<void>
+  onJoinRoom: (tableId: string, gameType: string) => Promise<void>
   onCreateTable: () => void
   onBack: () => void
+  appVersion?: string
 }
 
 const filterFlags: TableFlag[] = ['casual', 'serious', 'newbie', 'short_handed']
@@ -29,7 +29,7 @@ const statusLabels: Record<string, string> = {
   finished: t('tableStatusFinished'),
 }
 
-export function LobbyScreen({ currentUser, onOpenMyPage, onLogout, onJoinRoom, onCreateTable, onBack }: Props) {
+export function LobbyScreen({ currentUser, onOpenMyPage, onJoinRoom, onCreateTable, onBack, appVersion }: Props) {
   const [tables, setTables] = useState<Table[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -72,7 +72,7 @@ export function LobbyScreen({ currentUser, onOpenMyPage, onLogout, onJoinRoom, o
 
   return (
     <>
-      <UserHeader username={currentUser?.username ?? ''} onOpenMyPage={onOpenMyPage} onLogout={onLogout} />
+      <UserHeader username={currentUser?.username ?? ''} onOpenMyPage={onOpenMyPage} appVersion={appVersion} />
       <div className="lobby-browser-head">
         <div>
           <h2>{t('lobbyBrowserTitle')}</h2>
@@ -137,11 +137,14 @@ export function LobbyScreen({ currentUser, onOpenMyPage, onLogout, onJoinRoom, o
           <article key={table.id} className="lobby-browser-row">
             <div className="lobby-browser-main">
               <div className="lobby-browser-title-row">
+                <span className={table.game_type === 'offline' ? 'game-type-dot offline' : 'game-type-dot online'} title={table.game_type === 'offline' ? 'オフライン' : 'オンライン'} />
                 <strong>{table.name}</strong>
-                <span className={`table-visibility ${table.visibility}`}>{table.visibility === 'public' ? t('publicTable') : t('privateTable')}</span>
+                <span className={table.visibility === 'public' ? 'table-visibility public' : 'table-visibility private'}>
+                  {table.visibility === 'public' ? t('publicTable') : t('privateTable')}
+                </span>
               </div>
               <div className="lobby-browser-meta">
-                <span>{t('stakeLabel')} {table.stake.small_blind}/{table.stake.big_blind}</span>
+                <span>{t('stakeLabel')} {table.stake.small_blind}/{table.stake.big_blind}{table.stake.ante > 0 ? ` / ${t('ante')} ${table.stake.ante}` : ''}{table.stake.straddle_enabled ? ` / ${t('straddle')}` : ''}</span>
                 <span>{t('membersLabel')} {table.member_count}/{table.max_players}</span>
                 <span>{t('status')} {statusLabel(table.status)}</span>
               </div>
@@ -157,7 +160,7 @@ export function LobbyScreen({ currentUser, onOpenMyPage, onLogout, onJoinRoom, o
               ) : null}
             </div>
             <div className="lobby-browser-actions">
-              <button className="primary" onClick={() => void onJoinRoom(table.id)} disabled={loading}>
+              <button className="primary" onClick={() => void onJoinRoom(table.id, table.game_type)} disabled={loading}>
                 {t('joinTable')}
               </button>
             </div>

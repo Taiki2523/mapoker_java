@@ -1,107 +1,93 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMatch, useNavigate } from 'react-router-dom'
 import './App.css'
-import { fetchJSON } from './api'
+import {
+  apiLogout, apiDeclareShowdown, createTable, fetchMe, fetchVersion, joinTable, leaveTable, seatOffline,
+} from './api'
 import { t } from './i18n'
 import { bestHandName } from './handEval'
 import { mapMembers } from './utils'
 import type {
-  AuthUser, BetPreset, CreateGameConfig, GameState, HandHistoryEntry, JoinResponse, PayoutLine, Table,
-  RoomMember, RoomMemberApi, Showdown, StoredSession, UserTableHistoryEntry,
-  WalletLedgerEntry, WalletSummary,
+  AuthUser, BetPreset, CreateGameConfig, GameState, RoomMember, RoomMemberApi,
+  Showdown, Table,
 } from './types'
 import { AuthScreen } from './components/AuthScreen'
 import { BuyInPopup } from './components/BuyInPopup'
+import { OfflineSeatPopup } from './components/OfflineSeatPopup'
 import { GameTypeScreen } from './components/GameTypeScreen'
 import { LobbyScreen } from './components/LobbyScreen'
 import { MyPagePanel } from './components/MyPagePanel'
 import { RoomScreen } from './components/RoomScreen'
 import { GameScreen } from './components/GameScreen'
 
-const NEXT_HAND_DELAY_MS = 3000
+import { useBuyInFlow } from './hooks/useBuyInFlow'
+import { useGameActions } from './hooks/useGameActions'
+import { useGameConnection } from './hooks/useGameConnection'
+import { useLeaveRoom } from './hooks/useLeaveRoom'
+import { useProfileData } from './hooks/useProfileData'
+import { useTableSession } from './hooks/useTableSession'
+
+const NEXT_HAND_DELAY_MS = 7000
+const CARD_REVEAL_MS_PER_STREET = 1500
 
 function App() {
+  // ---- ルーティング ----
+  const navigate = useNavigate()
+  const match = useMatch('/table/:tableId')
+  const gameId = match?.params.tableId ?? ''
+
+  // gameId への遷移をラップ（URL が正規表現）
+  const goToTable = (id: string) => navigate(`/table/${id}`, { replace: true })
+  const goToLobby = () => navigate('/', { replace: true })
+
+  // ---- グローバル state ----
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
-  const [gameId, setGameId] = useState('')
+  const [appVersion, setAppVersion] = useState('')
+  const [roomScreenMode, setRoomScreenMode] = useState<'gameType' | 'room' | 'lobby'>('gameType')
+  const [showMyPage, setShowMyPage] = useState(false)
+
+  // ---- ゲーム state ----
   const [game, setGame] = useState<GameState | null>(null)
   const [showdown, setShowdown] = useState<Showdown | null>(null)
-  const [autoRefresh, setAutoRefresh] = useState(true)
-  const [actionAmount, setActionAmount] = useState(0)
+  const [roster, setRoster] = useState<RoomMember[]>([])
+  const [table, setTable] = useState<Table | null>(null)
+  const [offlineSeatTable, setOfflineSeatTable] = useState<Table | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [inviteCopied, setInviteCopied] = useState(false)
-  const showdownInFlight = useRef(false)
-  const prevIsMyTurn = useRef(false)
-  const [myName, setMyName] = useState('')
-  const [mySeatIndex, setMySeatIndex] = useState<number | null>(null)
-  const [loginSeatIndex, setLoginSeatIndex] = useState(0)
-  const [loginError, setLoginError] = useState('')
-  const [leavePending, setLeavePending] = useState(false)
-  const [roster, setRoster] = useState<RoomMember[]>([])
-  const [showMyPage, setShowMyPage] = useState(false)
-  const [table, setTable] = useState<Table | null>(null)
-  const [profileTables, setProfileTables] = useState<Table[]>([])
-  const [profileHistory, setProfileHistory] = useState<UserTableHistoryEntry[]>([])
-  const [profileHandHistory, setProfileHandHistory] = useState<HandHistoryEntry[]>([])
-  const [wallet, setWallet] = useState<WalletSummary | null>(null)
-  const [walletLedger, setWalletLedger] = useState<WalletLedgerEntry[]>([])
-  const [profileLoading, setProfileLoading] = useState(false)
-  const [profileError, setProfileError] = useState('')
-  const [roomScreenMode, setRoomScreenMode] = useState<'gameType' | 'room' | 'lobby'>('gameType')
-  const [buyInContext, setBuyInContext] = useState<{
-    tableId: string
-    tableName: string
-    minBuyIn: number
-    maxBuyIn: number
-    bigBlind: number
-    onConfirm: (amount: number) => void
-    onCancel: () => void
-  } | null>(null)
+  const [actionAmount, setActionAmount] = useState(0)
+  const [doStraddle, setDoStraddle] = useState(false)
 
-  const formatErrorMessage = (err: unknown) => {
-    const message = err instanceof Error ? err.message : String(err)
-    if (message === 'insufficient funds') return t('insufficientFunds')
-    return message
-  }
+  // ---- refs ----
+  const cardRevealEndsAtRef = useRef(0)
+  const streetRevealedAtRef = useRef(0)
+  const prevCommLenRef = useRef(0)
+  const prevIsMyTurnRef = useRef(false)
 
-  const currentPlayer = useMemo(() => {
-    if (!game) return null
-    return game.players[game.current_player]
-  }, [game])
+  // ---- hooks ----
+  const session = useTableSession(gameId, roster)
+  const { myName, setMyName, mySeatIndex, setMySeatIndex, mySeat, persistSession, clearGameSession } = session
 
-  const inferredSeatIndex = useMemo(() => {
-    if (!myName.trim()) return null
-    const member = roster.find((m) => m.name === myName.trim())
-    return member ? member.seatIndex : null
-  }, [myName, roster])
+  const profile = useProfileData(formatErrorMessage)
+  const { wallet, walletLedger, profileTables, profileHistory, profileLoading, profileError, refreshProfileTables, handleClaimDailyBonus } = profile
 
-  const mySeat = useMemo(() => mySeatIndex ?? inferredSeatIndex, [mySeatIndex, inferredSeatIndex])
+  // ---- 派生値 ----
+  const currentPlayer = useMemo(() => game ? game.players[game.current_player] : null, [game])
+  const isSpectator = useMemo(() => {
+    if (!game || mySeat === null) return false
+    return game.players[mySeat]?.stack === 0
+  }, [game, mySeat])
 
-  const displayName = useMemo(() => {
-    return (seatIndex: number) => {
-      const member = roster.find((m) => m.seatIndex === seatIndex)
-      return member?.name || game?.players?.[seatIndex]?.id || t('seatN', { n: seatIndex + 1 })
-    }
+  const displayName = useMemo(() => (seatIndex: number) => {
+    const member = roster.find((m) => m.seatIndex === seatIndex)
+    return member?.displayName || member?.name || game?.players?.[seatIndex]?.id || t('seatN', { n: seatIndex + 1 })
   }, [game?.players, roster])
 
-  const winnerNames = useMemo(() => {
-    if (!showdown) return ''
-    return (showdown.winners ?? []).map((idx) => displayName(idx)).join(', ')
-  }, [displayName, showdown])
-
-  const payoutLines = useMemo((): PayoutLine[] => {
-    if (!showdown || !game) return []
-    return (showdown.payouts ?? [])
-      .map((amount, idx) => ({ name: displayName(idx), amount }))
-      .filter((l) => l.amount > 0)
-  }, [displayName, game, showdown])
-
-  const isShowdown = game?.status === 'showdown'
-    || (game?.status === 'finished' && showdown !== null)
-
-  const inviteUrl = useMemo(() => {
-    if (!gameId) return ''
-    return `${window.location.origin}?tableId=${gameId}`
-  }, [gameId])
+  const isShowdown = game?.status === 'showdown' || (game?.status === 'finished' && showdown !== null)
+  const inviteUrl = gameId
+    ? `${window.location.origin}/table/${gameId}${table?.invite_code ? `?code=${table.invite_code}` : ''}`
+    : ''
+  const urlInviteCode = new URLSearchParams(window.location.search).get('code') ?? null
 
   const toCall = useMemo(() => {
     if (!game || !currentPlayer) return 0
@@ -110,9 +96,8 @@ function App() {
 
   const minRaise = useMemo(() => {
     if (!game) return 0
-    if (toCall === 0) return game.big_blind
-    return game.current_bet + Math.max(game.big_blind, game.last_raise_size || game.big_blind)
-  }, [game, toCall])
+    return game.current_bet === 0 ? game.big_blind : game.current_bet * 2
+  }, [game])
 
   const maxBet = useMemo(() => {
     if (!game || mySeat === null) return 0
@@ -123,28 +108,30 @@ function App() {
     if (!game) return []
     const cap = Math.max(maxBet, minRaise)
     const clamp = (v: number) => Math.min(cap, Math.max(minRaise, v))
-    if (toCall === 0) {
-      const pot = game.pot_total
+    if (game.street === 'preflop') {
       return [
-        { label: '30%', amount: clamp(Math.round(pot * 0.3)) },
-        { label: '50%', amount: clamp(Math.round(pot * 0.5)) },
-        { label: '100%', amount: clamp(pot) },
-      ]
+        { label: 'x2', amount: clamp(game.current_bet * 2) },
+        { label: 'x3', amount: clamp(game.current_bet * 3) },
+        { label: 'x4', amount: clamp(game.current_bet * 4) },
+        { label: 'ALL', amount: maxBet },
+      ].filter((p) => p.amount > 0 && p.amount <= maxBet)
     }
-    const cb = game.current_bet
+    const pot = game.pot_total
     return [
-      { label: '2x', amount: clamp(cb * 2) },
-      { label: '3x', amount: clamp(cb * 3) },
-      { label: '4x', amount: clamp(cb * 4) },
-    ]
-  }, [game, toCall, minRaise, maxBet])
+      { label: t('presetMin'), amount: minRaise },
+      { label: '30%', amount: clamp(Math.round(pot * 0.3)) },
+      { label: '50%', amount: clamp(Math.round(pot * 0.5)) },
+      { label: '100%', amount: clamp(pot) },
+      { label: '200%', amount: clamp(pot * 2) },
+      { label: t('presetAll'), amount: maxBet },
+    ].filter((p) => p.amount > 0 && p.amount <= maxBet)
+  }, [game, minRaise, maxBet])
 
   const myHandName = useMemo(() => {
     if (mySeat === null || !game) return null
     const hole = (game.players[mySeat]?.hole ?? []).filter((c) => c && c !== '--')
     if (hole.length < 2) return null
-    const community = (game.community ?? []).filter((c) => c && c !== '--')
-    return bestHandName(hole, community)
+    return bestHandName(hole, (game.community ?? []).filter((c) => c && c !== '--'))
   }, [game, mySeat])
 
   const isMyTurn = useMemo(() => {
@@ -152,14 +139,22 @@ function App() {
     return game.current_player === mySeat
   }, [game, mySeat])
 
-  const isSpectator = useMemo(() => {
-    if (!game || mySeat === null) return false
-    return game.players[mySeat]?.stack === 0
-  }, [game, mySeat])
+  const canAct = useMemo(
+    () => isMyTurn && game?.status === 'in_progress' && !isSpectator,
+    [game?.status, isMyTurn, isSpectator]
+  )
 
-  const canAct = useMemo(() => {
-    return isMyTurn && game?.status === 'in_progress' && !isSpectator
-  }, [game?.status, isMyTurn, isSpectator])
+  const winnerNames = useMemo(() => {
+    if (!showdown) return ''
+    return (showdown.winners ?? []).map((idx) => displayName(idx)).join(', ')
+  }, [displayName, showdown])
+
+  const payoutLines = useMemo(() => {
+    if (!showdown || !game) return []
+    return (showdown.payouts ?? [])
+      .map((amount, idx) => ({ name: displayName(idx), amount }))
+      .filter((l) => l.amount > 0)
+  }, [displayName, game, showdown])
 
   const viewMode = useMemo(() => {
     if (!currentUser) return 'auth'
@@ -167,152 +162,168 @@ function App() {
     return 'game'
   }, [currentUser, game, gameId])
 
-  useEffect(() => {
-    fetchJSON<AuthUser>('/v1/auth/me')
-      .then((user) => { setCurrentUser(user); setMyName(user.username) })
-      .catch(() => {})
-  }, [])
+  // ---- game connection ----
+  const connection = useGameConnection(gameId, {
+    mySeat, mySeatIndex, setMySeatIndex, isSpectator,
+    setGame, setShowdown, setRoster,
+    cardRevealEndsAtRef, streetRevealedAtRef,
+  })
+  const { autoRefresh, setAutoRefresh, refreshGame, refreshMembers } = connection
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const initial = params.get('tableId') ?? params.get('gameId')
-    if (initial) {
-      setGameId(initial)
-      void refreshGame(initial)
-      void refreshMembers(initial)
-      void refreshTable(initial)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  useEffect(() => {
-    if (!gameId) return
-    const raw = window.localStorage.getItem(`mapoker.session.${gameId}`)
-    if (!raw) return
-    try {
-      const data = JSON.parse(raw) as StoredSession
-      setMyName(data.name)
-      setMySeatIndex(data.seatIndex)
-      setLoginSeatIndex(data.seatIndex)
-    } catch {
-      // ignore
-    }
-  }, [gameId])
-
-  useEffect(() => {
-    if (!gameId || !myName.trim() || mySeatIndex !== null) return
-    const member = roster.find((m) => m.name === myName.trim())
-    if (member) {
-      setMySeatIndex(member.seatIndex)
-      setLoginSeatIndex(member.seatIndex)
-    }
-  }, [gameId, myName, mySeatIndex, roster])
-
-  useEffect(() => {
-    if (!autoRefresh || !gameId) return
-    const timer = window.setInterval(() => {
-      void refreshGame(gameId)
-      void refreshMembers(gameId)
-    }, 2000)
-    return () => window.clearInterval(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoRefresh, gameId])
-
-  useEffect(() => {
-    if (!game) return
-    if (game.status === 'showdown' && !showdown) {
-      void runShowdown({ suppressError: true })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game, showdown])
-
-  useEffect(() => {
-    if (!game || game.status !== 'finished' || !game.can_start_hand) return
-    const timer = window.setTimeout(() => {
-      void startHand(undefined, undefined, { suppressError: true })
-    }, NEXT_HAND_DELAY_MS)
-    return () => window.clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game?.status, game?.can_start_hand, gameId])
-
-  useEffect(() => {
-    if (isMyTurn && !prevIsMyTurn.current) {
-      setActionAmount(minRaise)
-    }
-    prevIsMyTurn.current = isMyTurn
-  }, [isMyTurn, minRaise])
-
-  // Bug3: 退席予約が解消されたらロビーに戻る
-  useEffect(() => {
-    if (!leavePending || !myName.trim()) return
-    const stillInRoster = roster.some((m) => m.name === myName.trim())
-    if (!stillInRoster) {
-      navigateToLobby()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roster, leavePending, myName])
-
-  // Bug4: ローカルのシート番号が他のプレイヤーと衝突していたらリセット
-  useEffect(() => {
-    if (mySeatIndex === null || !myName.trim() || !roster.length) return
-    const memberAtSeat = roster.find((m) => m.seatIndex === mySeatIndex)
-    if (memberAtSeat && memberAtSeat.name !== myName.trim()) {
-      setMySeatIndex(null)
-      if (gameId) window.localStorage.removeItem(`mapoker.session.${gameId}`)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roster])
-
-  const refreshGame = async (id = gameId) => {
-    if (!id) return
-    try {
-      let seat = mySeat
-      if (seat === null) {
-        const raw = window.localStorage.getItem(`mapoker.session.${id}`)
-        if (raw) {
-          try {
-            const data = JSON.parse(raw) as { seatIndex?: number }
-            if (typeof data.seatIndex === 'number') {
-              seat = data.seatIndex
-              setMySeatIndex(data.seatIndex)
-            }
-          } catch {
-            // ignore
-          }
-        }
-      }
-      const params = new URLSearchParams()
-      if (seat !== null) params.set('viewer_index', String(seat))
-      if (isSpectator) params.set('spectator', '1')
-      const query = params.toString()
-      const path = query ? `/v1/games/${id}?${query}` : `/v1/games/${id}`
-      const data = await fetchJSON<GameState>(path)
-      setGame(data)
-      if (data.last_showdown) {
-        setShowdown(data.last_showdown)
-      } else {
-        setShowdown(null)
-      }
-      setLoginSeatIndex((prev) => (prev < data.players.length ? prev : 0))
-    } catch (err) {
-      setError((err as Error).message)
-    }
+  // ---- navigate to lobby ----
+  const navigateToLobby = () => {
+    clearGameSession()
+    setGame(null)
+    setTable(null)
+    setMySeatIndex(null)
+    setRoster([])
+    setLeavePending_(false)
+    setShowdown(null)
+    setRoomScreenMode('lobby')
+    goToLobby()
   }
 
-  const refreshMembers = async (id = gameId) => {
-    if (!id) return
-    try {
-      const data = await fetchJSON<{ members: RoomMemberApi[] }>(`/v1/tables/${id}/members`)
-      setRoster(mapMembers(data.members))
-    } catch {
-      // ignore
+  // ---- leave room ----
+  const leaveHook = useLeaveRoom({
+    gameId, myName, mySeatIndex, roster, setRoster, navigateToLobby,
+    gameStatus: game?.status,
+  })
+  const { leavePending, setLeavePending: setLeavePending_, leaveRoom } = leaveHook
+
+  // ---- game actions ----
+  const actions = useGameActions({
+    gameId, mySeat, game, showdown,
+    doStraddle, setDoStraddle,
+    setGame: (g) => setGame(g),
+    setShowdown,
+    setLoading, setError, setActionAmount,
+    prevIsMyTurnRef,
+    refreshGame,
+    runShowdown: async (opts) => actions.runShowdown(opts),
+  })
+
+  // ---- buy-in flow ----
+  const buyIn = useBuyInFlow({
+    game, mySeat, myName, gameId, table, wallet,
+    cardRevealEndsAtRef,
+    onRebuyConfirm: (amount) => {
+      if (table?.game_type === 'offline' && mySeat !== null) {
+        // オフラインリバイ: joinTable（満席チェックあり）ではなく seatOffline を使う
+        void seatOffline(gameId, {
+          seat_index: mySeat,
+          name: myName.trim() || 'Player',
+          buy_in: amount,
+          invite_code: '',  // リバイ時はバックエンドで招待コードチェックをスキップ
+        })
+          .then(() => refreshGame(gameId))
+          .catch((err) => setError(formatErrorMessage(err)))
+      } else {
+        void doTableJoin(gameId, myName, amount)
+          .then(() => refreshGame(gameId))
+          .catch((err) => setError(formatErrorMessage(err)))
+      }
+    },
+    onRebuyCancel: () => void leaveRoom(),
+  })
+  const { buyInContext, setBuyInContext } = buyIn
+
+  // ---- 初期化 ----
+  useEffect(() => {
+    void fetchMe()
+      .then((user) => { setCurrentUser(user); setMyName(user.username) })
+      .catch(() => {})
+    void fetchVersion()
+      .then((res) => setAppVersion(res.version))
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // mount 時のみ実行
+
+  // URL に tableId があれば初回ロード
+  useEffect(() => {
+    if (!gameId) return
+    void refreshGame(gameId)
+    void refreshMembers(gameId)
+    void refreshTable(gameId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])  // mount 時のみ
+
+  // isMyTurn 変化で actionAmount をリセット
+  useEffect(() => {
+    if (isMyTurn && !prevIsMyTurnRef.current) setActionAmount(minRaise)
+    prevIsMyTurnRef.current = isMyTurn
+  }, [isMyTurn, minRaise])
+
+  // コミュニティカード公開アニメーション終了時刻の追跡
+  useEffect(() => {
+    const current = (game?.community ?? []).filter((c) => c && c !== '--').length
+    const prev = prevCommLenRef.current
+    prevCommLenRef.current = current
+    if (current <= prev) {
+      if (current === 0) cardRevealEndsAtRef.current = 0
+      return
     }
+    let ms = 0
+    if (prev < 3 && current >= 3) ms += CARD_REVEAL_MS_PER_STREET
+    if (prev < 4 && current >= 4) ms += CARD_REVEAL_MS_PER_STREET
+    if (prev < 5 && current >= 5) ms += CARD_REVEAL_MS_PER_STREET
+    if (ms > 0) {
+      const base = streetRevealedAtRef.current > 0 ? streetRevealedAtRef.current : Date.now()
+      streetRevealedAtRef.current = 0
+      cardRevealEndsAtRef.current = base + ms + 1600
+    }
+  }, [game?.community])
+
+  // 自動ショーダウン（オフラインは手動宣言のためスキップ）
+  useEffect(() => {
+    if (!game) return
+    if (table?.game_type === 'offline') return
+    if (game.status === 'showdown' && !showdown) {
+      const delay = Math.max(0, cardRevealEndsAtRef.current - Date.now())
+      if (delay > 0) {
+        const timer = window.setTimeout(() => void actions.runShowdown({ suppressError: true }), delay)
+        return () => window.clearTimeout(timer)
+      }
+      void actions.runShowdown({ suppressError: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game, showdown, table?.game_type])
+
+  // 自動ハンド開始
+  useEffect(() => {
+    const isAutoStartable = game?.status === 'finished' || !game?.status
+    const activeRosterCount = roster.filter((m) => !m.pendingLeave).length
+    if (!game || !isAutoStartable || !game.can_start_hand || activeRosterCount < 2) return
+    const timer = window.setTimeout(
+      () => void actions.startHand(undefined, undefined, { suppressError: true }),
+      NEXT_HAND_DELAY_MS
+    )
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game?.status, game?.can_start_hand, gameId, roster])
+
+  // ---- helpers ----
+  function formatErrorMessage(err: unknown) {
+    const code = err instanceof Error ? err.message : String(err)
+    const codeMap: Record<string, string> = {
+      insufficient_funds: t('insufficientFunds'),
+      not_found:          t('errNotFound'),
+      forbidden:          t('errForbidden'),
+      invalid_action:     t('errInvalidAction'),
+      internal_error:     t('errServerError'),
+      http_400:           t('errBadRequest'),
+      http_401:           t('errUnauthorized'),
+      http_403:           t('errForbidden'),
+      http_404:           t('errNotFound'),
+      http_500:           t('errServerError'),
+    }
+    return codeMap[code] ?? t('errUnknown')
   }
 
   const refreshTable = async (id = gameId) => {
     if (!id) return null
     try {
-      const data = await fetchJSON<Table>(`/v1/tables/${id}`)
+      const { fetchTable } = await import('./api')
+      const data = await fetchTable(id)
       setTable(data)
       return data
     } catch {
@@ -321,75 +332,41 @@ function App() {
     }
   }
 
-  const refreshWallet = async () => {
-    let nextWallet: WalletSummary | null = null
-    try {
-      nextWallet = await fetchJSON<WalletSummary>('/v1/wallet')
-      setWallet(nextWallet)
-    } catch {
-      setWallet(null)
-      setWalletLedger([])
-      return
-    }
-    const ledger = await fetchJSON<WalletLedgerEntry[]>('/v1/wallet/ledger?limit=20')
-    setWallet(nextWallet)
-    setWalletLedger(ledger)
+  const doTableJoin = async (tableId: string, name: string, buyInAmount: number) => {
+    const result = await joinTable(tableId, name, buyInAmount)
+    const assignedSeatIndex = result.assigned_seat_index
+    setMySeatIndex(assignedSeatIndex)
+    setRoster(mapMembers(result.members as RoomMemberApi[]))
+    persistSession(tableId, { name, seatIndex: assignedSeatIndex })
+    return assignedSeatIndex
   }
 
   const handleAuthSuccess = (user: AuthUser) => {
     setCurrentUser(user)
     setMyName(user.username)
+    if (gameId) {
+      void lobbyJoinWithBuyIn(gameId, table?.game_type ?? 'ring', user.username)
+    }
   }
 
   const handleLogout = async () => {
-    try {
-      await fetchJSON('/v1/auth/logout', { method: 'POST' })
-    } catch {
-      // ignore
+    if (gameId && myName.trim()) {
+      try {
+        await leaveTable(gameId, myName.trim(), mySeatIndex)
+      } catch { /* ignore */ }
     }
+    try { await apiLogout() } catch { /* ignore */ }
     setCurrentUser(null)
     setMyName('')
-    setGameId('')
+    clearGameSession()
     setGame(null)
     setTable(null)
     setMySeatIndex(null)
-    setProfileHistory([])
-    setProfileHandHistory([])
-    setWallet(null)
-    setWalletLedger([])
-    setShowMyPage(false)
+    setShowdown(null)
     setBuyInContext(null)
+    setShowMyPage(false)
     setRoomScreenMode('gameType')
-  }
-
-  const persistSession = (tableId: string, session: Omit<StoredSession, 'updatedAt'>) => {
-    window.localStorage.setItem(
-      `mapoker.session.${tableId}`,
-      JSON.stringify({
-        ...session,
-        updatedAt: new Date().toISOString(),
-      })
-    )
-  }
-
-  const refreshProfileTables = async () => {
-    setProfileLoading(true)
-    setProfileError('')
-    try {
-      const [tables, history, handHistory] = await Promise.all([
-        fetchJSON<Table[]>('/v1/tables'),
-        fetchJSON<UserTableHistoryEntry[]>('/v1/auth/history'),
-        fetchJSON<HandHistoryEntry[]>('/v1/auth/hand-history'),
-      ])
-      setProfileTables(tables)
-      setProfileHistory(history)
-      setProfileHandHistory(handHistory)
-      await refreshWallet()
-    } catch (err) {
-      setProfileError(formatErrorMessage(err))
-    } finally {
-      setProfileLoading(false)
-    }
+    profile.clear()
   }
 
   const openMyPage = async () => {
@@ -397,48 +374,94 @@ function App() {
     await refreshProfileTables()
   }
 
-  const doTableJoin = async (tableId: string, name: string, buyIn: number) => {
-    const result = await fetchJSON<JoinResponse>(`/v1/tables/${tableId}/join`, {
-      method: 'POST',
-      body: JSON.stringify({ name, buy_in: buyIn }),
-    })
-    const assignedSeatIndex = result.assigned_seat_index
-    setMySeatIndex(assignedSeatIndex)
-    setLoginSeatIndex(assignedSeatIndex)
-    setRoster(mapMembers(result.members))
-    persistSession(tableId, { name, seatIndex: assignedSeatIndex })
-    return assignedSeatIndex
+  const copyInvite = async () => {
+    if (!inviteUrl) return
+    try {
+      await navigator.clipboard.writeText(inviteUrl)
+      setInviteCopied(true)
+      window.setTimeout(() => setInviteCopied(false), 1500)
+    } catch { setInviteCopied(false) }
   }
 
-  const createGame = async (config: CreateGameConfig) => {
+  const showBuyInPopup = (
+    t_: Table, id: string,
+    onConfirm: (amount: number) => void,
+    onCancel: () => void
+  ) => {
+    const effectiveMax = wallet ? Math.min(t_.max_buy_in, wallet.chip_balance) : t_.max_buy_in
+    setBuyInContext({
+      tableId: id,
+      tableName: t_.name,
+      minBuyIn: t_.min_buy_in,
+      maxBuyIn: effectiveMax,
+      bigBlind: t_.stake.big_blind,
+      onConfirm: (amount) => { setBuyInContext(null); onConfirm(amount) },
+      onCancel: () => { setBuyInContext(null); onCancel() },
+    })
+  }
+
+  const createGame = async (config: CreateGameConfig): Promise<void> => {
     setLoading(true)
     setError('')
     setShowdown(null)
+    setRoomScreenMode('room')
     try {
       const payload = {
         table_name: config.tableName.trim() || 'Cash Orbit',
         player_count: config.playerCount,
         small_blind: config.smallBlind,
         big_blind: config.bigBlind,
+        ante: config.ante,
+        straddle_enabled: config.straddleEnabled,
         visibility: config.visibility,
         flags: config.flags,
+        game_type: config.gameType,
       }
-      const data = await fetchJSON<Table>('/v1/tables', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      })
+      const data = await createTable(payload)
       if (!data.game) throw new Error('table game payload is missing')
+
+      if (config.gameType === 'offline') {
+        const tableSnapshot = data
+        const hostName = myName.trim() || 'Host'
+        showBuyInPopup(
+          tableSnapshot, data.id,
+          async (buyInAmount) => {
+            setLoading(true)
+            setError('')
+            try {
+              const result = await seatOffline(data.id, {
+                seat_index: 0,
+                name: hostName,
+                buy_in: buyInAmount,
+                invite_code: data.invite_code ?? '',
+              })
+              setMySeatIndex(result.seat_index)
+              persistSession(data.id, { name: hostName, seatIndex: result.seat_index })
+              setRoomScreenMode('room')
+              goToTable(data.id)
+              await refreshGame(data.id)
+              await refreshMembers(data.id)
+              await refreshTable(data.id)
+            } catch (err) {
+              setError(formatErrorMessage(err))
+            } finally {
+              setLoading(false)
+            }
+          },
+          () => { setRoomScreenMode('lobby'); goToLobby() }
+        )
+        return
+      }
 
       const name = myName.trim() || 'Host'
 
-      const doJoinAndNavigate = async (buyIn: number) => {
+      const doJoinAndNavigate = async (buyInAmount: number) => {
         setLoading(true)
         try {
-          setGameId(data.id)
+          await doTableJoin(data.id, name, buyInAmount)
+          goToTable(data.id)
           setGame(data.game ?? null)
           setTable(data)
-          window.history.replaceState(null, '', `?tableId=${data.id}`)
-          await doTableJoin(data.id, name, buyIn)
           await refreshGame(data.id)
         } catch (err) {
           setError(formatErrorMessage(err))
@@ -448,15 +471,15 @@ function App() {
       }
 
       if (data.min_buy_in > 0) {
-        setBuyInContext({
-          tableId: data.id,
-          tableName: data.name,
-          minBuyIn: data.min_buy_in,
-          maxBuyIn: data.max_buy_in,
-          bigBlind: data.stake.big_blind,
-          onConfirm: (amount) => { setBuyInContext(null); void doJoinAndNavigate(amount) },
-          onCancel: () => { setBuyInContext(null) },
-        })
+        if (wallet && wallet.chip_balance < data.min_buy_in) {
+          setError(`チップが不足しています（最低バイイン: ${data.min_buy_in.toLocaleString()}）`)
+          setRoomScreenMode('lobby')
+          return
+        }
+        showBuyInPopup(data, data.id,
+          (amount) => void doJoinAndNavigate(amount),
+          () => setRoomScreenMode('lobby')
+        )
       } else {
         await doJoinAndNavigate(0)
       }
@@ -467,243 +490,115 @@ function App() {
     }
   }
 
-  const joinRoom = async (raw: string) => {
-    if (!raw) return
-    setLoginError('')
-    setRoomScreenMode('room')
-    let id = raw
-    try {
-      if (raw.includes('://')) {
-        const url = new URL(raw)
-        id = url.searchParams.get('tableId') ?? url.searchParams.get('gameId') ?? raw
-      } else if (raw.includes('tableId=') || raw.includes('gameId=')) {
-        const url = new URL(`http://local.test/?${raw}`)
-        id = url.searchParams.get('tableId') ?? url.searchParams.get('gameId') ?? raw
-      }
-    } catch {
-      id = raw
-    }
-    setGameId(id)
-    setTable(null)
-    setShowdown(null)
-    window.history.replaceState(null, '', `?tableId=${id}`)
-    await refreshGame(id)
-    await refreshMembers(id)
-    await refreshTable(id)
-  }
-
-  const loginAsPlayer = async () => {
-    if (!game) { setLoginError(t('errLoadRoom')); return }
-    if (!myName.trim()) { setLoginError(t('errEnterName')); return }
-    if (!gameId) { setLoginError(t('errMissingRoom')); return }
-    setLoginError('')
-
-    const doLogin = async (buyIn: number) => {
+  const lobbyJoinWithBuyIn = async (tableId: string, gameType = 'ring', nameOverride?: string) => {
+    if (gameType === 'offline') {
+      setLoading(true)
       try {
-        await doTableJoin(gameId, myName.trim(), buyIn)
-      } catch (err) {
-        setLoginError(formatErrorMessage(err))
-      }
-    }
-
-    if (table && table.min_buy_in > 0) {
-      setBuyInContext({
-        tableId: gameId,
-        tableName: table.name,
-        minBuyIn: table.min_buy_in,
-        maxBuyIn: table.max_buy_in,
-        bigBlind: table.stake.big_blind,
-        onConfirm: (amount) => { setBuyInContext(null); void doLogin(amount) },
-        onCancel: () => { setBuyInContext(null) },
-      })
-    } else {
-      await doLogin(0)
-    }
-  }
-
-  const lobbyJoinWithBuyIn = async (tableId: string) => {
-    setRoomScreenMode('room')
-    const id = tableId
-    setGameId(id)
-    setTable(null)
-    setShowdown(null)
-    window.history.replaceState(null, '', `?tableId=${id}`)
-    await refreshGame(id)
-    await refreshMembers(id)
-    const fetchedTable = await refreshTable(id)
-
-    if (!myName.trim()) return
-
-    const doJoin = async (buyIn: number) => {
-      try {
-        await doTableJoin(id, myName.trim(), buyIn)
+        const fetchedTable = await refreshTable(tableId)
+        if (fetchedTable) setOfflineSeatTable(fetchedTable)
       } catch (err) {
         setError(formatErrorMessage(err))
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
+    setRoomScreenMode('room')
+    setTable(null)
+    setShowdown(null)
+    goToTable(tableId)
+    await refreshGame(tableId)
+    await refreshMembers(tableId)
+    const fetchedTable = await refreshTable(tableId)
+    const effectiveName = nameOverride?.trim() || myName.trim() || currentUser?.username?.trim() || ''
+    if (!effectiveName) return
+
+    const backToLobby = () => {
+      setTable(null)
+      setRoomScreenMode('lobby')
+      goToLobby()
+    }
+
+    const doJoin = async (buyInAmount: number) => {
+      try {
+        await doTableJoin(tableId, effectiveName, buyInAmount)
+      } catch (err) {
+        setError(formatErrorMessage(err))
+        backToLobby()
       }
     }
 
     if (fetchedTable && fetchedTable.min_buy_in > 0) {
-      setBuyInContext({
-        tableId: id,
-        tableName: fetchedTable.name,
-        minBuyIn: fetchedTable.min_buy_in,
-        maxBuyIn: fetchedTable.max_buy_in,
-        bigBlind: fetchedTable.stake.big_blind,
-        onConfirm: (amount) => { setBuyInContext(null); void doJoin(amount) },
-        onCancel: () => { setBuyInContext(null) },
-      })
+      if (wallet && wallet.chip_balance < fetchedTable.min_buy_in) {
+        setError(`チップが不足しています（最低バイイン: ${fetchedTable.min_buy_in.toLocaleString()}）`)
+        backToLobby()
+        return
+      }
+      showBuyInPopup(fetchedTable, tableId,
+        (amount) => void doJoin(amount),
+        backToLobby
+      )
     } else {
       await doJoin(0)
     }
   }
 
-  const handleClaimDailyBonus = async () => {
-    setProfileLoading(true)
-    setProfileError('')
-    try {
-      await fetchJSON('/v1/wallet/daily-bonus', { method: 'POST' })
-      await refreshWallet()
-    } catch (err) {
-      setProfileError(formatErrorMessage(err))
-    } finally {
-      setProfileLoading(false)
-    }
-  }
+  const handleOfflineSeat = (seatIndex: number, inviteCode: string) => {
+    if (!offlineSeatTable) return
+    const tableId = offlineSeatTable.id
+    const name = myName.trim() || 'Player'
+    const tableSnapshot = offlineSeatTable
 
-  const handleClaimRecovery = async () => {
-    setProfileLoading(true)
-    setProfileError('')
-    try {
-      await fetchJSON('/v1/wallet/recovery', { method: 'POST' })
-      await refreshWallet()
-    } catch (err) {
-      setProfileError(formatErrorMessage(err))
-    } finally {
-      setProfileLoading(false)
-    }
-  }
+    setOfflineSeatTable(null)
 
-  const navigateToLobby = () => {
-    if (gameId) {
-      window.localStorage.removeItem(`mapoker.session.${gameId}`)
-      window.history.replaceState(null, '', window.location.pathname)
-    }
-    setGameId('')
-    setGame(null)
-    setMySeatIndex(null)
-    setRoster([])
-    setLeavePending(false)
-    setShowdown(null)
-    setRoomScreenMode('lobby')
-  }
-
-  const leaveRoom = async () => {
-    if (!gameId) return
-    try {
-      const result = await fetchJSON<{ members: RoomMemberApi[] }>(`/v1/tables/${gameId}/leave`, {
-        method: 'POST',
-        body: JSON.stringify({ name: myName, seat_index: mySeatIndex }),
-      })
-      const updatedRoster = mapMembers(result.members)
-      setRoster(updatedRoster)
-      const stillInRoster = updatedRoster.some(
-        (m) => m.name === myName.trim()
-      )
-      if (stillInRoster) {
-        setLeavePending(true)
-      } else {
-        navigateToLobby()
+    showBuyInPopup(
+      tableSnapshot, tableId,
+      async (buyInAmount) => {
+        setLoading(true)
+        setError('')
+        try {
+          const result = await seatOffline(tableId, {
+            seat_index: seatIndex,
+            name,
+            buy_in: buyInAmount,
+            invite_code: inviteCode,
+          })
+          setMySeatIndex(result.seat_index)
+          persistSession(tableId, { name, seatIndex: result.seat_index })
+          setRoomScreenMode('room')
+          goToTable(tableId)
+          await refreshGame(tableId)
+          await refreshMembers(tableId)
+          await refreshTable(tableId)
+        } catch (err) {
+          setError(formatErrorMessage(err))
+        } finally {
+          setLoading(false)
+        }
+      },
+      () => {
+        setRoomScreenMode('lobby')
+        goToLobby()
       }
-    } catch {
-      navigateToLobby()
-    }
+    )
   }
 
-  const copyInvite = async () => {
-    if (!inviteUrl) return
-    try {
-      await navigator.clipboard.writeText(inviteUrl)
-      setInviteCopied(true)
-      window.setTimeout(() => setInviteCopied(false), 1500)
-    } catch {
-      setInviteCopied(false)
-    }
-  }
-
-  const startHand = async (
-    id = gameId,
-    bigBlindOverride?: number,
-    options?: { suppressError?: boolean }
-  ) => {
-    if (!id) return
-    setLoading(true)
-    setError('')
-    setShowdown(null)
-    setActionAmount(0)
-    prevIsMyTurn.current = false
-    try {
-      const bb = bigBlindOverride ?? game?.big_blind ?? 10
-      await fetchJSON(`/v1/games/${id}/start`, {
-        method: 'POST',
-        body: JSON.stringify({ big_blind: bb }),
-      })
-      await refreshGame(id)
-    } catch (err) {
-      if (!options?.suppressError) {
-        setError((err as Error).message)
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const sendAction = async (type: string, amount: number) => {
-    const seat = mySeat
-    if (!gameId || seat === null) { setError(t('errSelectSeatFirst')); return }
+  const handleOfflineDeclare = async (win: boolean) => {
+    if (!gameId || mySeat === null) return
     setLoading(true)
     setError('')
     try {
-      const data = await fetchJSON<GameState>(`/v1/games/${gameId}/actions`, {
-        method: 'POST',
-        body: JSON.stringify({ player_index: seat, action: { type, amount } }),
-      })
-      setGame(data)
-      if (data.last_showdown) {
-        setShowdown(data.last_showdown)
-      } else {
-        setShowdown(null)
-      }
-      if (data.status === 'showdown' && !showdown) {
-        void runShowdown({ suppressError: true })
-      } else {
-        await refreshGame(gameId)
-      }
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const runShowdown = async (options?: { suppressError?: boolean }) => {
-    if (!gameId || showdownInFlight.current) return
-    showdownInFlight.current = true
-    setLoading(true)
-    setError('')
-    try {
-      const data = await fetchJSON<Showdown>(`/v1/games/${gameId}/showdown`, { method: 'POST' })
-      setShowdown(data)
+      await apiDeclareShowdown(gameId, mySeat, win)
       await refreshGame(gameId)
     } catch (err) {
-      if (!options?.suppressError) {
-        setError((err as Error).message)
-      }
+      setError(formatErrorMessage(err))
     } finally {
-      showdownInFlight.current = false
       setLoading(false)
     }
   }
 
+  // ---- render ----
   return (
     <div className="app">
       {viewMode !== 'game' && (
@@ -716,8 +611,8 @@ function App() {
               <GameTypeScreen
                 currentUser={currentUser}
                 onOpenMyPage={() => void openMyPage()}
-                onLogout={() => void handleLogout()}
                 onSelectRing={() => setRoomScreenMode('lobby')}
+                appVersion={appVersion}
               />
             )}
             {viewMode === 'room' && roomScreenMode === 'room' && (
@@ -727,18 +622,18 @@ function App() {
                 onCreateGame={createGame}
                 currentUser={currentUser}
                 onOpenMyPage={() => void openMyPage()}
-                onLogout={() => void handleLogout()}
                 onBack={() => setRoomScreenMode('lobby')}
+                appVersion={appVersion}
               />
             )}
             {viewMode === 'room' && roomScreenMode === 'lobby' && (
               <LobbyScreen
                 currentUser={currentUser}
                 onOpenMyPage={() => void openMyPage()}
-                onLogout={() => void handleLogout()}
-                onJoinRoom={lobbyJoinWithBuyIn}
+                onJoinRoom={(id, gt) => lobbyJoinWithBuyIn(id, gt)}
                 onCreateTable={() => setRoomScreenMode('room')}
                 onBack={() => setRoomScreenMode('gameType')}
+                appVersion={appVersion}
               />
             )}
           </div>
@@ -749,12 +644,8 @@ function App() {
           game={game}
           showdown={showdown}
           isShowdown={isShowdown ?? false}
-          currentUser={currentUser}
-          myName={myName}
           mySeat={mySeat}
           mySeatIndex={mySeatIndex}
-          loginSeatIndex={loginSeatIndex}
-          setLoginSeatIndex={setLoginSeatIndex}
           isSpectator={isSpectator}
           roster={roster}
           autoRefresh={autoRefresh}
@@ -764,7 +655,6 @@ function App() {
           loading={loading}
           error={error}
           inviteCopied={inviteCopied}
-          loginError={loginError}
           leavePending={leavePending}
           toCall={toCall}
           minRaise={minRaise}
@@ -778,10 +668,21 @@ function App() {
           displayName={displayName}
           onCopyInvite={() => void copyInvite()}
           onOpenMyPage={() => void openMyPage()}
-          onLoginAsPlayer={() => void loginAsPlayer()}
           onLeaveRoom={leaveRoom}
-          onLogout={() => void handleLogout()}
-          onSendAction={(type, amount) => void sendAction(type, amount)}
+          onSendAction={(type, amount) => void actions.sendAction(type, amount)}
+          doStraddle={doStraddle}
+          onToggleStraddle={actions.toggleStraddle}
+          table={table}
+          onOfflineWin={(win) => void handleOfflineDeclare(win)}
+        />
+      )}
+      {offlineSeatTable && (
+        <OfflineSeatPopup
+          table={offlineSeatTable}
+
+          prefilledCode={urlInviteCode}
+          onConfirm={(seatIndex, inviteCode) => handleOfflineSeat(seatIndex, inviteCode)}
+          onCancel={() => setOfflineSeatTable(null)}
         />
       )}
       {buyInContext && (
@@ -799,20 +700,15 @@ function App() {
           currentUser={currentUser}
           tables={profileTables}
           history={profileHistory}
-          handHistory={profileHandHistory}
           wallet={wallet}
           walletLedger={walletLedger}
           currentTableId={gameId}
           loading={profileLoading}
           error={profileError}
           onClose={() => setShowMyPage(false)}
-          onRefresh={() => void refreshProfileTables()}
+          onLogout={() => void handleLogout()}
+          onUpdateUser={(user) => { setCurrentUser(user); setMyName(user.username) }}
           onClaimDailyBonus={() => void handleClaimDailyBonus()}
-          onClaimRecovery={() => void handleClaimRecovery()}
-          onOpenTable={(tableId) => {
-            setShowMyPage(false)
-            void joinRoom(tableId)
-          }}
         />
       )}
     </div>

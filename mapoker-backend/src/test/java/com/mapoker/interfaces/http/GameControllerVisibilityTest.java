@@ -1,7 +1,12 @@
 package com.mapoker.interfaces.http;
 
-import com.mapoker.application.GameService;
-import com.mapoker.application.TableService;
+import com.mapoker.application.game.GameActionService;
+import com.mapoker.application.game.GameLifecycleService;
+import com.mapoker.application.game.GameReadService;
+import com.mapoker.application.table.TableLifecycleService;
+import com.mapoker.application.table.TableMembershipService;
+import com.mapoker.application.table.TableQueryService;
+import com.mapoker.application.auth.UserService;
 import com.mapoker.domain.game.GameState;
 import com.mapoker.domain.game.OddChipRule;
 import com.mapoker.domain.game.Player;
@@ -20,19 +25,26 @@ class GameControllerVisibilityTest {
 
     @Test
     void authenticatedUserOnlySeesOwnHoleCards() {
-        GameService gameService = mock(GameService.class);
-        TableService tableService = mock(TableService.class);
-        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableService);
+        GameReadService gameRead = mock(GameReadService.class);
+        GameLifecycleService gameLifecycle = mock(GameLifecycleService.class);
+        GameActionService gameAction = mock(GameActionService.class);
+        TableQueryService tableQueryService = mock(TableQueryService.class);
+        TableLifecycleService tableLifecycleService = mock(TableLifecycleService.class);
+        UserService userService = mock(UserService.class);
+        GameController controller = new GameController(gameRead, gameLifecycle, gameAction, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableQueryService, tableLifecycleService, userService);
 
         GameState state = startedGame();
-        when(gameService.getGame("game-1")).thenReturn(state);
-        when(tableService.findSeatIndex("game-1", "alice")).thenReturn(1);
+        when(gameRead.getGame("game-1")).thenReturn(state);
+        var appAlice = new com.mapoker.application.auth.User(
+                1L, "pub-alice", "alice", "0000", null, java.time.LocalDateTime.now());
+        when(userService.getByPublicId("pub-alice")).thenReturn(appAlice);
+        when(tableQueryService.findSeatIndex("game-1", "alice")).thenReturn(1);
 
         var response = controller.getGame(
                 "game-1",
                 0,
                 "0",
-                new User("alice", "secret", List.of())
+                new User("pub-alice", "secret", List.of())
         );
 
         assertThat(response.players().get(0).hole()).isNull();
@@ -41,19 +53,26 @@ class GameControllerVisibilityTest {
 
     @Test
     void authenticatedUserCannotSpoofViewerIndexWithoutSeat() {
-        GameService gameService = mock(GameService.class);
-        TableService tableService = mock(TableService.class);
-        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableService);
+        GameReadService gameRead = mock(GameReadService.class);
+        GameLifecycleService gameLifecycle = mock(GameLifecycleService.class);
+        GameActionService gameAction = mock(GameActionService.class);
+        TableQueryService tableQueryService = mock(TableQueryService.class);
+        TableLifecycleService tableLifecycleService = mock(TableLifecycleService.class);
+        UserService userService = mock(UserService.class);
+        GameController controller = new GameController(gameRead, gameLifecycle, gameAction, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableQueryService, tableLifecycleService, userService);
 
         GameState state = startedGame();
-        when(gameService.getGame("game-1")).thenReturn(state);
-        when(tableService.findSeatIndex("game-1", "mallory")).thenReturn(null);
+        when(gameRead.getGame("game-1")).thenReturn(state);
+        var appMallory = new com.mapoker.application.auth.User(
+                2L, "pub-mallory", "mallory", "0000", null, java.time.LocalDateTime.now());
+        when(userService.getByPublicId("pub-mallory")).thenReturn(appMallory);
+        when(tableQueryService.findSeatIndex("game-1", "mallory")).thenReturn(null);
 
         var response = controller.getGame(
                 "game-1",
                 0,
                 "0",
-                new User("mallory", "secret", List.of())
+                new User("pub-mallory", "secret", List.of())
         );
 
         assertThat(response.players()).allSatisfy(player -> assertThat(player.hole()).isNull());
@@ -61,12 +80,15 @@ class GameControllerVisibilityTest {
 
     @Test
     void anonymousViewerCanUseExplicitViewerIndex() {
-        GameService gameService = mock(GameService.class);
-        TableService tableService = mock(TableService.class);
-        GameController controller = new GameController(gameService, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableService);
+        GameReadService gameRead = mock(GameReadService.class);
+        GameLifecycleService gameLifecycle = mock(GameLifecycleService.class);
+        GameActionService gameAction = mock(GameActionService.class);
+        TableQueryService tableQueryService = mock(TableQueryService.class);
+        TableLifecycleService tableLifecycleService = mock(TableLifecycleService.class);
+        GameController controller = new GameController(gameRead, gameLifecycle, gameAction, new GameProperties(OddChipRule.LOW_INDEX, "Player"), tableQueryService, tableLifecycleService, mock(UserService.class));
 
         GameState state = startedGame();
-        when(gameService.getGame("game-1")).thenReturn(state);
+        when(gameRead.getGame("game-1")).thenReturn(state);
 
         var response = controller.getGame("game-1", 0, "0", null);
 

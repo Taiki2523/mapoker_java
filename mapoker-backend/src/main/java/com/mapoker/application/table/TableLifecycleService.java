@@ -1,0 +1,262 @@
+package com.mapoker.application.table;
+
+import com.mapoker.application.game.GameLifecycleService;
+import com.mapoker.application.game.GameReadService;
+import com.mapoker.domain.game.GameState;
+import com.mapoker.domain.game.GameStatus;
+import com.mapoker.domain.game.OddChipRule;
+import com.mapoker.infrastructure.config.GameProperties;
+import com.mapoker.infrastructure.config.WalletProperties;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+
+import java.security.SecureRandom;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * テーブル作成・ハンド進行・スケジュールクリーンアップを担うサービス。
+ */
+@Service
+public class TableLifecycleService {
+
+    private static final String CODE_CHARS = "0123456789";
+    private static final int CODE_LENGTH = 6;
+    private static final SecureRandom SECURE_RNG = new SecureRandom();
+
+    private final TableStore store;
+    private final TableQueryService queryService;
+    private final GameLifecycleService gameService;
+    private final GameReadService gameRead;
+    private final GameProperties gameProperties;
+    private final WalletProperties walletProperties;
+
+    public TableLifecycleService(TableStore store,
+                                 TableQueryService queryService,
+                                 GameLifecycleService gameService,
+                                 GameReadService gameRead,
+                                 GameProperties gameProperties,
+                                 WalletProperties walletProperties) {
+        this.store = store;
+        this.queryService = queryService;
+        this.gameService = gameService;
+        this.gameRead = gameRead;
+        this.gameProperties = gameProperties;
+        this.walletProperties = walletProperties;
+    }
+
+    public CreateTableResult createRingTable(CreateRingTableInput input) {
+        validateCreateInput(input);
+
+        List<GameLifecycleService.PlayerInput> players = new ArrayList<>();
+        for (int i = 0; i < input.playerCount(); i++) {
+            players.add(new GameLifecycleService.PlayerInput("p" + (i + 1), 0));
+        }
+
+        OddChipRule oddChipRule = gameProperties.defaultOddChipRule();
+        GameState game = gameService.createRingGame(
+                players, input.bigBlind(), oddChipRule, input.ante(), input.straddleEnabled());
+
+        int minBuyIn = input.bigBlind() * walletProperties.minBuyinBbMultiplier();
+        int maxBuyIn = input.bigBlind() * walletProperties.maxBuyinBbMultiplier();
+
+        TableRecord table = new TableRecord(
+                game.getId(), game.getId(),
+                normalizeTableName(input.tableName(), game.getId()),
+                "ring",
+                input.smallBlind(), input.bigBlind(),
+                minBuyIn, maxBuyIn, input.playerCount(),
+                normalizeFlags(input.flags()),
+                normalizeVisibility(input.visibility()),
+                "inactive",
+                game.getId(),
+                Instant.now(),
+                false,
+                input.ante(),
+                input.straddleEnabled(),
+                null);
+
+        store.tables.put(table.id(), table);
+        store.tableMembers.putIfAbsent(table.id(), new ArrayList<>());
+        store.lastEmptiedAt.put(table.id(), Instant.now());
+        return new CreateTableResult(table, game);
+    }
+
+    public CreateTableResult createOfflineTable(CreateOfflineTableInput input) {
+        if (input.playerCount() < 2 || input.playerCount() > 9)
+            throw new IllegalArgumentException("player count must be between 2 and 9");
+        if (input.bigBlind() <= 0)
+            throw new IllegalArgumentException("big blind must be positive");
+
+        List<GameLifecycleService.PlayerInput> players = new ArrayList<>();
+        for (int i = 0; i < input.playerCount(); i++) {
+            players.add(new GameLifecycleService.PlayerInput("p" + (i + 1), 0));
+        }
+
+        OddChipRule oddChipRule = gameProperties.defaultOddChipRule();
+        GameState game = gameService.createRingGame(
+                players, input.bigBlind(), oddChipRule, input.ante(), input.straddleEnabled());
+
+        int minBuyIn = input.bigBlind() * walletProperties.minBuyinBbMultiplier();
+        int maxBuyIn = input.bigBlind() * walletProperties.maxBuyinBbMultiplier();
+        String inviteCode = generateInviteCode();
+
+        TableRecord table = new TableRecord(
+                game.getId(), game.getId(),
+                normalizeTableName(input.tableName(), game.getId()),
+                "offline",
+                Math.max(1, input.bigBlind() / 2), input.bigBlind(),
+                minBuyIn, maxBuyIn, input.playerCount(),
+                normalizeFlags(null),
+                normalizeVisibility(input.visibility()),
+                "inactive",
+                game.getId(),
+                Instant.now(),
+                false,
+                input.ante(),
+                input.straddleEnabled(),
+                inviteCode);
+
+        store.tables.put(table.id(), table);
+        store.tableMembers.putIfAbsent(table.id(), new ArrayList<>());
+        store.lastEmptiedAt.put(table.id(), Instant.now());
+        return new CreateTableResult(table, game);
+    }
+
+    public GameState startHand(String tableId, int bigBlind) {
+        return startHand(tableId, bigBlind, false);
+    }
+
+    public GameState startHand(String tableId, int bigBlind, boolean doStraddle) {
+        synchronized (store.lock(tableId)) {
+            GameState current = gameRead.getGame(tableId);
+            if (current.getStatus() == GameStatus.IN_PROGRESS) {
+                return current;
+            }
+            long activeRosterCount = queryService.getMembers(tableId).stream()
+                    .filter(m -> !m.pendingLeave())
+                    .count();
+            if (activeRosterCount < com.mapoker.domain.PokerConstants.MIN_PLAYERS) {
+                throw new IllegalStateException("not enough players at the table");
+            }
+            boolean isOffline = "offline".equals(queryService.getTable(tableId).gameType());
+            return gameService.startHand(tableId, bigBlind, doStraddle, isOffline);
+        }
+    }
+
+    public void setStraddleIntent(String tableId, boolean straddle) {
+        synchronized (store.lock(tableId)) {
+            gameService.setStraddleIntent(tableId, straddle);
+        }
+    }
+
+    @Scheduled(fixedDelay = 600_000)
+    public void removeStaleEmptyTables() {
+        Instant threshold = Instant.now().minus(1, ChronoUnit.HOURS);
+        store.lastEmptiedAt.entrySet().removeIf(entry -> {
+            if (entry.getValue().isBefore(threshold)) {
+                String tableId = entry.getKey();
+                store.deletedTableIds.add(tableId);
+                store.tables.remove(tableId);
+                store.tableMembers.remove(tableId);
+                return true;
+            }
+            return false;
+        });
+    }
+
+    private void validateCreateInput(CreateRingTableInput input) {
+        if (input.playerCount() < 2 || input.playerCount() > 9) {
+            throw new IllegalArgumentException("player count must be between 2 and 9");
+        }
+        if (input.bigBlind() <= 0) {
+            throw new IllegalArgumentException("big blind must be positive");
+        }
+        if (input.smallBlind() <= 0) {
+            throw new IllegalArgumentException("small blind must be positive");
+        }
+    }
+
+    private String normalizeTableName(String tableName, String tableId) {
+        if (tableName != null && !tableName.isBlank()) {
+            return tableName.trim();
+        }
+        String suffix = tableId.length() >= 8 ? tableId.substring(0, 8) : tableId;
+        return "Cash Orbit " + suffix;
+    }
+
+    private String normalizeVisibility(String visibility) {
+        if ("private".equalsIgnoreCase(visibility)) {
+            return "private";
+        }
+        return "public";
+    }
+
+    private List<String> normalizeFlags(List<String> flags) {
+        if (flags == null || flags.isEmpty()) {
+            return List.of("casual");
+        }
+        Set<String> unique = new LinkedHashSet<>();
+        for (String flag : flags) {
+            if (flag == null || flag.isBlank()) continue;
+            unique.add(flag.trim().toLowerCase());
+        }
+        return unique.isEmpty() ? List.of("casual") : List.copyOf(unique);
+    }
+
+    /** リングテーブル作成時の入力値。 */
+    public record CreateRingTableInput(
+            String tableName,
+            int playerCount,
+            int smallBlind,
+            int bigBlind,
+            String visibility,
+            List<String> flags,
+            int ante,
+            boolean straddleEnabled
+    ) {
+        public CreateRingTableInput(String tableName, int playerCount, int bigBlind,
+                                    String visibility, List<String> flags) {
+            this(tableName, playerCount, Math.max(1, bigBlind / 2), bigBlind, visibility, flags, 0, false);
+        }
+
+        public CreateRingTableInput(String tableName, int playerCount, int smallBlind,
+                                    int bigBlind, String visibility, List<String> flags) {
+            this(tableName, playerCount, smallBlind, bigBlind, visibility, flags, 0, false);
+        }
+
+        public CreateRingTableInput(String tableName, int playerCount, int smallBlind,
+                                    int bigBlind, String visibility, List<String> flags, int ante) {
+            this(tableName, playerCount, smallBlind, bigBlind, visibility, flags, ante, false);
+        }
+    }
+
+    /** テーブル作成結果。 */
+    public record CreateTableResult(TableRecord table, GameState game) {}
+
+    private static String generateInviteCode() {
+        StringBuilder sb = new StringBuilder(CODE_LENGTH);
+        for (int i = 0; i < CODE_LENGTH; i++) {
+            sb.append(CODE_CHARS.charAt(SECURE_RNG.nextInt(CODE_CHARS.length())));
+        }
+        return sb.toString();
+    }
+
+    /** オフラインテーブル作成時の入力値。 */
+    public record CreateOfflineTableInput(
+            String tableName,
+            int playerCount,
+            int bigBlind,
+            String visibility,
+            int ante,
+            boolean straddleEnabled
+    ) {
+        public CreateOfflineTableInput(String tableName, int playerCount, int bigBlind, String visibility) {
+            this(tableName, playerCount, bigBlind, visibility, 0, false);
+        }
+    }
+}
