@@ -97,50 +97,44 @@ export function RoomScreen({
           ))}
         </select>
       </label>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <label className="toggle-switch">
-            <input
-              type="checkbox"
-              checked={anteEnabled}
-              onChange={(e) => setAnteEnabled(e.target.checked)}
-            />
-            <span className="toggle-track"><span className="toggle-thumb" /></span>
-            {t('ante')}
-          </label>
-          {anteEnabled && (
-            <input
-              type="number" min={1} value={ante}
+      <div style={{ display: 'grid', gridTemplateColumns: 'max-content auto', alignItems: 'center', gap: '0.5rem 0.75rem' }}>
+        <label className="toggle-switch">
+          <input
+            type="checkbox"
+            checked={anteEnabled}
+            onChange={(e) => setAnteEnabled(e.target.checked)}
+          />
+          <span className="toggle-track"><span className="toggle-thumb" /></span>
+          {t('ante')}
+        </label>
+        {anteEnabled
+          ? <input type="number" min={1} value={ante}
               onChange={(e) => setAnte(Math.max(1, Number(e.target.value)))}
-              style={{ width: '7rem' }}
-            />
-          )}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <label className="toggle-switch">
-            <input
-              type="checkbox"
-              checked={straddleEnabled}
-              onChange={(e) => setStraddleEnabled(e.target.checked)}
-            />
-            <span className="toggle-track"><span className="toggle-thumb" /></span>
-            {t('straddle')}
-          </label>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <label className="toggle-switch">
-            <input
-              type="checkbox"
-              checked={isOffline}
-              onChange={(e) => setIsOffline(e.target.checked)}
-            />
-            <span className="toggle-track"><span className="toggle-thumb" /></span>
-            <span>
-              <span className={`game-type-dot ${isOffline ? 'offline' : 'online'}`} style={{ marginRight: '0.4rem', verticalAlign: 'middle' }} />
-              {isOffline ? 'オフライン（物理カード）' : 'オンライン'}
-            </span>
-          </label>
-        </div>
+              style={{ width: '7rem' }} />
+          : <span />}
+        <label className="toggle-switch">
+          <input
+            type="checkbox"
+            checked={straddleEnabled}
+            onChange={(e) => setStraddleEnabled(e.target.checked)}
+          />
+          <span className="toggle-track"><span className="toggle-thumb" /></span>
+          {t('straddle')}
+        </label>
+        <span />
+        <label className="toggle-switch">
+          <input
+            type="checkbox"
+            checked={isOffline}
+            onChange={(e) => setIsOffline(e.target.checked)}
+          />
+          <span className="toggle-track"><span className="toggle-thumb" /></span>
+          <span>
+            <span className={`game-type-dot ${isOffline ? 'offline' : 'online'}`} style={{ marginRight: '0.4rem', verticalAlign: 'middle' }} />
+            {isOffline ? 'オフライン（物理カード）' : 'オンライン'}
+          </span>
+        </label>
+        <span />
       </div>
       <label>
         {t('visibility')}
