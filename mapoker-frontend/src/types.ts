@@ -18,6 +18,10 @@ export type GameState = {
   current_bet: number
   last_raise_size: number
   big_blind: number
+  ante: number
+  straddle_enabled: boolean
+  straddle_idx: number
+  next_utg_idx: number
   pot_total: number
   players: Player[]
   community: string[]
@@ -26,6 +30,15 @@ export type GameState = {
   viewer_membership_active: boolean
   can_rebuy: boolean
   last_showdown?: Showdown
+  showdown_declarations?: Record<string, boolean> | null
+}
+
+export type ActionLogEntry = {
+  seq: number
+  player_index: number
+  type: string
+  amount: number
+  label?: string | null
 }
 
 export type Showdown = {
@@ -35,8 +48,12 @@ export type Showdown = {
 }
 
 export type AuthUser = {
-  id: number
+  public_id: string
   username: string
+  discriminator: string
+  display_name: string
+  avatar_url: string | null
+  new_user?: boolean
 }
 
 export type TableVisibility = 'public' | 'private'
@@ -83,7 +100,6 @@ export type HandHistoryEntry = {
 export type WalletSummary = {
   chip_balance: number
   next_daily_bonus_at: string | null
-  next_recovery_at: string | null
 }
 
 export type WalletLedgerEntry = {
@@ -104,6 +120,8 @@ export type Table = {
   stake: {
     small_blind: number
     big_blind: number
+    ante: number
+    straddle_enabled: boolean
   }
   min_buy_in: number
   max_buy_in: number
@@ -116,6 +134,7 @@ export type Table = {
   member_count: number
   members: RoomMemberApi[]
   game?: GameState | null
+  invite_code?: string | null
 }
 
 export type ApiError = {
@@ -130,6 +149,8 @@ export type RoomMember = {
   seatIndex: number
   joinedAt?: string
   pendingLeave?: boolean
+  displayName?: string
+  avatarUrl?: string | null
 }
 
 export type RoomMemberApi = {
@@ -137,6 +158,8 @@ export type RoomMemberApi = {
   seat_index: number
   joined_at: string
   pending_leave?: boolean
+  display_name?: string
+  avatar_url?: string | null
 }
 
 export type Member = RoomMemberApi
@@ -161,6 +184,19 @@ export type CreateGameConfig = {
   playerCount: number
   smallBlind: number
   bigBlind: number
+  ante: number
+  straddleEnabled: boolean
   visibility: TableVisibility
   flags: TableFlag[]
+  gameType: 'ring' | 'offline'
+}
+
+export type BuyInContext = {
+  tableId: string
+  tableName: string
+  minBuyIn: number
+  maxBuyIn: number
+  bigBlind: number
+  onConfirm: (amount: number) => void
+  onCancel: () => void
 }

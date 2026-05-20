@@ -1,0 +1,125 @@
+# 設計判断
+
+## 2026-04-17
+- 使用言語: Java 21
+- フレームワーク: HTTP API とアプリケーション起動基盤に Spring Boot 3.x を採用する
+- ビルドツール: Maven Wrapper を採用する
+- 目標: 将来の Web フロントエンドを見据えた API-first 構成にする
+- 初期の実行形態: まずは単一の Spring Boot アプリケーションとし、Java 移行の初期段階では CLI アダプタは分けない
+- 優先事項: ポーカーのルールは決定的でテストしやすく保ち、フレームワーク依存の隠れた挙動よりも明示的なドメインコードを優先する
+- 進め方: 先に Go 版のドメイン挙動を移植し、その後に周辺アダプタを段階的に置き換える
+- Go 版から維持するドメイン範囲:
+  - Card / Deck / Hand / Board モデル
+  - ハンド評価（7 枚からの最強 5 枚判定、勝者決定）
+  - アクションの合法性検証
+  - ハンド進行（preflop, flop, turn, river）
+  - showdown、サイドポット計算、端数チップ配分
+- プレイヤー人数: 呼び出し側が固定で 2-9 人を指定する
+- API 方式: JSON over HTTP とし、`game_id` をキーにサーバー側でゲーム状態を保持する
+- ID 方針: game ID は UUID 文字列を使用する
+- シリアライズ: リクエスト/レスポンス DTO と JSON カラムの変換には Jackson を使う
+- 永続化方針:
+  - アプリケーション層は repository port に依存する
+  - 高速なテストとローカル開発用にインメモリ実装を用意する
+  - 永続運用向けに PostgreSQL 実装を用意する
+  - ゲーム状態更新と action log 追加は 1 トランザクションで行う
+- SQL アクセス: ゲーム状態のマッピングを明示的に保つため、Spring JDBC / `JdbcTemplate` 系の実装を優先する
+- マイグレーション: Flyway を使い、`src/main/resources/db/migration` に配置する
+- パッケージ構成:
+  - `com.mapoker.application`: ユースケースとサービスのオーケストレーション
+  - `com.mapoker.domain`: ポーカーのルール、評価器、エンティティ/値オブジェクト
+  - `com.mapoker.infrastructure`: 永続化、認証連携、設定
+  - `com.mapoker.interfaces.http`: Controller、DTO、例外マッピング
+- Java のソース配置:
+  - `src/main/java`
+  - `src/main/resources`
+  - `src/test/java`
+  - `src/integrationTest/java`（または同等の Maven integration-test source set）
+- テスト方針:
+  - 単体テストとアプリケーションテストに JUnit 5 を使う
+  - 可読性の高いアサーションのため AssertJ を使う
+  - PostgreSQL 連携テストに Testcontainers を使う
+  - JaCoCo のカバレッジ目標は全体 80% 以上とし、特に `domain` と `application` を重視する
+- 整形と静的チェック:
+  - Spotless 経由で `google-java-format` を適用する
+  - 最初の動作版の後に、必要に応じて SpotBugs や Error Prone を追加する
+- 認証方針:
+  - 認証方式: Google OAuth を採用しない。ユーザー名 / パスワード認証（Spring Security + BCrypt + セッション Cookie）を使う
+  - Java 実装では cookie / session 処理に Spring Security を使う
+  - パスワード照合は BCrypt を使い、認証済み状態はセッション Cookie で扱う
+- 可視性ポリシー:
+  - ハンド進行中の hole cards は本人にだけ見せる
+  - showdown では全員に hole cards を公開する
+  - 管理者 / デバッグ用の可視性は別の関心事として扱う
+- Go 版から維持するベッティング判断:
+  - `bet` と `raise` の `amount` は raise-to の合計額とする
+  - `call` の `amount = 0` は auto-call とみなしてよい
+  - 最小レイズ額は `max(big blind, current_bet)` とする（v1.0.1 で last raise size から変更）
+  - 最小レイズ未満の all-in は許可するが、ベッティングは reopen しない
+- Go 版から維持する配当判断:
+  - サイドポットは各プレイヤーの hand 全体の contribution を基準に計算する
+  - 端数チップ配分は設定可能とし、デフォルトは `low_index` とする
+
+## 2026-05-14
+- WebSocket 移行（a740e04）:
+  - REST ポーリング（2秒間隔）を廃止し、STOMP over SockJS に移行する
+  - アクション送信は引き続き REST POST を使う。WebSocket はサーバー → クライアントの push 専用
+  - ブローカー設定: `enableSimpleBroker("/topic", "/queue")`（`/queue` は `/user/...` 解決に必須）
+  - `GameEventPublisher` コンポーネントが `SimpMessagingTemplate` で各 push を担当する
+  - ゲーム状態 broadcast はホールカードを全マスクして `/topic/tables/{tableId}/game` に送る
+  - ホールカードは `startHand` 時に着席プレイヤー全員へ `/user/queue/hole-cards` で個別 push する
+  - `streetRevealedAt`（`Instant`）をペイロードに含め、フロントエンドのアニメーション開始時刻を全クライアント間で同期する
+  - STOMP フレーム認可: `WebSocketSecurityConfigLocal`（全許可）と `WebSocketSecurityConfigProd`（認証必須）を `@Profile` で切り替える
+  - `GameService → GameEventPublisher` の循環依存は `ObjectProvider<TableService>` パターンで回避する
+- パッケージ追加: `com.mapoker.interfaces.ws` — WebSocket DTO を置く場所
+- リバイ理由の追加（v1.0.0）:
+  - `wallet_ledger_reason` ENUM に `TABLE_REBUY` を追加（V8 migration）
+  - スタック 0 で着席中のプレイヤーに `can_rebuy: true` を `GameResponse` で返す
+
+## 2026-05-20
+
+### ホールカード WS 配信バグ修正
+- `GameEventPublisher.publishHoleCards` が `member.name()`（ゲーム内プレイヤー名）を STOMP ユーザー識別子として使っていたが、STOMP の principal は `publicId`（UUID）であるため配信先が一致せずホールカードが届かなかった
+- 修正: `member.publicId()` で `convertAndSendToUser` を呼ぶ。`publicId = null`（オフラインプレイヤー）はスキップ（物理カード使用のため push 不要）
+- `resolveViewerIndex` も `findSeatIndex` が null を返した場合（サーバー再起動後など members store が空）にクライアント送信の `viewer_index` へフォールバックするよう修正
+
+### 退席でシートが空かないバグ修正
+- `TableMembershipService.leave` がオフラインメンバー（`publicId = null`）の退席を処理できていなかった
+  - 認証済みユーザーの退席は `publicId` でメンバー検索するが、オフラインメンバーは `publicId = null` で登録されるためヒットせず何もしなかった
+- 修正: `publicId` 検索が失敗した場合に `name` ベースのフォールバック検索を追加
+
+### 招待リンク経由ログイン後の参加フロー
+- 未ログイン状態で招待リンクを開いてログインした場合、ゲームデータが再取得されず着席できなかった
+- 修正: `handleAuthSuccess` が `gameId` を検知した場合に `lobbyJoinWithBuyIn(gameId, gameType, user.username)` を呼び出して通常の参加導線に乗せる
+- `lobbyJoinWithBuyIn` に `nameOverride` パラメータを追加し、ステートが更新される前でもユーザー名を正しく使えるようにした
+- `navigateToLobby()` に `setTable(null)` を追加してオフラインテーブル退席後の state 残留を防止
+- `effectiveName` のフォールバックに `currentUser?.username` を追加し、`myName` が空（ロビーに戻ると `useTableSession` が `''` にリセット）でも参加できるようにした
+
+### 招待リンクへの OTP 埋め込み
+- 招待 URL に `?code={inviteCode}` を付与し、リンク経由でアクセスした場合は `OfflineSeatPopup` の OTP 入力欄に自動入力する
+- OTP の生成文字セットをアルファベット混在から数字のみ（`"0123456789"`）に変更
+
+### アバターのリアルタイム反映
+- アバター更新時（`POST /v1/auth/me/avatar`）に `TableMembershipService.refreshAvatarUrl` を呼び出し、参加中の全テーブルの `TableMemberRecord` を更新して WS push する
+- `RoomController.mapMembers`・`TableController.toMembers` で `avatarUrl = null` かつ `publicId` がある場合に DB から最新 URL を取得するよう変更（参加前にアバター未設定だったケース対応）
+
+### オフラインモード: 今ハンドの増減表示
+- `finished` 状態遷移時に直前のスタックとの差分を計算して表示する（`offline-payout-list` 領域）
+- 増: 緑、減: 赤で視認性を高める
+- 初回ハンドは基準値なしのため非表示
+
+## 2026-04-21
+- Git ブランチ戦略:
+  - 長寿命ブランチは `main` と `develop` の 2 本とする
+  - 通常開発は `feature/*` を `develop` から作成し、PR で `develop` にマージする
+  - リリース反映は `develop` から `main` への PR で行う
+  - 緊急修正は `hotfix/*` を `main` から作成し、`main` と `develop` の両方へ反映する
+- ブランチ保護方針:
+  - `main` と `develop` は direct push を避け、PR 経由でのみ更新する
+  - `main` と `develop` は force push / branch deletion を禁止する
+  - `main` と `develop` は stale approval dismiss と conversation resolution を有効化する
+  - approval 件数は当面 `0` とし、単独運用でも PR 必須ルールを維持する
+- CI 必須チェック方針:
+  - GitHub Actions 整備前は required status checks を有効化しない
+  - GitHub Actions 整備後は `backend-test`, `frontend-lint`, `frontend-build` を `main` / `develop` の必須チェックにする
+  - 対応する実行コマンドは `mapoker-backend` の `./mvnw test`、`mapoker-frontend` の `npm run lint`、`mapoker-frontend` の `npm run build` とする

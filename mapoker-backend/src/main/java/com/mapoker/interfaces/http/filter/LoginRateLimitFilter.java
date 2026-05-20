@@ -12,6 +12,9 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * ログインエンドポイントへのアクセス頻度を制限するフィルタです。
+ */
 public class LoginRateLimitFilter extends OncePerRequestFilter {
 
     private static final int MAX_REQUESTS_PER_MINUTE = 10;

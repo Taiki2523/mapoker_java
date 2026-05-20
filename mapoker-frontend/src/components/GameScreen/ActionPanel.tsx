@@ -15,17 +15,37 @@ type Props = {
   setActionAmount: (n: number) => void
   myHandName: string | null
   currentPlayer: Player | null
+  stackMode: 'chips' | 'bb'
   displayName: (idx: number) => string
   onSendAction: (type: string, amount: number) => void
+  doStraddle: boolean
+  onToggleStraddle: (v: boolean) => void
 }
 
 export function ActionPanel({
   game, mySeatIndex, canAct, loading,
   toCall, minRaise, maxBet, betPresets, actionAmount, setActionAmount,
-  myHandName, currentPlayer, displayName, onSendAction,
+  myHandName, currentPlayer, stackMode, displayName, onSendAction,
+  doStraddle, onToggleStraddle,
 }: Props) {
+  const bb = game?.big_blind ?? 0
+  const fmt = (chips: number) => {
+    if (stackMode === 'bb' && bb > 0) {
+      return `${Math.round((chips / bb) * 10) / 10}BB`
+    }
+    return `¥${chips}`
+  }
+
+  const canCheck = toCall === 0
+  const step = bb > 0 ? bb : 1
+  const adjustAmount = (delta: number) => {
+    const next = actionAmount + delta * step
+    setActionAmount(Math.min(Math.max(minRaise, next), maxBet))
+  }
+
   return (
-    <div className="action-panel">
+    <div className={`action-panel ${canAct ? 'active' : 'inactive'}`}>
+      <div className="action-panel-controls">
       <div className="action-info-row">
         <div className="action-my-cards">
           {(mySeatIndex !== null && game?.players?.[mySeatIndex]?.hole?.length
@@ -60,6 +80,12 @@ export function ActionPanel({
             ))}
           </div>
           <div className="bet-slider-wrap">
+            <button
+              className="bet-step-btn"
+              onClick={() => adjustAmount(-1)}
+              disabled={actionAmount <= minRaise}
+              aria-label="-1BB"
+            >−</button>
             <input
               type="range"
               className="bet-slider"
@@ -68,43 +94,66 @@ export function ActionPanel({
               value={actionAmount}
               onChange={(e) => setActionAmount(Number(e.target.value))}
             />
-            <span className="bet-slider-value">{actionAmount}</span>
+            <button
+              className="bet-step-btn"
+              onClick={() => adjustAmount(1)}
+              disabled={actionAmount >= maxBet}
+              aria-label="+1BB"
+            >＋</button>
+            <span className="bet-slider-value">{fmt(actionAmount)}</span>
           </div>
         </div>
       )}
 
-      <div className="action-buttons">
-        <button
-          className="ghost danger"
-          onClick={() => onSendAction('fold', 0)}
-          disabled={!canAct || loading}
-        >
-          {t('fold')}
-        </button>
-        <button
-          className="primary"
-          onClick={() => onSendAction(toCall === 0 ? 'check' : 'call', 0)}
-          disabled={!canAct || loading}
-        >
-          {toCall === 0 ? t('check') : `${t('call')} ${toCall}`}
-        </button>
-        <button
-          className="ghost"
-          onClick={() => onSendAction(toCall === 0 ? 'bet' : 'raise', actionAmount)}
-          disabled={!canAct || loading || actionAmount <= 0}
-        >
-          {toCall === 0
-            ? `${t('betLabel')} ${actionAmount}`
-            : `${t('raiseLabel')} ${actionAmount}`}
-        </button>
-        <button
-          className="ghost"
-          onClick={() => onSendAction('all_in', 0)}
-          disabled={!canAct || loading}
-        >
-          {t('allInBtn')}
-        </button>
-      </div>
+      {canAct && (
+        <div className="action-buttons">
+          <button
+            className="fold-btn"
+            onClick={() => onSendAction('fold', 0)}
+            disabled={!canAct || loading || canCheck}
+            title={canCheck ? 'チェックできます' : undefined}
+          >
+            {t('fold')}
+          </button>
+          <button
+            className="call-btn"
+            onClick={() => onSendAction(canCheck ? 'check' : 'call', 0)}
+            disabled={!canAct || loading}
+          >
+            {canCheck ? t('check') : `${t('call')} ${fmt(toCall)}`}
+          </button>
+          <button
+            className="raise-btn"
+            onClick={() => onSendAction(game?.current_bet === 0 ? 'bet' : 'raise', actionAmount)}
+            disabled={!canAct || loading || actionAmount < minRaise}
+          >
+            {game?.current_bet === 0
+              ? `${t('betLabel')} ${fmt(actionAmount)}`
+              : `${t('raiseLabel')} ${fmt(actionAmount)}`}
+          </button>
+          <button
+            className="allin-btn"
+            onClick={() => onSendAction('all_in', 0)}
+            disabled={!canAct || loading}
+          >
+            {t('allInBtn')}
+          </button>
+        </div>
+      )}
+      {game?.straddle_enabled && game.next_utg_idx === mySeatIndex && (
+        <div className="straddle-toggle-row">
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={doStraddle}
+              onChange={(e) => onToggleStraddle(e.target.checked)}
+            />
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
+            {t('straddleNext')}
+          </label>
+        </div>
+      )}
+      </div>{/* end action-panel-controls */}
     </div>
   )
 }

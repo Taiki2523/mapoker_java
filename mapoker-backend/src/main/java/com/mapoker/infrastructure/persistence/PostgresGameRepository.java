@@ -3,8 +3,8 @@ package com.mapoker.infrastructure.persistence;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mapoker.application.ActionRecord;
-import com.mapoker.application.GameRepository;
+import com.mapoker.application.game.ActionRecord;
+import com.mapoker.application.ports.GameRepository;
 import com.mapoker.domain.card.Card;
 import com.mapoker.domain.game.GameState;
 import com.mapoker.domain.game.GameStatus;
@@ -24,6 +24,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * Spring の {@code @Repository} として PostgreSQL へゲーム状態を永続化する実装です。
+ */
 @Repository
 @Profile("postgresql")
 public class PostgresGameRepository implements GameRepository {
@@ -38,6 +41,12 @@ public class PostgresGameRepository implements GameRepository {
         this.mapper = mapper;
     }
 
+    /**
+     * 新しいゲームを永続化します。
+     *
+     * @param id ゲーム ID
+     * @param state 保存するゲーム状態
+     */
     @Override
     @Transactional
     public void create(String id, GameState state) {
@@ -46,6 +55,13 @@ public class PostgresGameRepository implements GameRepository {
         insertPlayers(id, state);
     }
 
+    /**
+     * ゲーム状態とアクション履歴を更新します。
+     *
+     * @param id ゲーム ID
+     * @param state 更新後のゲーム状態
+     * @param action 追加するアクション履歴
+     */
     @Override
     @Transactional
     public void update(String id, GameState state, ActionRecord action) {
@@ -55,6 +71,12 @@ public class PostgresGameRepository implements GameRepository {
         insertAction(id, action);
     }
 
+    /**
+     * ゲーム状態のみを更新します。
+     *
+     * @param id ゲーム ID
+     * @param state 更新後のゲーム状態
+     */
     @Override
     @Transactional
     public void update(String id, GameState state) {
@@ -63,6 +85,12 @@ public class PostgresGameRepository implements GameRepository {
         updatePlayers(id, state);
     }
 
+    /**
+     * ID でゲーム状態を取得します。
+     *
+     * @param id ゲーム ID
+     * @return 見つかったゲーム状態
+     */
     @Override
     public Optional<GameState> findById(String id) {
         List<Map<String, Object>> rows = jdbc.queryForList(
@@ -73,6 +101,11 @@ public class PostgresGameRepository implements GameRepository {
         return Optional.of(toGameState(rows.get(0), playerRows));
     }
 
+    /**
+     * すべてのゲーム状態を取得します。
+     *
+     * @return ゲーム状態一覧
+     */
     @Override
     public List<GameState> findAll() {
         List<Map<String, Object>> gameRows = jdbc.queryForList(
@@ -96,6 +129,12 @@ public class PostgresGameRepository implements GameRepository {
         return result;
     }
 
+    /**
+     * 指定ゲームのアクション履歴を取得します。
+     *
+     * @param gameId ゲーム ID
+     * @return アクション履歴一覧
+     */
     @Override
     public List<ActionRecord> findActionsByGameId(String gameId) {
         return jdbc.query(
@@ -104,7 +143,8 @@ public class PostgresGameRepository implements GameRepository {
                         rs.getInt("seq"),
                         rs.getInt("player_index"),
                         ActionType.fromLabel(rs.getString("action_type")),
-                        rs.getInt("amount")),
+                        rs.getInt("amount"),
+                        rs.getString("label")),
                 gameId);
     }
 
@@ -115,11 +155,13 @@ public class PostgresGameRepository implements GameRepository {
                 INSERT INTO games (
                   id, status, street, button_index, small_blind_idx, big_blind_idx,
                   current_player, current_bet, last_raise_size, big_blind, pot_total,
-                  odd_chip_rule, deck, deck_pos, community, acted, raise_open, fold_win, last_showdown
+                  odd_chip_rule, deck, deck_pos, community, acted, raise_open, fold_win, last_showdown,
+                  ante, straddle_enabled, next_hand_straddle, showdown_declarations
                 ) VALUES (
                   ?, CAST(? AS game_status), CAST(? AS game_street), ?, ?, ?, ?, ?, ?, ?, ?,
                   CAST(? AS odd_chip_rule),
-                  CAST(? AS jsonb), ?, CAST(? AS jsonb), CAST(? AS jsonb), ?, ?, CAST(? AS jsonb)
+                  CAST(? AS jsonb), ?, CAST(? AS jsonb), CAST(? AS jsonb), ?, ?, CAST(? AS jsonb),
+                  ?, ?, ?, CAST(? AS jsonb)
                 )
                 """,
                 id,
@@ -140,7 +182,11 @@ public class PostgresGameRepository implements GameRepository {
                 toJson(s.getActed()),
                 s.isRaiseOpen(),
                 s.isFoldWin(),
-                s.getLastShowdown() != null ? toJson(s.getLastShowdown()) : null);
+                s.getLastShowdown() != null ? toJson(s.getLastShowdown()) : null,
+                s.getAnte(),
+                s.isStraddleEnabled(),
+                s.isNextHandStraddle(),
+                !s.getShowdownDeclarations().isEmpty() ? toJson(s.getShowdownDeclarations()) : null);
     }
 
     private void updateGame(String id, GameState s) {
@@ -164,6 +210,10 @@ public class PostgresGameRepository implements GameRepository {
                   raise_open      = ?,
                   fold_win        = ?,
                   last_showdown   = CAST(? AS jsonb),
+                  ante            = ?,
+                  straddle_enabled = ?,
+                  next_hand_straddle = ?,
+                  showdown_declarations = CAST(? AS jsonb),
                   updated_at      = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
@@ -185,6 +235,10 @@ public class PostgresGameRepository implements GameRepository {
                 s.isRaiseOpen(),
                 s.isFoldWin(),
                 s.getLastShowdown() != null ? toJson(s.getLastShowdown()) : null,
+                s.getAnte(),
+                s.isStraddleEnabled(),
+                s.isNextHandStraddle(),
+                !s.getShowdownDeclarations().isEmpty() ? toJson(s.getShowdownDeclarations()) : null,
                 id);
     }
 
@@ -224,13 +278,18 @@ public class PostgresGameRepository implements GameRepository {
         }
     }
 
+    @Override
+    public void appendAction(String id, ActionRecord action) {
+        insertAction(id, action);
+    }
+
     private void insertAction(String id, ActionRecord action) {
         jdbc.update("""
-                INSERT INTO actions (game_id, seq, player_index, action_type, amount)
-                VALUES (?, ?, ?, CAST(? AS action_type), ?)
+                INSERT INTO actions (game_id, seq, player_index, action_type, amount, label)
+                VALUES (?, ?, ?, CAST(? AS action_type), ?, ?)
                 """,
                 id, action.seq(), action.playerIndex(),
-                action.actionType().getLabel(), action.amount());
+                action.actionType().getLabel(), action.amount(), action.label());
     }
 
     // ---- deserialize ----
@@ -261,6 +320,27 @@ public class PostgresGameRepository implements GameRepository {
         Object sdRaw = row.get("last_showdown");
         if (sdRaw != null) {
             s.setLastShowdown(fromJson(str(sdRaw), ShowdownResult.class));
+        }
+        Object anteRaw = row.get("ante");
+        if (anteRaw != null) {
+            s.setAnte((Integer) anteRaw);
+        }
+        Object straddleRaw = row.get("straddle_enabled");
+        if (straddleRaw != null) {
+            s.setStraddleEnabled((Boolean) straddleRaw);
+        }
+        Object nextStraddleRaw = row.get("next_hand_straddle");
+        if (nextStraddleRaw != null) {
+            s.setNextHandStraddle((Boolean) nextStraddleRaw);
+        }
+        Object declRaw = row.get("showdown_declarations");
+        if (declRaw != null) {
+            var rawMap = fromJson(str(declRaw), new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String, Boolean>>() {});
+            if (rawMap != null) {
+                java.util.Map<Integer, Boolean> decl = new java.util.HashMap<>();
+                rawMap.forEach((k, v) -> decl.put(Integer.parseInt(k), v));
+                s.setShowdownDeclarations(decl);
+            }
         }
 
         List<Player> players = new ArrayList<>();

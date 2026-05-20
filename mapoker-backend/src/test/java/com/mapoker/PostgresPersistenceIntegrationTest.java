@@ -1,9 +1,13 @@
 package com.mapoker;
 
-import com.mapoker.application.GameService;
-import com.mapoker.application.TableService;
-import com.mapoker.application.UserService;
-import com.mapoker.application.UserTableHistoryService;
+import com.mapoker.application.game.GameActionService;
+import com.mapoker.application.game.GameLifecycleService;
+import com.mapoker.application.game.GameReadService;
+import com.mapoker.application.table.TableLifecycleService;
+import com.mapoker.application.table.TableMembershipService;
+import com.mapoker.application.table.TableQueryService;
+import com.mapoker.application.ports.UserRepository;
+import com.mapoker.application.history.UserTableHistoryService;
 import com.mapoker.domain.game.GameStatus;
 import com.mapoker.domain.game.OddChipRule;
 import com.mapoker.domain.rules.ActionType;
@@ -25,27 +29,34 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PostgresPersistenceIntegrationTest {
 
     @Autowired
-    private UserService userService;
+    private UserRepository userRepository;
 
     @Autowired
-    private GameService gameService;
+    private GameReadService gameService;
+    @Autowired
+    private GameLifecycleService gameLifecycle;
+    @Autowired
+    private GameActionService gameAction;
 
     @Autowired
-    private TableService tableService;
+    private TableLifecycleService tableLifecycleService;
+    @Autowired
+    private TableMembershipService tableMembershipService;
 
     @Autowired
     private UserTableHistoryService userTableHistoryService;
 
     @Test
     void persistsUsersAndGameLifecycleInPostgres() {
-        var user = userService.register("alice", "password123");
+        var user = userRepository.createWithGoogle("alice", "0000", null);
         assertThat(user.id()).isPositive();
-        assertThat(userService.getByUsername("alice").username()).isEqualTo("alice");
+        assertThat(user.username()).isEqualTo("alice");
+        assertThat(user.publicId()).isNotBlank();
 
-        var game = gameService.createGame(
+        var game = gameLifecycle.createGame(
                 List.of(
-                        new GameService.PlayerInput("p1", 100),
-                        new GameService.PlayerInput("p2", 100)
+                        new GameLifecycleService.PlayerInput("p1", 100),
+                        new GameLifecycleService.PlayerInput("p2", 100)
                 ),
                 0,
                 10,
@@ -53,9 +64,9 @@ class PostgresPersistenceIntegrationTest {
                 OddChipRule.LOW_INDEX
         );
 
-        var started = gameService.startHand(game.getId(), 10);
+        var started = gameLifecycle.startHand(game.getId(), 10);
         int actor = started.getCurrentPlayer();
-        var nextState = gameService.applyAction(game.getId(), actor, ActionType.CALL, 0);
+        var nextState = gameAction.applyAction(game.getId(), actor, ActionType.CALL, 0);
         var reloaded = gameService.getGame(game.getId());
 
         assertThat(nextState.getStatus()).isIn(GameStatus.IN_PROGRESS, GameStatus.SHOWDOWN, GameStatus.FINISHED);
@@ -66,9 +77,9 @@ class PostgresPersistenceIntegrationTest {
 
     @Test
     void persistsUserTableHistoryInPostgres() {
-        userService.register("history_alice", "password123");
+        userRepository.createWithGoogle("history_alice", "0001", null);
 
-        var created = tableService.createRingTable(new TableService.CreateRingTableInput(
+        var created = tableLifecycleService.createRingTable(new TableLifecycleService.CreateRingTableInput(
                 "History Table",
                 3,
                 10,
@@ -76,8 +87,8 @@ class PostgresPersistenceIntegrationTest {
                 List.of("casual", "newbie")
         ));
 
-        var joinResult = tableService.join(created.table().id(), "history_alice", 0);
-        tableService.leave(created.table().id(), "history_alice", null);
+        var joinResult = tableMembershipService.join(created.table().id(), "history_alice", 0);
+        tableMembershipService.leave(created.table().id(), "history_alice", null);
 
         var history = userTableHistoryService.listRecent("history_alice", 10);
         assertThat(history).hasSize(1);

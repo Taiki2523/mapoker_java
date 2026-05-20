@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+  <!-- ログ出力先ディレクトリ（環境変数 LOGS_LOCATION、デフォルトはプロジェクト相対の ./logs） -->
+  <springProperty name="LOG_DIR" source="logging.file.dir" defaultValue="./logs"/>
+
+  <!-- ===== コンソール出力（常時） ===== -->
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+      <charset>UTF-8</charset>
+    </encoder>
+  </appender>
+
+  <!-- ===== ファイル出力（docker プロファイル時のみ有効） ===== -->
+  <springProfile name="postgresql,production">
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+      <file>${LOG_DIR}/backend/application.log</file>
+      <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+        <fileNamePattern>${LOG_DIR}/backend/application.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+        <maxFileSize>100MB</maxFileSize>
+        <maxHistory>30</maxHistory>
+        <totalSizeCap>2GB</totalSizeCap>
+      </rollingPolicy>
+      <encoder>
+        <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        <charset>UTF-8</charset>
+      </encoder>
+    </appender>
+  </springProfile>
+
+  <!-- アプリケーションロガー -->
+  <logger name="com.mapoker" level="INFO"/>
+  <logger name="com.mapoker.interfaces.http" level="DEBUG"/>
+  <logger name="org.springframework.web" level="WARN"/>
+  <logger name="org.springframework.security" level="WARN"/>
+
+  <!-- root: 本番（postgresql/production プロファイル）はファイルにも出力 -->
+  <springProfile name="postgresql,production">
+    <root level="WARN">
+      <appender-ref ref="CONSOLE"/>
+      <appender-ref ref="FILE"/>
+    </root>
+  </springProfile>
+
+  <!-- それ以外（local/test）はコンソールのみ -->
+  <springProfile name="!postgresql &amp; !production">
+    <root level="WARN">
+      <appender-ref ref="CONSOLE"/>
+    </root>
+  </springProfile>
+</configuration>

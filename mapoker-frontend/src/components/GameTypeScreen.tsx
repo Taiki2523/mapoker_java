@@ -5,14 +5,14 @@ import { UserHeader } from './UserHeader'
 type Props = {
   currentUser: AuthUser | null
   onOpenMyPage: () => void
-  onLogout: () => void
   onSelectRing: () => void
+  appVersion?: string
 }
 
-export function GameTypeScreen({ currentUser, onOpenMyPage, onLogout, onSelectRing }: Props) {
+export function GameTypeScreen({ currentUser, onOpenMyPage, onSelectRing, appVersion }: Props) {
   return (
     <>
-      <UserHeader username={currentUser?.username ?? ''} onOpenMyPage={onOpenMyPage} onLogout={onLogout} />
+      <UserHeader username={currentUser?.username ?? ''} onOpenMyPage={onOpenMyPage} appVersion={appVersion} />
       <div>
         <h2>{t('gameTypeTitle')}</h2>
         <p>{t('gameTypeDesc')}</p>

@@ -16,6 +16,11 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api/, ''),
         },
+        '/ws': {
+          target: env.BACKEND_URL || 'http://localhost:8080',
+          changeOrigin: true,
+          ws: true,
+        },
       },
     },
   }

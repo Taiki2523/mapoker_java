@@ -81,4 +81,33 @@ class ActionValidatorTest {
                 ActionValidator.validate(TABLE_PREFLOP_NOCALL, folded, Action.of(ActionType.CHECK, 0)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void bbPreflop_canCheckWhenContributionMatchesBet() {
+        // BBはプリフロップでcontributed=currentBet=10のときチェック可能
+        TableState table = new TableState(Street.PREFLOP, 10, 10, 10, true);
+        PlayerState bb = new PlayerState(90, 10, false, false);
+        assertThatNoException().isThrownBy(() ->
+                ActionValidator.validate(table, bb, Action.of(ActionType.CHECK, 0)));
+    }
+
+    @Test
+    void bbPreflop_canRaiseWhenContributionMatchesBet() {
+        // BBはプリフロップでcontributed=currentBet=10のときレイズ可能
+        TableState table = new TableState(Street.PREFLOP, 10, 10, 10, true);
+        PlayerState bb = new PlayerState(90, 10, false, false);
+        assertThatNoException().isThrownBy(() ->
+                ActionValidator.validate(table, bb, Action.of(ActionType.RAISE, 20)));
+    }
+
+    @Test
+    void bbPreflop_cannotBetWhenCurrentBetExists() {
+        // BBはプリフロップでcurrentBet>0のときbetは不可（raiseを使うべき）
+        TableState table = new TableState(Street.PREFLOP, 10, 10, 10, true);
+        PlayerState bb = new PlayerState(90, 10, false, false);
+        assertThatThrownBy(() ->
+                ActionValidator.validate(table, bb, Action.of(ActionType.BET, 20)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot bet");
+    }
 }

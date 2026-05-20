@@ -1,7 +1,10 @@
 package com.mapoker.interfaces.http;
 
-import com.mapoker.application.TableMemberRecord;
-import com.mapoker.application.TableService;
+import com.mapoker.application.table.TableMemberRecord;
+import com.mapoker.application.table.TableMembershipService;
+import com.mapoker.application.table.TableQueryService;
+import com.mapoker.application.auth.User;
+import com.mapoker.application.auth.UserService;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.mapoker.interfaces.http.dto.TableMembershipRequest;
 import jakarta.validation.Valid;
@@ -11,49 +14,131 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * Spring の {@code @RestController} としてルーム参加者 API を提供するコントローラです。
+ */
 @RestController
 @RequestMapping("/v1/rooms")
 public class RoomController {
 
-    private final TableService tableService;
+    private final TableQueryService tableQueryService;
+    private final TableMembershipService tableMembershipService;
+    private final UserService userService;
 
-    public RoomController(TableService tableService) {
-        this.tableService = tableService;
+    public RoomController(TableQueryService tableQueryService,
+                          TableMembershipService tableMembershipService,
+                          UserService userService) {
+        this.tableQueryService = tableQueryService;
+        this.tableMembershipService = tableMembershipService;
+        this.userService = userService;
     }
 
+    /**
+     * 参加者表示用 DTO です。
+     *
+     * @param name        参加者名（シート名）
+     * @param seatIndex   着席位置
+     * @param joinedAt    参加日時
+     * @param displayName 表示名（username#discriminator 形式）
+     * @param avatarUrl   アバター画像 URL（null 可）
+     */
     public record MemberRecord(
             String name,
             @JsonProperty("seat_index") int seatIndex,
-            @JsonProperty("joined_at") String joinedAt
+            @JsonProperty("joined_at") String joinedAt,
+            @JsonProperty("display_name") String displayName,
+            @JsonProperty("avatar_url") String avatarUrl
     ) {}
 
-    private record MembersResponse(List<MemberRecord> members) {}
+    record MembersResponse(List<MemberRecord> members) {}
 
+    /**
+     * ルーム参加者一覧を取得します。
+     *
+     * @param id ルーム ID
+     * @return 参加者一覧
+     */
     @GetMapping("/{id}/members")
     public MembersResponse getMembers(@PathVariable String id) {
-        return new MembersResponse(mapMembers(tableService.getMembers(id)));
+        return new MembersResponse(mapMembers(tableQueryService.getMembers(id)));
     }
 
+    /**
+     * 認証ユーザーまたは指定名義でルームへ参加します。
+     *
+     * @param id        ルーム ID
+     * @param body      参加リクエスト（名前・バイイン額）
+     * @param principal 認証済みユーザー
+     * @return 更新後の参加者一覧
+     */
     @PostMapping("/{id}/join")
     public MembersResponse join(@PathVariable String id,
                                 @Valid @RequestBody(required = false) TableMembershipRequest body,
                                 @AuthenticationPrincipal UserDetails principal) {
-        String name = principal != null ? principal.getUsername() : body != null ? body.name() : null;
+        String name = resolveName(principal, body);
         int buyIn = body != null && body.buyIn() != null ? body.buyIn() : 0;
-        return new MembersResponse(mapMembers(tableService.join(id, name, buyIn).members()));
+        String[] userInfo = resolveUserInfo(principal, name);
+        return new MembersResponse(mapMembers(tableMembershipService.join(id, name, buyIn, userInfo[0], userInfo[1], userInfo[2]).members()));
     }
 
+    /**
+     * 認証ユーザーまたは指定名義でルームから退出します。
+     *
+     * @param id        ルーム ID
+     * @param body      退出リクエスト
+     * @param principal 認証済みユーザー
+     * @return 更新後の参加者一覧
+     */
     @PostMapping("/{id}/leave")
     public MembersResponse leave(@PathVariable String id,
                                  @Valid @RequestBody(required = false) TableMembershipRequest body,
                                  @AuthenticationPrincipal UserDetails principal) {
-        String name = principal != null ? principal.getUsername() : body != null ? body.name() : null;
-        return new MembersResponse(mapMembers(tableService.leave(id, name, null)));
+        String name = resolveName(principal, body);
+        String publicId = principal != null ? principal.getUsername() : null;
+        return new MembersResponse(mapMembers(tableMembershipService.leave(id, name, null, publicId)));
+    }
+
+    /**
+     * 認証済みユーザーは principal の publicId からユーザー名を解決します（body.name は無視）。
+     * 未認証時のみ body.name を使用します。
+     */
+    private String resolveName(UserDetails principal, TableMembershipRequest body) {
+        if (principal != null) {
+            try {
+                return userService.getByPublicId(principal.getUsername()).username();
+            } catch (Exception ignored) {}
+        }
+        if (body != null && body.name() != null && !body.name().isBlank()) {
+            return body.name();
+        }
+        return null;
+    }
+
+    /**
+     * 認証ユーザーの {@code [displayName, avatarUrl, publicId]} を返します。未認証時は {@code [name, null, null]}。
+     */
+    private String[] resolveUserInfo(UserDetails principal, String name) {
+        if (principal != null) {
+            try {
+                User user = userService.getByPublicId(principal.getUsername());
+                return new String[]{ user.displayName(), user.avatarUrl(), user.publicId() };
+            } catch (Exception ignored) {}
+        }
+        return new String[]{ name, null, null };
     }
 
     private List<MemberRecord> mapMembers(List<TableMemberRecord> members) {
         return members.stream()
-                .map(member -> new MemberRecord(member.name(), member.seatIndex(), member.joinedAt()))
+                .map(member -> {
+                    String avatarUrl = member.avatarUrl();
+                    if (avatarUrl == null && member.publicId() != null) {
+                        try { avatarUrl = userService.getByPublicId(member.publicId()).avatarUrl(); }
+                        catch (Exception ignored) {}
+                    }
+                    return new MemberRecord(
+                            member.name(), member.seatIndex(), member.joinedAt(),
+                            member.displayName(), avatarUrl);
+                })
                 .toList();
     }
 }
