@@ -51,9 +51,14 @@ export function TopBar({
           ? t('finished')
           : ''
 
+  const sweepedPot = game
+    ? game.pot_total - game.players.reduce((s, p) => s + p.contributed, 0)
+    : 0
+
   return (
     <header className="game-topbar">
-      <div className="topbar-left">
+      {/* 上段: ゲーム状態情報 */}
+      <div className="topbar-row topbar-row--info">
         <span className="topbar-brand">mapoker</span>
         {game?.street && (
           <span className={`street-badge street-badge--${game.street.toLowerCase()}`}>
@@ -61,22 +66,22 @@ export function TopBar({
           </span>
         )}
         {statusText && <span className="topbar-status">{statusText}</span>}
-      </div>
-
-      <div className="topbar-center">
-        <span className="topbar-stat">POT <strong>{fmt(game ? game.pot_total - game.players.reduce((s, p) => s + p.contributed, 0) : 0)}</strong></span>
+        <span className="topbar-spacer" />
+        <span className="topbar-stat">POT <strong>{fmt(sweepedPot)}</strong></span>
         {(game?.current_bet ?? 0) > 0 && (
           <span className="topbar-stat">BET <strong>{fmt(game!.current_bet)}</strong></span>
         )}
+        {error && <span className="topbar-error">{error}</span>}
       </div>
 
-      <div className="topbar-right">
+      {/* 下段: 操作ボタン群 */}
+      <div className="topbar-row topbar-row--controls">
         {inviteCode && (
-          <span className="offline-invite-code" style={{ fontSize: '0.8rem', letterSpacing: '0.15em', padding: '0.1rem 0.4rem' }}>
+          <span className="offline-invite-code" style={{ fontSize: '0.75rem', letterSpacing: '0.15em', padding: '0.1rem 0.35rem' }}>
             {inviteCode}
           </span>
         )}
-        {error && <span className="topbar-error">{error}</span>}
+        <span className="topbar-spacer" />
         <button
           className="icon-btn topbar-stack-toggle"
           onClick={onToggleStackMode}
