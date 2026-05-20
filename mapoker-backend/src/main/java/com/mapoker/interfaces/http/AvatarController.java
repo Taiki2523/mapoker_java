@@ -3,6 +3,7 @@ package com.mapoker.interfaces.http;
 import com.mapoker.application.auth.User;
 import com.mapoker.application.ports.UserRepository;
 import com.mapoker.application.auth.UserService;
+import com.mapoker.application.table.TableMembershipService;
 import com.mapoker.interfaces.http.dto.UserResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
@@ -40,14 +41,17 @@ public class AvatarController {
     private final Path storagePath;
     private final UserService userService;
     private final UserRepository userRepository;
+    private final TableMembershipService tableMembership;
 
     public AvatarController(
             @Value("${avatar.storage-path:/data/avatars}") String storagePath,
             UserService userService,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            TableMembershipService tableMembership) {
         this.storagePath = Paths.get(storagePath).toAbsolutePath().normalize();
         this.userService = userService;
         this.userRepository = userRepository;
+        this.tableMembership = tableMembership;
     }
 
     /**
@@ -112,6 +116,7 @@ public class AvatarController {
 
             String avatarUrl = "/api/v1/avatars/" + filename;
             userRepository.updateAvatarUrl(user.publicId(), avatarUrl);
+            tableMembership.refreshAvatarUrl(user.publicId(), avatarUrl);
             User updated = userService.getByPublicId(user.publicId());
             return ResponseEntity.ok(UserResponse.from(updated));
         } catch (IOException e) {

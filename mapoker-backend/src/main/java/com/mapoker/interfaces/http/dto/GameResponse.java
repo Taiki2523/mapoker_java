@@ -63,7 +63,8 @@ public record GameResponse(
         int ante,
         @JsonProperty("straddle_enabled") boolean straddleEnabled,
         @JsonProperty("straddle_idx") int straddleIdx,
-        @JsonProperty("next_utg_idx") int nextUtgIdx
+        @JsonProperty("next_utg_idx") int nextUtgIdx,
+        @JsonProperty("showdown_declarations") java.util.Map<Integer, Boolean> showdownDeclarations
 ) {
     /**
      * プレイヤー表示 DTO です。
@@ -152,9 +153,10 @@ public record GameResponse(
         ShowdownDto showdownDto = null;
         if (g.getLastShowdown() != null) {
             ShowdownResult sr = g.getLastShowdown();
-            ShowdownDto.BestHandDto bestHandDto = g.isFoldWin()
-                    ? null
-                    : new ShowdownDto.BestHandDto(sr.bestHand().rank(), sr.bestHand().kickers());
+            // bestHand は fold-win またはオフライン手動宣言では null になる
+            ShowdownDto.BestHandDto bestHandDto = (!g.isFoldWin() && sr.bestHand() != null)
+                    ? new ShowdownDto.BestHandDto(sr.bestHand().rank(), sr.bestHand().kickers())
+                    : null;
             showdownDto = new ShowdownDto(
                     sr.winnerIndexes(),
                     bestHandDto,
@@ -167,6 +169,7 @@ public record GameResponse(
                 g.getCurrentBet(), g.getLastRaiseSize(), g.getBigBlindSize(),
                 g.getPot(), playerResponses, g.getCommunity(), g.getOddChipRule(),
                 canStartHand, viewerMembershipActive, canRebuy, showdownDto,
-                g.getAnte(), g.isStraddleEnabled(), g.getStraddleIdx(), g.computeNextUtgIdx());
+                g.getAnte(), g.isStraddleEnabled(), g.getStraddleIdx(), g.computeNextUtgIdx(),
+                g.getShowdownDeclarations().isEmpty() ? null : g.getShowdownDeclarations());
     }
 }

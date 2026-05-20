@@ -61,6 +61,7 @@ CREATE TABLE games (
   ante            INT          NOT NULL DEFAULT 0,      -- V12 追加: ハンドごとのアンティ額
   straddle_enabled BOOLEAN     NOT NULL DEFAULT FALSE,  -- V14 追加: ストラドル有効フラグ
   next_hand_straddle BOOLEAN   NOT NULL DEFAULT FALSE,  -- V15 追加: 次ハンドのストラドル意思（startHand後リセット）
+  showdown_declarations JSONB,                          -- V17 追加: オフライン宣言状態 {"0": true, "1": false}
   created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -83,6 +84,9 @@ CREATE TABLE players (
   all_in       BOOLEAN      NOT NULL,
   hole         JSONB        NOT NULL,  -- ["AS","KH"] — DB には常に保存、可視性は API 層で制御
   sitting_out  BOOLEAN      NOT NULL DEFAULT FALSE,
+  offline_buy_in  INT,                                  -- V16 追加: オフラインバイイン累計
+  offline_cash_out INT,                                 -- V16 追加: 利確額（NULL=未確定）
+  cashout_at   TIMESTAMP,                               -- V16 追加: 利確日時（NULL=未確定）
   created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (game_id, player_index),
@@ -254,10 +258,18 @@ CREATE TABLE tables (
   status       VARCHAR(32)  NOT NULL DEFAULT 'inactive',
   ever_seated  BOOLEAN      NOT NULL DEFAULT FALSE,
   game_id      VARCHAR(128),
-  ante         INT          NOT NULL DEFAULT 0,  -- V12 追加: テーブルのアンティ額設定
+  ante         INT          NOT NULL DEFAULT 0,     -- V12 追加: テーブルのアンティ額設定
   straddle_enabled BOOLEAN  NOT NULL DEFAULT FALSE,  -- V13 追加: ストラドル有効フラグ
   created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+-- 注: invite_code はオフラインテーブルのみ使用。PostgreSQL では tables テーブルに永続化しない（インメモリ管理）。
+```
+
+### offline_buy_ins（インメモリのみ）
+
+オフラインセッションのバイイン・利確記録は `players` テーブルの `offline_buy_in` / `offline_cash_out` / `cashout_at` カラムで管理する（専用テーブルなし）。
+
+`offline_profit`（`cash_out - buy_in`）と `settlement_status` は派生値のため DB には持たない。`cashout_at IS NULL` で未確定、`NOT NULL` で確定済みを判定する。
 ```
 
 ---
@@ -281,3 +293,5 @@ CREATE TABLE tables (
 | V13 | `V13__add_straddle_enabled.sql` | tables に `straddle_enabled` カラム追加 |
 | V14 | `V14__add_straddle_enabled_to_games.sql` | games に `straddle_enabled` カラム追加 |
 | V15 | `V15__add_next_hand_straddle.sql` | games に `next_hand_straddle` カラム追加（ストラドル意思の永続化） |
+| V16 | `V16__offline_mode.sql` | players に `offline_buy_in` / `offline_cash_out` / `cashout_at` 追加、tables の `game_type` に `offline` チェック制約追加 |
+| V17 | `V17__add_showdown_declarations.sql` | games に `showdown_declarations` (JSONB) 追加（オフラインショーダウン宣言状態） |

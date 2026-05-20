@@ -129,9 +129,16 @@ public class RoomController {
 
     private List<MemberRecord> mapMembers(List<TableMemberRecord> members) {
         return members.stream()
-                .map(member -> new MemberRecord(
-                        member.name(), member.seatIndex(), member.joinedAt(),
-                        member.displayName(), member.avatarUrl()))
+                .map(member -> {
+                    String avatarUrl = member.avatarUrl();
+                    if (avatarUrl == null && member.publicId() != null) {
+                        try { avatarUrl = userService.getByPublicId(member.publicId()).avatarUrl(); }
+                        catch (Exception ignored) {}
+                    }
+                    return new MemberRecord(
+                            member.name(), member.seatIndex(), member.joinedAt(),
+                            member.displayName(), avatarUrl);
+                })
                 .toList();
     }
 }

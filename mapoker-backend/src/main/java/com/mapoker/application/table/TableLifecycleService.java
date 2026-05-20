@@ -10,6 +10,7 @@ import com.mapoker.infrastructure.config.WalletProperties;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -22,6 +23,10 @@ import java.util.Set;
  */
 @Service
 public class TableLifecycleService {
+
+    private static final String CODE_CHARS = "0123456789";
+    private static final int CODE_LENGTH = 6;
+    private static final SecureRandom SECURE_RNG = new SecureRandom();
 
     private final TableStore store;
     private final TableQueryService queryService;
@@ -72,7 +77,49 @@ public class TableLifecycleService {
                 Instant.now(),
                 false,
                 input.ante(),
-                input.straddleEnabled());
+                input.straddleEnabled(),
+                null);
+
+        store.tables.put(table.id(), table);
+        store.tableMembers.putIfAbsent(table.id(), new ArrayList<>());
+        store.lastEmptiedAt.put(table.id(), Instant.now());
+        return new CreateTableResult(table, game);
+    }
+
+    public CreateTableResult createOfflineTable(CreateOfflineTableInput input) {
+        if (input.playerCount() < 2 || input.playerCount() > 9)
+            throw new IllegalArgumentException("player count must be between 2 and 9");
+        if (input.bigBlind() <= 0)
+            throw new IllegalArgumentException("big blind must be positive");
+
+        List<GameLifecycleService.PlayerInput> players = new ArrayList<>();
+        for (int i = 0; i < input.playerCount(); i++) {
+            players.add(new GameLifecycleService.PlayerInput("p" + (i + 1), 0));
+        }
+
+        OddChipRule oddChipRule = gameProperties.defaultOddChipRule();
+        GameState game = gameService.createRingGame(
+                players, input.bigBlind(), oddChipRule, input.ante(), input.straddleEnabled());
+
+        int minBuyIn = input.bigBlind() * walletProperties.minBuyinBbMultiplier();
+        int maxBuyIn = input.bigBlind() * walletProperties.maxBuyinBbMultiplier();
+        String inviteCode = generateInviteCode();
+
+        TableRecord table = new TableRecord(
+                game.getId(), game.getId(),
+                normalizeTableName(input.tableName(), game.getId()),
+                "offline",
+                Math.max(1, input.bigBlind() / 2), input.bigBlind(),
+                minBuyIn, maxBuyIn, input.playerCount(),
+                normalizeFlags(null),
+                normalizeVisibility(input.visibility()),
+                "inactive",
+                game.getId(),
+                Instant.now(),
+                false,
+                input.ante(),
+                input.straddleEnabled(),
+                inviteCode);
 
         store.tables.put(table.id(), table);
         store.tableMembers.putIfAbsent(table.id(), new ArrayList<>());
@@ -96,7 +143,8 @@ public class TableLifecycleService {
             if (activeRosterCount < com.mapoker.domain.PokerConstants.MIN_PLAYERS) {
                 throw new IllegalStateException("not enough players at the table");
             }
-            return gameService.startHand(tableId, bigBlind, doStraddle);
+            boolean isOffline = "offline".equals(queryService.getTable(tableId).gameType());
+            return gameService.startHand(tableId, bigBlind, doStraddle, isOffline);
         }
     }
 
@@ -189,4 +237,26 @@ public class TableLifecycleService {
 
     /** テーブル作成結果。 */
     public record CreateTableResult(TableRecord table, GameState game) {}
+
+    private static String generateInviteCode() {
+        StringBuilder sb = new StringBuilder(CODE_LENGTH);
+        for (int i = 0; i < CODE_LENGTH; i++) {
+            sb.append(CODE_CHARS.charAt(SECURE_RNG.nextInt(CODE_CHARS.length())));
+        }
+        return sb.toString();
+    }
+
+    /** オフラインテーブル作成時の入力値。 */
+    public record CreateOfflineTableInput(
+            String tableName,
+            int playerCount,
+            int bigBlind,
+            String visibility,
+            int ante,
+            boolean straddleEnabled
+    ) {
+        public CreateOfflineTableInput(String tableName, int playerCount, int bigBlind, String visibility) {
+            this(tableName, playerCount, bigBlind, visibility, 0, false);
+        }
+    }
 }

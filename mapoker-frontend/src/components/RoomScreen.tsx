@@ -33,6 +33,7 @@ export function RoomScreen({
   const [straddleEnabled, setStraddleEnabled] = useState(false)
   const [visibility, setVisibility] = useState<TableVisibility>('public')
   const [flags, setFlags] = useState<TableFlag[]>(['casual'])
+  const [isOffline, setIsOffline] = useState(false)
 
   const toggleFlag = (flag: TableFlag) => {
     setFlags((prev) => (
@@ -126,6 +127,20 @@ export function RoomScreen({
             {t('straddle')}
           </label>
         </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={isOffline}
+              onChange={(e) => setIsOffline(e.target.checked)}
+            />
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
+            <span>
+              <span className={`game-type-dot ${isOffline ? 'offline' : 'online'}`} style={{ marginRight: '0.4rem', verticalAlign: 'middle' }} />
+              {isOffline ? 'オフライン（物理カード）' : 'オンライン'}
+            </span>
+          </label>
+        </div>
       </div>
       <label>
         {t('visibility')}
@@ -137,7 +152,7 @@ export function RoomScreen({
           <option value="private">{t('privateTable')}</option>
         </select>
       </label>
-      <div>
+      <div style={{ visibility: isOffline ? 'hidden' : 'visible' }}>
         <div className="label" style={{ marginBottom: '0.45rem' }}>{t('tableFlags')}</div>
         <div className="button-row" style={{ justifyContent: 'flex-start' }}>
           <button type="button" className={flags.includes('casual') ? 'primary' : 'secondary'} onClick={() => toggleFlag('casual')}>
@@ -160,16 +175,19 @@ export function RoomScreen({
         </button>
         <button
           className="primary"
-          onClick={() => void onCreateGame({
-            tableName,
-            playerCount,
-            smallBlind: selectedFormat.smallBlind,
-            bigBlind: selectedFormat.bigBlind,
-            ante: anteEnabled ? ante : 0,
-            straddleEnabled,
-            visibility,
-            flags,
-          })}
+          onClick={() => {
+            void onCreateGame({
+              tableName,
+              playerCount,
+              smallBlind: selectedFormat.smallBlind,
+              bigBlind: selectedFormat.bigBlind,
+              ante: anteEnabled ? ante : 0,
+              straddleEnabled,
+              visibility,
+              flags,
+              gameType: isOffline ? 'offline' : 'ring',
+            })
+          }}
           disabled={loading}
         >
           {t('createGame')}

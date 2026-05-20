@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import type { BetPreset, GameState, Player, RoomMember, Showdown, PayoutLine } from '../../types'
+import type { BetPreset, GameState, Player, RoomMember, Showdown, PayoutLine, Table } from '../../types'
 import { TopBar } from './TopBar'
 import { TableArea } from './TableArea'
 import { ActionPanel } from './ActionPanel'
 import { ActionLogDialog } from './ActionLog'
+import { OfflineGameScreen } from './OfflineGameScreen'
 
 import { t } from '../../i18n'
 
@@ -41,6 +42,8 @@ type Props = {
   onSendAction: (type: string, amount: number) => void
   doStraddle: boolean
   onToggleStraddle: (v: boolean) => void
+  table?: Table | null
+  onOfflineWin?: (win: boolean) => void
 }
 
 export function GameScreen({
@@ -54,6 +57,7 @@ export function GameScreen({
   winnerNames, payoutLines, displayName,
   onCopyInvite, onOpenMyPage, onLeaveRoom,
   onSendAction, doStraddle, onToggleStraddle,
+  table, onOfflineWin,
 }: Props) {
   const [stackMode, setStackMode] = useState<'chips' | 'bb'>(() => {
     return (localStorage.getItem(STACK_MODE_KEY) as 'chips' | 'bb') ?? 'chips'
@@ -65,6 +69,40 @@ export function GameScreen({
   }, [stackMode])
 
   const toggleStackMode = () => setStackMode((m) => m === 'chips' ? 'bb' : 'chips')
+
+  // オフラインモードは専用画面を使用
+  if (table?.game_type === 'offline') {
+    return (
+      <OfflineGameScreen
+        game={game}
+        mySeat={mySeat}
+        mySeatIndex={mySeatIndex}
+        table={table}
+        autoRefresh={autoRefresh}
+        setAutoRefresh={setAutoRefresh}
+        loading={loading}
+        error={error}
+        inviteCopied={inviteCopied}
+        leavePending={leavePending}
+        toCall={toCall}
+        minRaise={minRaise}
+        maxBet={maxBet}
+        betPresets={betPresets}
+        actionAmount={actionAmount}
+        setActionAmount={setActionAmount}
+        canAct={canAct}
+        winnerNames={winnerNames}
+        displayName={displayName}
+        onCopyInvite={onCopyInvite}
+        onOpenMyPage={onOpenMyPage}
+        onLeaveRoom={onLeaveRoom}
+        onSendAction={onSendAction}
+        onOfflineWin={onOfflineWin ?? (() => {})}
+        doStraddle={doStraddle}
+        onToggleStraddle={onToggleStraddle}
+      />
+    )
+  }
 
   return (
     <div className="game-layout">
@@ -82,6 +120,7 @@ export function GameScreen({
         onCopyInvite={onCopyInvite}
         onOpenMyPage={onOpenMyPage}
         onOpenActionLog={() => setLogOpen(true)}
+        inviteCode={table?.game_type === 'offline' ? (table.invite_code ?? null) : null}
       />
       <TableArea
         game={game}

@@ -67,15 +67,21 @@ public class GameLifecycleService {
     }
 
     public GameState startHand(String id, int bigBlind) {
-        return startHand(id, bigBlind, false);
+        return startHand(id, bigBlind, false, false);
     }
 
     public GameState startHand(String id, int bigBlind, boolean doStraddle) {
+        return startHand(id, bigBlind, doStraddle, false);
+    }
+
+    public GameState startHand(String id, int bigBlind, boolean doStraddle, boolean skipCardDeal) {
         GameState state = readService.getGame(id);
-        state.startHand(bigBlind, doStraddle);
+        state.startHand(bigBlind, doStraddle, skipCardDeal);
         gameRepository.update(id, state);
         publishGame(id, state);
-        publishHoleCards(id, state);
+        if (!skipCardDeal) {
+            publishHoleCards(id, state);
+        }
         return state;
     }
 

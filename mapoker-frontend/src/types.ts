@@ -30,6 +30,7 @@ export type GameState = {
   viewer_membership_active: boolean
   can_rebuy: boolean
   last_showdown?: Showdown
+  showdown_declarations?: Record<string, boolean> | null
 }
 
 export type ActionLogEntry = {
@@ -133,6 +134,7 @@ export type Table = {
   member_count: number
   members: RoomMemberApi[]
   game?: GameState | null
+  invite_code?: string | null
 }
 
 export type ApiError = {
@@ -186,6 +188,7 @@ export type CreateGameConfig = {
   straddleEnabled: boolean
   visibility: TableVisibility
   flags: TableFlag[]
+  gameType: 'ring' | 'offline'
 }
 
 export type BuyInContext = {

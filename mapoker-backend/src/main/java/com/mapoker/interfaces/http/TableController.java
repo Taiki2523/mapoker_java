@@ -50,12 +50,21 @@ public class TableController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public TableResponse createTable(@Valid @RequestBody CreateTableRequest request) {
-        TableLifecycleService.CreateTableResult result = tableLifecycleService.createRingTable(
-                new TableLifecycleService.CreateRingTableInput(
-                        request.tableName(), request.playerCount(),
-                        request.smallBlind(), request.bigBlind(),
-                        request.visibility(), request.flags(),
-                        request.ante(), request.straddleEnabled()));
+        TableLifecycleService.CreateTableResult result;
+        if ("offline".equals(request.gameType())) {
+            result = tableLifecycleService.createOfflineTable(
+                    new TableLifecycleService.CreateOfflineTableInput(
+                            request.tableName(), request.playerCount(),
+                            request.bigBlind(), request.visibility(),
+                            request.ante(), request.straddleEnabled()));
+        } else {
+            result = tableLifecycleService.createRingTable(
+                    new TableLifecycleService.CreateRingTableInput(
+                            request.tableName(), request.playerCount(),
+                            request.smallBlind(), request.bigBlind(),
+                            request.visibility(), request.flags(),
+                            request.ante(), request.straddleEnabled()));
+        }
         return TableResponse.from(result.table(),
                 tableQueryService.getMembers(result.table().id()),
                 GameResponse.from(result.game(), null, false));
@@ -160,8 +169,15 @@ public class TableController {
 
     private List<TableResponse.MemberDto> toMembers(List<TableMemberRecord> members) {
         return members.stream()
-                .map(member -> new TableResponse.MemberDto(member.name(), member.seatIndex(), member.joinedAt(),
-                        member.pendingLeave(), member.displayName(), member.avatarUrl()))
+                .map(member -> {
+                    String avatarUrl = member.avatarUrl();
+                    if (avatarUrl == null && member.publicId() != null) {
+                        try { avatarUrl = userService.getByPublicId(member.publicId()).avatarUrl(); }
+                        catch (Exception ignored) {}
+                    }
+                    return new TableResponse.MemberDto(member.name(), member.seatIndex(), member.joinedAt(),
+                            member.pendingLeave(), member.displayName(), avatarUrl);
+                })
                 .toList();
     }
 

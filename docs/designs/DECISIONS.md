@@ -76,6 +76,38 @@
   - `wallet_ledger_reason` ENUM に `TABLE_REBUY` を追加（V8 migration）
   - スタック 0 で着席中のプレイヤーに `can_rebuy: true` を `GameResponse` で返す
 
+## 2026-05-20
+
+### ホールカード WS 配信バグ修正
+- `GameEventPublisher.publishHoleCards` が `member.name()`（ゲーム内プレイヤー名）を STOMP ユーザー識別子として使っていたが、STOMP の principal は `publicId`（UUID）であるため配信先が一致せずホールカードが届かなかった
+- 修正: `member.publicId()` で `convertAndSendToUser` を呼ぶ。`publicId = null`（オフラインプレイヤー）はスキップ（物理カード使用のため push 不要）
+- `resolveViewerIndex` も `findSeatIndex` が null を返した場合（サーバー再起動後など members store が空）にクライアント送信の `viewer_index` へフォールバックするよう修正
+
+### 退席でシートが空かないバグ修正
+- `TableMembershipService.leave` がオフラインメンバー（`publicId = null`）の退席を処理できていなかった
+  - 認証済みユーザーの退席は `publicId` でメンバー検索するが、オフラインメンバーは `publicId = null` で登録されるためヒットせず何もしなかった
+- 修正: `publicId` 検索が失敗した場合に `name` ベースのフォールバック検索を追加
+
+### 招待リンク経由ログイン後の参加フロー
+- 未ログイン状態で招待リンクを開いてログインした場合、ゲームデータが再取得されず着席できなかった
+- 修正: `handleAuthSuccess` が `gameId` を検知した場合に `lobbyJoinWithBuyIn(gameId, gameType, user.username)` を呼び出して通常の参加導線に乗せる
+- `lobbyJoinWithBuyIn` に `nameOverride` パラメータを追加し、ステートが更新される前でもユーザー名を正しく使えるようにした
+- `navigateToLobby()` に `setTable(null)` を追加してオフラインテーブル退席後の state 残留を防止
+- `effectiveName` のフォールバックに `currentUser?.username` を追加し、`myName` が空（ロビーに戻ると `useTableSession` が `''` にリセット）でも参加できるようにした
+
+### 招待リンクへの OTP 埋め込み
+- 招待 URL に `?code={inviteCode}` を付与し、リンク経由でアクセスした場合は `OfflineSeatPopup` の OTP 入力欄に自動入力する
+- OTP の生成文字セットをアルファベット混在から数字のみ（`"0123456789"`）に変更
+
+### アバターのリアルタイム反映
+- アバター更新時（`POST /v1/auth/me/avatar`）に `TableMembershipService.refreshAvatarUrl` を呼び出し、参加中の全テーブルの `TableMemberRecord` を更新して WS push する
+- `RoomController.mapMembers`・`TableController.toMembers` で `avatarUrl = null` かつ `publicId` がある場合に DB から最新 URL を取得するよう変更（参加前にアバター未設定だったケース対応）
+
+### オフラインモード: 今ハンドの増減表示
+- `finished` 状態遷移時に直前のスタックとの差分を計算して表示する（`offline-payout-list` 領域）
+- 増: 緑、減: 赤で視認性を高める
+- 初回ハンドは基準値なしのため非表示
+
 ## 2026-04-21
 - Git ブランチ戦略:
   - 長寿命ブランチは `main` と `develop` の 2 本とする

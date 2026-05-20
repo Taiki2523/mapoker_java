@@ -93,6 +93,18 @@ export const apiSendAction = (gameId: string, playerIndex: number, type: string,
 export const apiShowdown = (gameId: string) =>
   fetchJSON<Showdown>(`/v1/games/${gameId}/showdown`, { method: 'POST' })
 
+export const apiOfflineShowdown = (gameId: string, declaredWinners: number[]) =>
+  fetchJSON<Showdown>(`/v1/games/${gameId}/showdown`, {
+    method: 'POST',
+    body: JSON.stringify({ declared_winners: declaredWinners }),
+  })
+
+export const apiDeclareShowdown = (gameId: string, playerIndex: number, win: boolean) =>
+  fetchJSON<GameState>(`/v1/games/${gameId}/showdown/declare`, {
+    method: 'POST',
+    body: JSON.stringify({ player_index: playerIndex, win }),
+  })
+
 export const apiStraddleIntent = (gameId: string, straddle: boolean) =>
   fetchJSON<void>(`/v1/games/${gameId}/straddle-intent`, {
     method: 'POST',
@@ -101,6 +113,15 @@ export const apiStraddleIntent = (gameId: string, straddle: boolean) =>
 
 export const createTable = (payload: object) =>
   fetchJSON<Table>('/v1/tables', { method: 'POST', body: JSON.stringify(payload) })
+
+export const seatOffline = (
+  tableId: string,
+  body: { seat_index: number; name: string; buy_in: number; invite_code: string }
+) =>
+  fetchJSON<{ seat_index: number; members: unknown[] }>(
+    `/v1/games/${tableId}/seat`,
+    { method: 'POST', body: JSON.stringify(body) }
+  )
 
 export const readSession = (tableId: string): StoredSession | null => {
   try {

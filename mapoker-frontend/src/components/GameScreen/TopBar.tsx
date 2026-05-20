@@ -15,6 +15,7 @@ type Props = {
   onCopyInvite: () => void
   onOpenMyPage: () => void
   onOpenActionLog: () => void
+  inviteCode?: string | null
 }
 
 export function TopBar({
@@ -22,6 +23,7 @@ export function TopBar({
   error, autoRefresh, setAutoRefresh,
   inviteCopied, stackMode, onToggleStackMode,
   onCopyInvite, onOpenMyPage, onOpenActionLog,
+  inviteCode,
 }: Props) {
   const bb = game?.big_blind ?? 0
   const fmt = (chips: number) => {
@@ -69,6 +71,11 @@ export function TopBar({
       </div>
 
       <div className="topbar-right">
+        {inviteCode && (
+          <span className="offline-invite-code" style={{ fontSize: '0.8rem', letterSpacing: '0.15em', padding: '0.1rem 0.4rem' }}>
+            {inviteCode}
+          </span>
+        )}
         {error && <span className="topbar-error">{error}</span>}
         <button
           className="icon-btn topbar-stack-toggle"
