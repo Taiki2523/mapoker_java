@@ -230,9 +230,7 @@ public class GameController {
         }
         try {
             String username = userService.getByPublicId(principal.getUsername()).username();
-            Integer resolved = tableQueryService.findSeatIndex(id, username);
-            // members store にない場合（サーバー再起動等）はクライアント送信値を使う
-            return resolved != null ? resolved : requestedViewerIndex;
+            return tableQueryService.findSeatIndex(id, username);
         } catch (Exception ignored) {
             return requestedViewerIndex;
         }

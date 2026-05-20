@@ -3,7 +3,6 @@ import type { Table } from '../types'
 
 type Props = {
   table: Table
-  defaultName: string
   prefilledCode?: string | null
   onConfirm: (seatIndex: number, inviteCode: string) => void
   onCancel: () => void
@@ -114,7 +113,7 @@ function MiniTable({
   )
 }
 
-export function OfflineSeatPopup({ table, defaultName: _defaultName, prefilledCode, onConfirm, onCancel }: Props) {
+export function OfflineSeatPopup({ table, prefilledCode, onConfirm, onCancel }: Props) {
   const takenSeats = new Set(table.members.map((m) => m.seat_index))
   const availableSeats = Array.from({ length: table.max_players }, (_, i) => i).filter(
     (i) => !takenSeats.has(i)

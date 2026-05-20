@@ -98,7 +98,7 @@ export function GameScreen({
         onOpenMyPage={onOpenMyPage}
         onLeaveRoom={onLeaveRoom}
         onSendAction={onSendAction}
-        onOfflineWin={onOfflineWin ?? ((_win: boolean) => {})}
+        onOfflineWin={onOfflineWin ?? (() => {})}
         doStraddle={doStraddle}
         onToggleStraddle={onToggleStraddle}
       />

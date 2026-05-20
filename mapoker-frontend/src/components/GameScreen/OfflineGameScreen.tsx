@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { BetPreset, GameState, Player, RoomMember, Table } from '../../types'
+import type { BetPreset, GameState, Player, Table } from '../../types'
 import { TopBar } from './TopBar'
 import { ActionPanel } from './ActionPanel'
 import { t } from '../../i18n'
@@ -11,7 +11,7 @@ type Props = {
   mySeat: number | null
   mySeatIndex: number | null
   table: Table
-  roster: RoomMember[]
+
   autoRefresh: boolean
   setAutoRefresh: (v: boolean) => void
   loading: boolean
@@ -49,7 +49,7 @@ function fmtChips(chips: number): string {
 }
 
 export function OfflineGameScreen({
-  game, mySeat, mySeatIndex, table, roster: _roster,
+  game, mySeat, mySeatIndex, table,
   autoRefresh, setAutoRefresh,
   loading, error, inviteCopied, leavePending,
   toCall, minRaise, maxBet, betPresets, actionAmount, setActionAmount,
@@ -263,7 +263,7 @@ export function OfflineGameScreen({
 
           {/* 宣言状況リスト */}
           <div className="offline-declare-list">
-            {activePlayers.map(({ player: _p, idx }) => {
+            {activePlayers.map(({ idx }) => {
               const declared = declarations[String(idx)]
               return (
                 <div key={idx} className="offline-declare-row">

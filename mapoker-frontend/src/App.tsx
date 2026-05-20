@@ -679,7 +679,7 @@ function App() {
       {offlineSeatTable && (
         <OfflineSeatPopup
           table={offlineSeatTable}
-          defaultName={myName}
+
           prefilledCode={urlInviteCode}
           onConfirm={(seatIndex, inviteCode) => handleOfflineSeat(seatIndex, inviteCode)}
           onCancel={() => setOfflineSeatTable(null)}
