@@ -1,0 +1,22 @@
+project_name = "mapoker"
+environment  = "learn"
+aws_region   = "ap-northeast-1"
+
+# Optional DNS / HTTPS.
+# route53_zone_id      = "Zxxxxxxxxxxxxxxxxxxxx"
+# domain_name          = "mapoker.example.com"
+# alb_certificate_arn  = "arn:aws:acm:ap-northeast-1:123456789012:certificate/..."
+
+# Replace these after you have a real domain.
+application_url              = "https://example.com"
+cors_allowed_origin_patterns = "https://example.com"
+
+# Keep one task per service while learning.
+desired_count = 1
+
+# Backend image is expected at:
+#   <backend_ecr_repository_url>:latest
+container_image_tag = "latest"
+
+google_client_id     = ""
+google_client_secret = ""
