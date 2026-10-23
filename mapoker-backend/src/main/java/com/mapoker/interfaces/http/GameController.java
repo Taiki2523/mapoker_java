@@ -12,6 +12,7 @@ import com.mapoker.infrastructure.config.GameProperties;
 import com.mapoker.interfaces.http.dto.*;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -125,12 +126,16 @@ public class GameController {
      * @return ハンド開始後のゲームの {@link GameResponse}
      */
     @PostMapping("/{id}/start")
-    public GameResponse startHand(@PathVariable String id, @Valid @RequestBody StartHandRequest req) {
+    public GameResponse startHand(@PathVariable String id, @Valid @RequestBody StartHandRequest req,
+                                  @AuthenticationPrincipal UserDetails principal) {
+        requireOnlineMember(id, principal);
         return GameResponse.from(tableLifecycleService.startHand(id, req.bigBlind(), req.doStraddle()), null, false, seatedCount(id));
     }
 
     @PostMapping("/{id}/straddle-intent")
-    public void setStraddleIntent(@PathVariable String id, @RequestBody StraddleIntentRequest req) {
+    public void setStraddleIntent(@PathVariable String id, @RequestBody StraddleIntentRequest req,
+                                   @AuthenticationPrincipal UserDetails principal) {
+        requireOnlineMember(id, principal);
         tableLifecycleService.setStraddleIntent(id, req.straddle());
     }
 
@@ -153,6 +158,12 @@ public class GameController {
             @Valid @RequestBody ApplyActionRequest req,
             @RequestParam(name = "viewer_index", required = false) Integer viewerIndex,
             @AuthenticationPrincipal UserDetails principal) {
+        if (principal != null && !"offline".equals(tableQueryService.getTable(id).gameType())) {
+            Integer ownSeat = tableQueryService.findSeatIndexByPublicId(id, principal.getUsername());
+            if (ownSeat == null || ownSeat != req.playerIndex()) {
+                throw new AccessDeniedException("cannot act for another player");
+            }
+        }
         GameState state = gameAction.applyAction(id, req.playerIndex(),
                 req.action().type(), req.action().amount());
         Integer effectiveViewerIndex = resolveViewerIndex(id, viewerIndex, principal);
@@ -182,8 +193,11 @@ public class GameController {
     @PostMapping("/{id}/showdown")
     public GameResponse resolveShowdown(
             @PathVariable String id,
-            @RequestBody(required = false) OfflineShowdownRequest req) {
+            @RequestBody(required = false) OfflineShowdownRequest req,
+            @AuthenticationPrincipal UserDetails principal) {
+        requireOnlineMember(id, principal);
         if (req != null && req.declaredWinners() != null && !req.declaredWinners().isEmpty()) {
+            requireOfflineTable(id);
             gameAction.resolveOfflineShowdown(id, req.declaredWinners());
         } else {
             gameAction.resolveShowdown(id);
@@ -197,6 +211,7 @@ public class GameController {
     public GameResponse declareShowdown(
             @PathVariable String id,
             @RequestBody DeclareShowdownRequest req) {
+        requireOfflineTable(id);
         gameAction.declareOfflineResult(id, req.playerIndex(), req.win());
         GameState state = gameRead.getGame(id);
         return GameResponse.from(state, null, false, seatedCount(id));
@@ -206,7 +221,8 @@ public class GameController {
      * 有効な {@code viewerIndex} を解決する内部ヘルパー。
      *
      * <p>認証済みユーザーの場合はテーブルメンバーシップからシートインデックスを取得し、
-     * リクエストパラメータを上書きする。未認証時はリクエストパラメータの値をそのまま返す。
+     * リクエストパラメータを上書きする。認証済みの席解決に失敗した場合は手札を返さない。
+     * 未認証時の明示インデックスは local 開発プロファイルでのみ到達可能。
      *
      * @param id                    ゲームID
      * @param requestedViewerIndex  クライアントが指定した {@code viewer_index}
@@ -224,15 +240,27 @@ public class GameController {
         }
     }
 
+    private void requireOfflineTable(String id) {
+        if (!"offline".equals(tableQueryService.getTable(id).gameType())) {
+            throw new AccessDeniedException("manual results are only allowed for offline tables");
+        }
+    }
+
+    private void requireOnlineMember(String id, UserDetails principal) {
+        if (principal != null && !"offline".equals(tableQueryService.getTable(id).gameType())
+                && tableQueryService.findSeatIndexByPublicId(id, principal.getUsername()) == null) {
+            throw new AccessDeniedException("table membership required");
+        }
+    }
+
     private Integer resolveViewerIndex(String id, Integer requestedViewerIndex, UserDetails principal) {
         if (principal == null) {
             return requestedViewerIndex;
         }
         try {
-            String username = userService.getByPublicId(principal.getUsername()).username();
-            return tableQueryService.findSeatIndex(id, username);
+            return tableQueryService.findSeatIndexByPublicId(id, principal.getUsername());
         } catch (Exception ignored) {
-            return requestedViewerIndex;
+            return null;
         }
     }
 }

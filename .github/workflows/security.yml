@@ -1,0 +1,66 @@
+name: Security
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 21 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  npm-audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mapoker-frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: mapoker-frontend/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm audit --audit-level=high
+
+  container-scan:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [backend, frontend, database]
+    env:
+      TRIVY_IMAGE: ghcr.io/aquasecurity/trivy@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare image
+        env:
+          SERVICE: ${{ matrix.service }}
+        run: |
+          docker build --pull -t security-scan:review "mapoker-$SERVICE"
+      - name: Scan runtime dependencies and OS packages
+        run: |
+          mkdir -p security-reports
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock:ro \
+            -v "$PWD/security-reports:/reports" \
+            "$TRIVY_IMAGE" image --scanners vuln \
+            --format json --output /reports/scan.json security-scan:review
+      - name: Enforce vulnerability policy
+        run: |
+          docker run --rm \
+            -v "$PWD/security-reports:/reports:ro" \
+            -v "$PWD/.trivyignore.yaml:/policy/ignore.yaml:ro" \
+            "$TRIVY_IMAGE" convert --format table --severity HIGH,CRITICAL \
+            --ignorefile /policy/ignore.yaml --exit-code 1 /reports/scan.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-${{ matrix.service }}
+          path: security-reports/
+          retention-days: 30

@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
@@ -11,16 +11,17 @@ COPY . .
 RUN npm run build
 
 # Runtime stage - nginx
-FROM nginx:alpine
+FROM nginx:1.31-alpine
 
 # logrotate と dcron（Alpine の cron 実装）をインストール
-RUN apk add --no-cache logrotate dcron
+RUN apk upgrade --no-cache && apk add --no-cache logrotate dcron
 
 # Copy built files
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Copy nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY security-headers.conf /etc/nginx/security-headers.conf
 
 # logrotate 設定
 COPY logrotate-nginx.conf /etc/logrotate.d/nginx-app

@@ -22,6 +22,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import javax.imageio.ImageIO;
+import javax.imageio.stream.ImageInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -35,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 @RestController
 public class AvatarController {
 
+    private static final int MAX_IMAGE_DIMENSION = 4096;
     private static final long MAX_FILE_SIZE = 2 * 1024 * 1024L;
     private static final Set<String> ALLOWED_TYPES = Set.of("image/jpeg", "image/png");
 
@@ -99,6 +102,24 @@ public class AvatarController {
             return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).build();
         }
 
+        try (ImageInputStream image = ImageIO.createImageInputStream(file.getInputStream())) {
+            var readers = ImageIO.getImageReaders(image);
+            if (!readers.hasNext()) return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).build();
+            var reader = readers.next();
+            try {
+                reader.setInput(image);
+                String format = reader.getFormatName();
+                boolean matches = "image/png".equals(contentType) ? "png".equalsIgnoreCase(format)
+                        : "jpeg".equalsIgnoreCase(format);
+                if (!matches || reader.getWidth(0) > MAX_IMAGE_DIMENSION || reader.getHeight(0) > MAX_IMAGE_DIMENSION) {
+                    return ResponseEntity.badRequest().build();
+                }
+            } finally {
+                reader.dispose();
+            }
+        } catch (IOException e) {
+            return ResponseEntity.badRequest().build();
+        }
         User user = userService.getByPublicId(principal.getUsername());
         String ext = "image/png".equals(contentType) ? ".png" : ".jpg";
         String filename = user.publicId() + ext;

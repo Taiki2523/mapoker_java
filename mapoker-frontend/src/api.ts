@@ -18,12 +18,20 @@ export const APPLICATION_URL = resolveApplicationUrl()
 
 export const API_BASE = `${APPLICATION_URL}/api`
 
+export async function fetchCsrfHeaders(): Promise<Record<string, string>> {
+  const res = await fetch(`${API_BASE}/v1/auth/csrf`, { credentials: 'include', cache: 'no-store' })
+  if (!res.ok) throw new Error(`http_${res.status}`)
+  const data = await res.json() as { headerName: string | null; token: string | null }
+  return data.headerName && data.token ? { [data.headerName]: data.token } : {}
+}
+
 export async function uploadFile<T>(path: string, file: File): Promise<T> {
   const form = new FormData()
   form.append('file', file)
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
     body: form,
+    headers: await fetchCsrfHeaders(),
     credentials: 'include',
   })
   const text = await res.text()
@@ -144,14 +152,18 @@ export const clearSession = (tableId: string) =>
 // ---- low-level fetch ----
 
 export async function fetchJSON<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const method = (options.method ?? 'GET').toUpperCase()
+  const headers = new Headers(options.headers)
+  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
+  if (!headers.has('Accept')) headers.set('Accept', 'application/json')
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+    const csrfHeaders = await fetchCsrfHeaders()
+    for (const [name, value] of Object.entries(csrfHeaders)) headers.set(name, value)
+  }
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      ...(options.headers ?? {}),
-    },
     credentials: 'include',
     ...options,
+    headers,
   })
   const text = await res.text()
   let data: T | ApiError = {} as T

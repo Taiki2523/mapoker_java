@@ -1,0 +1,12 @@
+# See docs/designs/SECURITY.md. Retain raw findings in CI scan artifacts.
+vulnerabilities:
+  - id: CVE-2026-47884
+    paths:
+      - "app/app.jar/BOOT-INF/lib/spring-webmvc-6.2.19.jar"
+    statement: "Not affected: this JSON REST API does not use XsltView or implicit view-name rendering. Reassess when adding server-rendered views."
+    expired_at: 2026-11-24
+  - id: CVE-2026-47890
+    paths:
+      - "app/app.jar/BOOT-INF/lib/spring-webmvc-6.2.19.jar"
+    statement: "Not affected: no SSE view-fragment rendering; game events use STOMP WebSocket messages. Reassess when adding SSE."
+    expired_at: 2026-11-24

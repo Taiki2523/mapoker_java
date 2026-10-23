@@ -38,7 +38,7 @@ class GameControllerVisibilityTest {
         var appAlice = new com.mapoker.application.auth.User(
                 1L, "pub-alice", "alice", "0000", null, java.time.LocalDateTime.now());
         when(userService.getByPublicId("pub-alice")).thenReturn(appAlice);
-        when(tableQueryService.findSeatIndex("game-1", "alice")).thenReturn(1);
+        when(tableQueryService.findSeatIndexByPublicId("game-1", "pub-alice")).thenReturn(1);
 
         var response = controller.getGame(
                 "game-1",
@@ -66,7 +66,7 @@ class GameControllerVisibilityTest {
         var appMallory = new com.mapoker.application.auth.User(
                 2L, "pub-mallory", "mallory", "0000", null, java.time.LocalDateTime.now());
         when(userService.getByPublicId("pub-mallory")).thenReturn(appMallory);
-        when(tableQueryService.findSeatIndex("game-1", "mallory")).thenReturn(null);
+        when(tableQueryService.findSeatIndexByPublicId("game-1", "pub-mallory")).thenReturn(null);
 
         var response = controller.getGame(
                 "game-1",
@@ -94,6 +94,20 @@ class GameControllerVisibilityTest {
 
         assertThat(response.players().get(0).hole()).hasSize(2);
         assertThat(response.players().get(1).hole()).isNull();
+    }
+
+    @Test
+    void failedIdentityLookupDoesNotFallBackToRequestedSeat() {
+        GameReadService gameRead = mock(GameReadService.class);
+        TableQueryService tables = mock(TableQueryService.class);
+        when(gameRead.getGame("game-1")).thenReturn(startedGame());
+        when(tables.findSeatIndexByPublicId("game-1", "pub-alice"))
+                .thenThrow(new IllegalStateException("lookup unavailable"));
+        GameController controller = new GameController(gameRead, mock(GameLifecycleService.class),
+                mock(GameActionService.class), new GameProperties(OddChipRule.LOW_INDEX, "Player"),
+                tables, mock(TableLifecycleService.class), mock(UserService.class));
+        var response = controller.getGame("game-1", 0, "0", new User("pub-alice", "secret", List.of()));
+        assertThat(response.players()).allSatisfy(player -> assertThat(player.hole()).isNull());
     }
 
     private static GameState startedGame() {

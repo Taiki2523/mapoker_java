@@ -19,6 +19,9 @@ import com.mapoker.interfaces.http.dto.CreateGameRequest;
 import com.mapoker.interfaces.http.dto.StartHandRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import com.mapoker.application.table.TableRecord;
+import org.springframework.security.access.AccessDeniedException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.springframework.security.core.userdetails.User;
 
 import java.util.List;
@@ -30,6 +33,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -174,7 +178,7 @@ class GameControllerTest {
         GameState started = startedGame();
         when(tableLifecycleService.startHand("g1", 10, false)).thenReturn(started);
 
-        var response = controller.startHand("g1", new StartHandRequest(10));
+        var response = controller.startHand("g1", new StartHandRequest(10), null);
 
         assertThat(response.id()).isEqualTo(started.getId());
         verify(tableLifecycleService).startHand("g1", 10, false);
@@ -185,7 +189,7 @@ class GameControllerTest {
         GameState started = startedGame();
         when(tableLifecycleService.startHand("g1", 10, false)).thenReturn(started);
 
-        var response = controller.startHand("g1", new StartHandRequest(10));
+        var response = controller.startHand("g1", new StartHandRequest(10), null);
 
         response.players().forEach(p -> assertThat(p.hole()).isNull());
     }
@@ -223,7 +227,10 @@ class GameControllerTest {
         var appAlice = new com.mapoker.application.auth.User(
                 1L, "pub-alice", "alice", "0000", null, java.time.LocalDateTime.now());
         when(userService.getByPublicId("pub-alice")).thenReturn(appAlice);
-        when(tableQueryService.findSeatIndex("g1", "alice")).thenReturn(1);
+        when(tableQueryService.findSeatIndexByPublicId("g1", "pub-alice")).thenReturn(1);
+        TableRecord table = mock(TableRecord.class);
+        when(table.gameType()).thenReturn("ring");
+        when(tableQueryService.getTable("g1")).thenReturn(table);
 
         var req = new ApplyActionRequest(1, new ApplyActionRequest.ActionDto(ActionType.CALL, 0));
         var response = controller.applyAction("g1", req, null,
@@ -231,6 +238,18 @@ class GameControllerTest {
 
         assertThat(response.players().get(1).hole()).hasSize(2);
         assertThat(response.players().get(0).hole()).isNull();
+    }
+
+    @Test
+    void authenticatedPlayerCannotActForAnotherSeat() {
+        TableRecord table = mock(TableRecord.class);
+        when(table.gameType()).thenReturn("ring");
+        when(tableQueryService.getTable("g1")).thenReturn(table);
+        when(tableQueryService.findSeatIndexByPublicId("g1", "pub-alice")).thenReturn(1);
+        var req = new ApplyActionRequest(0, new ApplyActionRequest.ActionDto(ActionType.FOLD, 0));
+        assertThatThrownBy(() -> controller.applyAction("g1", req, null,
+                new User("pub-alice", "secret", List.of()))).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(gameAction);
     }
 
     // -----------------------------------------------------------------------
@@ -270,7 +289,7 @@ class GameControllerTest {
         when(gameAction.resolveShowdown("g1")).thenReturn(null);
         when(gameService.getGame("g1")).thenReturn(finished);
 
-        var response = controller.resolveShowdown("g1", null);
+        var response = controller.resolveShowdown("g1", null, null);
 
         verify(gameAction).resolveShowdown("g1");
         assertThat(response.status()).isEqualTo(GameStatus.FINISHED);
@@ -282,7 +301,7 @@ class GameControllerTest {
         when(gameAction.resolveShowdown("g1")).thenReturn(null);
         when(gameService.getGame("g1")).thenReturn(finished);
 
-        var response = controller.resolveShowdown("g1", null);
+        var response = controller.resolveShowdown("g1", null, null);
 
         // FINISHED かつ非foldWin → showAll=true → 全員のホールカードが見える
         response.players().forEach(p -> assertThat(p.hole()).isNotNull().hasSize(2));

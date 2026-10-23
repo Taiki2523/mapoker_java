@@ -158,13 +158,10 @@ public class TableController {
     }
 
     private String resolveName(UserDetails principal, TableMembershipRequest body) {
-        if (body != null && body.name() != null && !body.name().isBlank()) return body.name();
         if (principal != null) {
-            try {
-                return userService.getByPublicId(principal.getUsername()).username();
-            } catch (Exception ignored) {}
+            return userService.getByPublicId(principal.getUsername()).username();
         }
-        return null;
+        return body != null ? body.name() : null;
     }
 
     private List<TableResponse.MemberDto> toMembers(List<TableMemberRecord> members) {
