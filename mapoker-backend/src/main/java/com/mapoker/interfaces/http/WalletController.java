@@ -135,8 +135,7 @@ class AdminWalletController {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        String adminUsername = userService.getByPublicId(principal.getUsername()).username();
-        walletService.adminGrant(adminUsername, request.targetUsername(), request.amount());
+        walletService.adminGrant(principal.getUsername(), request.targetUsername(), request.amount());
         // 対象ユーザーの publicId で残高を取得
         String targetPublicId = userRepository.findByUsername(request.targetUsername())
                 .map(com.mapoker.application.auth.User::publicId)

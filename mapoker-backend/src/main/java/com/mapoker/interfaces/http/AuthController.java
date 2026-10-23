@@ -20,6 +20,9 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
+import org.springframework.http.CacheControl;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -72,6 +75,15 @@ public class AuthController {
                 : UserResponse.from(result.user());
         return establishSessionWithResponse(result.user(), response, request);
     }
+
+    @GetMapping("/csrf")
+    public ResponseEntity<CsrfResponse> csrf(CsrfToken token) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(token == null ? new CsrfResponse(null, null)
+                        : new CsrfResponse(token.getHeaderName(), token.getToken()));
+    }
+
+    public record CsrfResponse(String headerName, String token) {}
 
     /**
      * 現在ログイン中のユーザー情報を返します。
@@ -160,7 +172,14 @@ public class AuthController {
         var userDetails = new org.springframework.security.core.userdetails.User(
                 user.publicId(), "", List.of());
         var auth = new UsernamePasswordAuthenticationToken(userDetails, null, List.of());
-        SecurityContextHolder.getContext().setAuthentication(auth);
+        if (request.getSession(false) != null) {
+            request.changeSessionId();
+        }
+        // Custom authentication bypasses Spring's authentication filters.
+        new HttpSessionCsrfTokenRepository().saveToken(null, request, null);
+        var context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(auth);
+        SecurityContextHolder.setContext(context);
         request.getSession(true).setAttribute(
                 HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
                 SecurityContextHolder.getContext());

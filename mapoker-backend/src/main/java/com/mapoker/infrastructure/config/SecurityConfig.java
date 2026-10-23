@@ -22,7 +22,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
  * <p>プロファイルによって動作を切り替える：
  * <ul>
  *   <li>{@code local} プロファイル: CSRF無効・全リクエスト許可（開発専用）</li>
- *   <li>その他: セッション認証・CSRF無効・エンドポイント別アクセス制御</li>
+ *   <li>その他: セッション認証・CSRF保護・エンドポイント別アクセス制御</li>
  * </ul>
  */
 @Configuration
@@ -75,7 +75,7 @@ public class SecurityConfig {
     public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .csrf(AbstractHttpConfigurer::disable)
+            .csrf(csrf -> csrf.ignoringRequestMatchers("/ws/**"))
             .formLogin(AbstractHttpConfigurer::disable)
             .httpBasic(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session
@@ -85,7 +85,7 @@ public class SecurityConfig {
                 .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health").permitAll()
-                .requestMatchers("/v1/auth/google", "/v1/auth/link-google").permitAll()
+                .requestMatchers("/v1/auth/google", "/v1/auth/csrf").permitAll()
                 .requestMatchers("/v1/avatars/**").permitAll()
                 .requestMatchers("/v1/version").permitAll()
                 .requestMatchers("/ws/**").permitAll()

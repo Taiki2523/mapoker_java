@@ -48,22 +48,22 @@ SPRING_PROFILES_ACTIVE=local,postgresql \
 export SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/mapoker
 export SPRING_DATASOURCE_USERNAME=mapoker
 export SPRING_DATASOURCE_PASSWORD=your_secure_password
-export CORS_ALLOWED_ORIGIN_PATTERNS=https://mapoker.marciadesign.org
+export CORS_ALLOWED_ORIGINS=https://mapoker.marciadesign.org
 export SPRING_PROFILES_ACTIVE=postgresql
-export WALLET_ADMIN_USERNAMES=admin1,admin2
+export WALLET_ADMIN_PUBLIC_IDS=admin1,admin2
 ```
 
 主要な設定項目（`application.properties` の対応キー）:
 
 | 環境変数 | プロパティキー | デフォルト | 説明 |
 |---|---|---|---|
-| `CORS_ALLOWED_ORIGIN_PATTERNS` | `cors.allowed-origin-patterns` | `*` | CORS 許可オリジン |
+| `CORS_ALLOWED_ORIGINS` | `cors.allowed-origin-patterns` | `http://localhost:3000` | CORS 許可オリジン |
 | `GAME_DEFAULT_ODD_CHIP_RULE` | `game.default-odd-chip-rule` | `LOW_INDEX` | 端数チップルール |
 | `WALLET_INITIAL_GRANT` | `wallet.initial-grant` | `10000` | 新規登録ボーナス |
 | `WALLET_DAILY_BONUS_AMOUNT` | `wallet.daily-bonus-amount` | `1000` | デイリーボーナス額 |
 | `WALLET_RECOVERY_THRESHOLD` | `wallet.recovery-threshold` | `1000` | 救済ボーナス発動残高 |
 | `WALLET_RECOVERY_AMOUNT` | `wallet.recovery-amount` | `5000` | 救済ボーナス額 |
-| `WALLET_ADMIN_USERNAMES` | `wallet.admin-usernames` | `""` | チップ付与権限ユーザー（カンマ区切り） |
+| `WALLET_ADMIN_PUBLIC_IDS` | `wallet.admin-public-ids` | `""` | チップ付与権限を持つ publicId（カンマ区切り） |
 
 ---
 
@@ -128,7 +128,7 @@ POSTGRES_PASSWORD=your_secure_password
 DB_DATA_LOCATION=/srv/mapoker/data/db  # DB データディレクトリのホストパス
 APPLICATION_URL=https://mapoker.marciadesign.org
 VITE_APP_ENV=production
-CORS_ALLOWED_ORIGIN_PATTERNS=https://mapoker.marciadesign.org
+CORS_ALLOWED_ORIGINS=https://mapoker.marciadesign.org
 SPRING_PROFILES_ACTIVE=postgresql
 ```
 

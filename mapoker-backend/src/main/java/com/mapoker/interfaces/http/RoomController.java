@@ -104,9 +104,7 @@ public class RoomController {
      */
     private String resolveName(UserDetails principal, TableMembershipRequest body) {
         if (principal != null) {
-            try {
-                return userService.getByPublicId(principal.getUsername()).username();
-            } catch (Exception ignored) {}
+            return userService.getByPublicId(principal.getUsername()).username();
         }
         if (body != null && body.name() != null && !body.name().isBlank()) {
             return body.name();

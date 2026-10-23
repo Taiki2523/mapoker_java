@@ -153,19 +153,19 @@ public class WalletService {
     /**
      * 管理者権限で残高を付与します。
      *
-     * <p>管理者の認可は {@code adminUsername} で行います（設定リストとの照合）。
+     * <p>管理者の認可は {@code adminPublicId} で行います（設定リストとの照合）。
      * 対象ユーザーは {@code targetUsername} で検索し、{@code publicId} に変換して入金します。
      *
-     * @param adminUsername   管理者ユーザー名（認可チェック用）
+     * @param adminPublicId   管理者 publicId（認可チェック用）
      * @param targetUsername  付与対象ユーザー名
      * @param amount          付与額
      */
-    public void adminGrant(String adminUsername, String targetUsername, long amount) {
-        if (adminUsername == null || adminUsername.isBlank()) {
-            throw new IllegalArgumentException("adminUsername is required");
+    public void adminGrant(String adminPublicId, String targetUsername, long amount) {
+        if (adminPublicId == null || adminPublicId.isBlank()) {
+            throw new IllegalArgumentException("adminPublicId is required");
         }
-        String normalizedAdmin = adminUsername.trim();
-        if (!walletProperties.adminUsernames().contains(normalizedAdmin)) {
+        String normalizedAdmin = adminPublicId.trim();
+        if (!walletProperties.adminPublicIds().contains(normalizedAdmin)) {
             throw new AccessDeniedException("admin access required");
         }
         validateAmount(amount);

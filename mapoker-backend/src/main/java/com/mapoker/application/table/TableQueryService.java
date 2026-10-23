@@ -77,6 +77,13 @@ public class TableQueryService {
                 .orElse(null);
     }
 
+    public Integer findSeatIndexByPublicId(String id, String publicId) {
+        return getMembers(id).stream()
+                .filter(member -> publicId.equals(member.publicId()))
+                .map(TableMemberRecord::seatIndex)
+                .findFirst().orElse(null);
+    }
+
     TableRecord fromGame(GameState game) {
         TableRecord table = store.tables.compute(game.getId(),
                 (ignored, existing) -> mergeTableWithGame(existing, game));

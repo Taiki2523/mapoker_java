@@ -165,8 +165,8 @@ public class TableMembershipService {
             TableMemberRecord byPublicId = (publicId != null && !publicId.isBlank())
                     ? members.stream().filter(m -> publicId.equals(m.publicId())).findFirst().orElse(null)
                     : null;
-            // publicId で見つからない場合（オフラインメンバーは publicId=null）は名前で検索
-            final TableMemberRecord member = byPublicId != null ? byPublicId : findMember(members, name, seatIndex);
+            // Authenticated callers must never fall back to another member's name.
+            final TableMemberRecord member = publicId != null ? byPublicId : findMember(members, name, seatIndex);
 
             if (member == null) {
                 List<TableMemberRecord> result = List.copyOf(members);

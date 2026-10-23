@@ -17,7 +17,7 @@ import java.util.List;
  * @param dailyBonusCooldownHours  デイリーボーナスのクールダウン時間（デフォルト: 24時間）
  * @param minBuyinBbMultiplier     最小バイイン額のBB倍率（デフォルト: 20BB）
  * @param maxBuyinBbMultiplier     最大バイイン額のBB倍率（デフォルト: 100BB）
- * @param adminUsernames           管理者権限を持つユーザー名リスト。ブランク・null は除外される
+ * @param adminPublicIds           管理者権限を持つ publicId リスト。ブランク・null は除外される
  */
 @ConfigurationProperties("wallet")
 public record WalletProperties(
@@ -26,11 +26,11 @@ public record WalletProperties(
         int dailyBonusCooldownHours,
         int minBuyinBbMultiplier,
         int maxBuyinBbMultiplier,
-        List<String> adminUsernames
+        List<String> adminPublicIds
 ) {
     /**
      * コンパクトコンストラクタ。0以下の数値フィールドにデフォルト値を適用し、
-     * {@code adminUsernames} からブランク・null エントリを除去してトリムする。
+     * {@code adminPublicIds} からブランク・null エントリを除去してトリムする。
      */
     public WalletProperties {
         if (initialGrant <= 0) initialGrant = 10000;
@@ -38,10 +38,10 @@ public record WalletProperties(
         if (dailyBonusCooldownHours <= 0) dailyBonusCooldownHours = 24;
         if (minBuyinBbMultiplier <= 0) minBuyinBbMultiplier = 20;
         if (maxBuyinBbMultiplier <= 0) maxBuyinBbMultiplier = 100;
-        if (adminUsernames == null) {
-            adminUsernames = List.of();
+        if (adminPublicIds == null) {
+            adminPublicIds = List.of();
         } else {
-            adminUsernames = adminUsernames.stream()
+            adminPublicIds = adminPublicIds.stream()
                     .filter(username -> username != null && !username.isBlank())
                     .map(String::trim)
                     .toList();
