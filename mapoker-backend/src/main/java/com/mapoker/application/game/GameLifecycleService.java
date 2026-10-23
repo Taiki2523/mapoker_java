@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Random;
+import java.security.SecureRandom;
 import java.util.UUID;
 
 /**
@@ -37,7 +38,7 @@ public class GameLifecycleService {
         List<Player> players = playerInputs.stream()
                 .map(pi -> new Player(pi.id(), pi.stack()))
                 .toList();
-        Random rng = seed != null ? new Random(seed) : new Random();
+        Random rng = seed != null ? new Random(seed) : new SecureRandom();
         GameState state = GameState.newGame(players, buttonIndex, bigBlind, rng, oddChipRule);
         String id = UUID.randomUUID().toString();
         state.setId(id);
@@ -58,7 +59,7 @@ public class GameLifecycleService {
         List<Player> players = playerInputs.stream()
                 .map(pi -> new Player(pi.id(), pi.stack()))
                 .toList();
-        GameState state = GameState.newGame(players, 0, bigBlind, new Random(), oddChipRule, ante, straddleEnabled);
+        GameState state = GameState.newGame(players, 0, bigBlind, new SecureRandom(), oddChipRule, ante, straddleEnabled);
         String id = UUID.randomUUID().toString();
         state.setId(id);
         state.setStatus(GameStatus.FINISHED);

@@ -35,6 +35,6 @@
 | [spectator-mode.md](spectator-mode.md) | 観戦モード | `planned` | マイナー |
 | [table-chat.md](table-chat.md) | テーブルチャット | `planned` | マイナー |
 | [hand-history-viewer.md](hand-history-viewer.md) | ハンド履歴ビューアー | `planned` | マイナー |
-| [tournament.md](tournament.md) | トーナメントモード | `in-design` | **メジャー** |
+| [tournament.md](tournament.md) | トーナメントモード | `planned` | **メジャー** |
 
 > **リリース済み（docs 不要）**: アンティ（v1.0.x）、ストラドル（v1.1.x）、オフラインモード（v1.2.0）は実装完了済み。設計判断は `docs/designs/DECISIONS.md`、API 仕様は `docs/designs/API.md`、DB スキーマは `docs/designs/db_schema.md` を参照。

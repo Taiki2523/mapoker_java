@@ -1,4 +1,5 @@
 import { Client } from '@stomp/stompjs'
+import { fetchCsrfHeaders } from './api'
 import type { IMessage } from '@stomp/stompjs'
 
 export interface GameBroadcastPayload {
@@ -20,10 +21,12 @@ export interface HoleCardsPayload {
 export function createStompClient(): Client {
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const brokerURL = `${wsProtocol}//${window.location.host}/ws/websocket`
-  return new Client({
+  const client = new Client({
     brokerURL,
     reconnectDelay: 3000,
+    beforeConnect: async () => { client.connectHeaders = await fetchCsrfHeaders() },
   })
+  return client
 }
 
 export function subscribeGame(

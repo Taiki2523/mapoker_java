@@ -584,7 +584,7 @@ DB にはメールアドレスを保存しない（`sub` claim のみ使用）�
 
 `POST /v1/admin/wallet/grants`
 
-`wallet.admin-usernames` に登録されたユーザーのみ実行可能。
+`wallet.admin-public-ids` にpublicIdが登録されたユーザーのみ実行可能。表示名による管理者判定は行わない。
 
 リクエスト:
 ```json

@@ -14,7 +14,7 @@ RUN ./mvnw clean package -DskipTests -Dspring.profiles.active=postgresql
 FROM eclipse-temurin:21-jre-alpine
 
 # su-exec: root → appuser へ安全に権限降格するユーティリティ
-RUN apk add --no-cache su-exec
+RUN apk upgrade --no-cache && apk add --no-cache su-exec
 
 WORKDIR /app
 
